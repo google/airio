@@ -1,29 +1,31 @@
 # AirIO: Task-based datasets, preprocessing, and evaluation for sequence models.
 
-**AirIO** is the next generation of
-[SeqIO](http://github.com/google/seqio): a library for processing
-sequential data to be fed into downstream sequence models. It uses a variety of
-data loaders to create scalable data pipelines. With one line of code, the
-returned dataset can be transformed to a numpy iterator and hence it is fully
-compatible with other frameworks such as [JAX](https://github.com/google/jax) or
-[PyTorch](https://pytorch.org/).
+Note: We're currently an experimental library; please reach out to mishragaurav@
+or g/airio-users if you're interested in using AirIO!
 
-The main improvements over SeqIO are:
+[TOC]
+
+**AirIO** is a library for loading, processing and feeding multimodal data into
+sequence models. It provides simple APIs to write reusable specifications
+encapsulating data loading and transformation steps in training, inference and
+evaluation. AirIO supports a variety of storage formats, e.g. SSTable, and
+services, e.g. TFDS, and a variety of data loaders, e.g. Grain and tf.data. It
+is fully compatible with frameworks such as Jax and TensorFlow.
+
+The following are guiding principles for AirIO development:
 
 *   Clear abstractions
     *   Agnostic encapsulation over data loading and processing steps
     *   Compatible with Grain, tf.data, etc.
-*   Better interfacing with other components
-    *   Simple bridges to smooth decoupling
+*   Clear interfaces with other components
     *   Clear boundary with evaluation libraries
     *   Ability to combine a variety of data formats
-*   Data pipelines are verifiable
+    *   Simple bridges to smooth decoupling
+*   Verifiable data pipelines
     *   Plug in inspection and visualization tools
-    *   Ability to set up tests
-*   Better design patterns
+    *   Easy path to setting up tests
+*   Good software design patterns
     *   No global state
     *   Composition over inheritance
     *   Loose coupling with data, eval, and other API layers
-
-Task definitions are compatible with SeqIO.
 
