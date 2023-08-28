@@ -1,8 +1,5 @@
 # AirIO: Task-based datasets, preprocessing, and evaluation for sequence models.
 
-Note: We're currently an experimental library; please reach out to mishragaurav@
-or g/airio-users if you're interested in using AirIO!
-
 
 **AirIO** is a library for loading, processing and feeding multimodal data into
 sequence models. It provides simple APIs to write reusable specifications
