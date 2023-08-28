@@ -27,7 +27,7 @@ import tensorflow_datasets as tfds
 SHUFFLE_BUFFER_SIZE = 1000
 
 # TODO(sahildua): Expose these data sources as AirIO data sources?
-GrainDataSource = Union[grain.TfdsDataSource, grain.SSTableDataSource]
+GrainDataSource = grain.TfdsDataSource
 GrainPreprocessor = grain.Transformation | grain.Operation
 
 

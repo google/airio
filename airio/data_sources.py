@@ -78,42 +78,7 @@ class TfdsDataSource(DataSource):
     return len(self._sources[split])
 
 
-class SSTableDataSource(DataSource):
-  """Wrapper for grain.SSTableDataSource with multiple splits support."""
-
-  def __init__(
-      self,
-      split_to_filepattern: Mapping[str, Union[str, Iterable[str]]],
-      split_to_keypath: Mapping[str, Union[str, Iterable[str]]],
-  ):
-    self._split_to_filepattern = split_to_filepattern
-    self._split_to_keypath = split_to_keypath
-
-    self.splits = set(self._split_to_filepattern)
-    if set(self._split_to_keypath.keys()) != set(self.splits):
-      raise ValueError(
-          f'Splits in keypaths {self._split_to_keypath.keys()} and '
-          f'splits in filepatterns {self.splits} do not match.'
-      )
-
-    self._sources = {}
-    for split in self.splits:
-      self._sources[split] = grain.SSTableDataSource(
-          paths=self._split_to_filepattern[split],
-          key_path=self._split_to_keypath[split],
-      )
-
-  def get_data_source(self, split: str) -> grain.SSTableDataSource:
-    if split not in self._sources:
-      raise ValueError(f'Split {split} not found in {self.splits}.')
-    return self._sources[split]
-
-  def num_input_examples(self, split: str) -> int:
-    if split not in self._sources:
-      raise ValueError(f'Split {split} not found in {self.splits}.')
-    return len(self._sources[split])
-
-
+@typing.runtime_checkable
 class DatasetFnCallable(Protocol):
   """Protocol for a function that returns a numpy array based on split."""
 
