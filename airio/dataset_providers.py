@@ -25,6 +25,8 @@ import tensorflow_datasets as tfds
 
 
 SHUFFLE_BUFFER_SIZE = 1000
+DEFAULT_NUM_RECORDS_TO_INSPECT = 2
+MAX_NUM_RECORDS_TO_INSPECT = 1000
 
 # TODO(sahildua): Expose these data sources as AirIO data sources?
 GrainDataSource = grain.TfdsDataSource
@@ -59,6 +61,7 @@ class DatasetProviderBase(Protocol):
 
 class Task(DatasetProviderBase):
   """A class to manage a dataset and its related metrics."""
+
   name: str
   source: data_sources.DataSource
 
@@ -127,12 +130,100 @@ class Task(DatasetProviderBase):
     if feature_converter is not None:
       ops.extend(feature_converter.get_operations())
 
+    return self._load_data(source=source, sampler=sampler, ops=ops)
+
+  def _load_data(
+      self,
+      source: GrainDataSource,
+      sampler: grain.IndexSampler,
+      ops: Sequence[GrainPreprocessor],
+  ) -> grain.PyGrainDatasetIterator:
+    """Returns a sampled data source after applying `ops`.
+
+    A helper function for get_dataset and get_dataset_by_step.
+
+    Args:
+      source: a data source to load.
+      sampler: a means of sampling from the source.
+      ops: a list of transformations to apply.
+
+    Returns an iterator of records after applying `ops`.
+    """
     ds = grain.DataLoader(
         data_source=source,
         sampler=sampler,
         operations=ops,
     )
     return ds.__iter__()
+
+  def get_dataset_by_step(
+      self,
+      num_records: int = DEFAULT_NUM_RECORDS_TO_INSPECT,
+      split: str = tfds.Split.TRAIN,
+      feature_converter: Optional[
+          feature_converters.PyGrainFeatureConverter
+      ] = None,
+      shuffle: bool = True,
+      seed: int | None = 0,
+  ) -> Iterable[Iterable[Mapping[str, Any]]]:
+    """Returns a step-by-step transformation of a sample of records.
+
+    Records the set of records after each transformation. Analogous to
+    get_dataset(), with the recording of intermediate states.
+
+    Args:
+      num_records: the number of records to include in the sample.
+      split: the split to sample from.
+      feature_converter: a feature converter.
+      shuffle: whether to shuffle or not.
+      seed: dataset seed.
+
+    Returns: a list indexed by processing step. For example:
+    |-----------------------------|
+    | Raw data                    |
+    | Preprocessing step 1        |
+    | Preprocessing step 2        |
+    | ...                         |
+    | Final transformed data      |
+    |-----------------------------|
+    """
+    # Validate num_records.
+    if num_records < 1:
+      num_records = DEFAULT_NUM_RECORDS_TO_INSPECT
+    elif num_records > MAX_NUM_RECORDS_TO_INSPECT:
+      num_records = MAX_NUM_RECORDS_TO_INSPECT
+
+    sampler = grain.IndexSampler(
+        num_records=num_records,
+        shard_options=grain.NoSharding(),
+        shuffle=shuffle,
+        num_epochs=1,
+        seed=seed,
+    )
+
+    source = self._get_data_source_for_split(split=split)
+
+    all_ops = self._preprocessors
+    if feature_converter is not None:
+      all_ops.extend(feature_converter.get_operations())
+
+    # Raw data
+    records_step0 = self._load_data(source=source, sampler=sampler, ops=[])
+    accumulated_result = [list(records_step0)]
+
+    if not all_ops:
+      return accumulated_result
+
+    # Apply all transformations, one by one.
+    accumulated_ops = []
+    for op in all_ops:
+      accumulated_ops.append(op)
+      records_next_step = self._load_data(
+          source=source, sampler=sampler, ops=accumulated_ops
+      )
+      accumulated_result.append(list(records_next_step))
+
+    return accumulated_result
 
 
 def get_dataset(

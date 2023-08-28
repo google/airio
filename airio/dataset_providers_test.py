@@ -164,6 +164,79 @@ class DatasetProvidersTest(absltest.TestCase):
     with self.assertRaisesRegex(ValueError, "Split nonexistent not found in"):
       task.get_dataset(split="nonexistent")
 
+  def test_task_get_dataset_by_step(self):
+    source = self._create_source()
+    task = self._create_task(source)
+    ds_by_step = task.get_dataset_by_step(num_records=1, shuffle=False)
+    expected = [
+        [{
+            "text": "ebc   ahgjefjhfe",
+            "label": 1,
+        }],
+        [{
+            "inputs": "imdb ebc   ahgjefjhfe",
+            "targets": "positive",
+        }],
+        [{
+            "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
+            "inputs": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                4,
+                2,
+                13,
+                3,
+                5,
+                20,
+                2,
+                4,
+                2,
+                20,
+                2,
+                4,
+            ],
+            "targets_pretokenized": "positive",
+            "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+        }],
+    ]
+    for i, step in enumerate(expected):
+      test_utils.assert_datasets_equal(ds_by_step[i], step)
+
+  def test_task_get_dataset_by_step_without_transformations(self):
+    source = self._create_source()
+    task = dataset_providers.Task(name="dummy_airio_task", source=source)
+    ds_by_step = task.get_dataset_by_step(num_records=1, shuffle=False)
+    expected = [
+        [{
+            "text": "ebc   ahgjefjhfe",
+            "label": 1,
+        }],
+    ]
+    test_utils.assert_datasets_equal(ds_by_step[0], expected[0])
+
+  def test_task_get_dataset_by_step_invalid_num_records(self):
+    source = self._create_source()
+    task = dataset_providers.Task(name="dummy_airio_task", source=source)
+    ds_by_step = task.get_dataset_by_step(num_records=-1, shuffle=False)
+    self.assertLen(
+        list(ds_by_step[0]), dataset_providers.DEFAULT_NUM_RECORDS_TO_INSPECT
+    )
+    ds_by_step = task.get_dataset_by_step(num_records=0, shuffle=False)
+    self.assertLen(
+        list(ds_by_step[0]), dataset_providers.DEFAULT_NUM_RECORDS_TO_INSPECT
+    )
+    ds_by_step = task.get_dataset_by_step(
+        num_records=dataset_providers.MAX_NUM_RECORDS_TO_INSPECT + 1,
+        shuffle=False,
+    )
+    self.assertLen(
+        list(ds_by_step[0]), dataset_providers.MAX_NUM_RECORDS_TO_INSPECT
+    )
+
   def test_get_dataset(self):
     source = self._create_source(
         source_name=_SOURCE_NAME,
