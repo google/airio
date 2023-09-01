@@ -15,10 +15,12 @@
 """Classes for AirIO data loading."""
 
 import typing
-from typing import Any, Callable, Iterable, Mapping, Optional, Protocol, Sequence, Union
+from typing import Any, Iterable, Mapping, Optional, Protocol, Sequence, Union
 
 from airio import data_sources
+from airio import dataset_iterators
 from airio import feature_converters
+from clu.data import dataset_iterator as clu_dataset_iterator
 import grain.python as grain
 import seqio
 import tensorflow_datasets as tfds
@@ -46,12 +48,11 @@ class DatasetProviderBase(Protocol):
       feature_converter: Optional[
           feature_converters.PyGrainFeatureConverter
       ] = None,
-      use_cached: bool = False,
       shuffle: bool = True,
       seed: Optional[int] = 0,
       shard_info: Optional[seqio.ShardInfo] = None,
       num_epochs: Optional[int] = 1,
-  ) -> grain.PyGrainDatasetIterator:
+  ) -> clu_dataset_iterator.DatasetIterator:
     """Returns the dataset iterator."""
     ...
 
@@ -70,23 +71,11 @@ class Task(DatasetProviderBase):
       name: str,
       source: data_sources.DataSource,
       preprocessors: Sequence[GrainPreprocessor] | None = None,
-      postprocess_fn: Callable[..., Any] | None = None,
-      metric_fns: Sequence[seqio.metrics.MetricFnCallable] | None = None,
-      metric_objs: Sequence[seqio.metrics.Metric] | None = None,
-      shuffle_buffer_size: int | None = SHUFFLE_BUFFER_SIZE,
-      source_info: seqio.SourceInfo | None = None,
   ):
     self.splits = source.splits
     self.name = name
     self.source = source
-    self._source_info = source_info
-
     self._preprocessors = list(preprocessors) if preprocessors else []
-    self._postprocess_fn = postprocess_fn
-    self._metric_fns = metric_fns
-
-    self._metric_objs = metric_objs
-    self._shuffle_buffer_size = shuffle_buffer_size
 
   def num_input_examples(self, split: str) -> int | None:
     return self.source.num_input_examples(split=split)
@@ -102,12 +91,11 @@ class Task(DatasetProviderBase):
       feature_converter: Optional[
           feature_converters.PyGrainFeatureConverter
       ] = None,
-      use_cached: bool = False,
       shuffle: bool = True,
       seed: int | None = 0,
       shard_info: seqio.ShardInfo | None = None,
       num_epochs: int | None = 1,
-  ) -> grain.PyGrainDatasetIterator:
+  ) -> clu_dataset_iterator.DatasetIterator:
     if shard_info is None:
       shard_options = grain.NoSharding()
     else:
@@ -137,7 +125,7 @@ class Task(DatasetProviderBase):
       source: GrainDataSource,
       sampler: grain.IndexSampler,
       ops: Sequence[GrainPreprocessor],
-  ) -> grain.PyGrainDatasetIterator:
+  ) -> clu_dataset_iterator.DatasetIterator:
     """Returns a sampled data source after applying `ops`.
 
     A helper function for get_dataset and get_dataset_by_step.
@@ -154,7 +142,8 @@ class Task(DatasetProviderBase):
         sampler=sampler,
         operations=ops,
     )
-    return ds.__iter__()
+
+    return dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader=ds)
 
   def get_dataset_by_step(
       self,
@@ -232,16 +221,14 @@ def get_dataset(
     feature_converter: Optional[
         feature_converters.PyGrainFeatureConverter
     ] = None,
-    use_cached: bool = False,
     shuffle: bool = False,
     num_epochs: Optional[int] = 1,
     seed: Optional[int] = None,
-) -> grain.PyGrainDatasetIterator:
+) -> clu_dataset_iterator.DatasetIterator:
   """Returns the PyGrain dataset iterator."""
   return mixture_or_task.get_dataset(
       split=split,
       feature_converter=feature_converter,
-      use_cached=use_cached,
       shuffle=shuffle,
       num_epochs=num_epochs,
       seed=seed,
