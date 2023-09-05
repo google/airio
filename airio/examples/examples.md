@@ -16,7 +16,7 @@ preprocessing steps. It performs the following actions:
 [`SentencePieceVocabulary`][seqio_vocabularies].
 
 The task's `get_dataset()` method is called, to demonstrate the contents of
-each record after processing.
+each record after fully processing all steps.
 
 ## Inspect
 
@@ -31,8 +31,15 @@ preprocessing steps. It performs the following actions:
 The task's `get_dataset_by_step()` method is called, to demonstrate the contents
 of each record after each individual processing step.
 
+### Number of records
+
 By default, the number of records to inspect at each step is set to 2. Any value
-between 1 - 1000 can be used.
+between 1 - 1000 can be used. To use a different value, adjust the `num_records`
+parameter, e.g. to view 3 records at each step:
+
+```
+steps = task.get_dataset_by_step(num_records=3)
+```
 
 
 [imdb_reviews]: https://www.tensorflow.org/datasets/catalog/imdb_reviews
