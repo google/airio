@@ -2,8 +2,8 @@
 
 The files in this directory illustrate basic usage of AirIO.
 
-* Quickstart: [quickstart.py](quickstart.py)
-* Inspect: [inspect.py](inspect.py)
+* Quickstart: [quickstart.py](quickstart.py), [quickstart.ipynb](quickstart.ipynb)
+* Inspect: [inspect.py](inspect.py), [inspect.ipynb](inspect.ipynb)
 
 ## Quickstart
 
@@ -17,6 +17,7 @@ preprocessing steps. It performs the following actions:
 
 The task's `get_dataset()` method is called, to demonstrate the contents of
 each record after fully processing all steps.
+
 
 ## Inspect
 
@@ -42,5 +43,10 @@ steps = task.get_dataset_by_step(num_records=3)
 ```
 
 
+
 [imdb_reviews]: https://www.tensorflow.org/datasets/catalog/imdb_reviews
+[inspect_ipynb]: inspect.ipynb
+[inspect_py]: inspect.py
+[quickstart_ipynb]: quickstart.ipynb
+[quickstart_py]: quickstart.py
 [seqio_vocabularies]: https://github.com/google/seqio/blob/main/seqio/vocabularies.py
