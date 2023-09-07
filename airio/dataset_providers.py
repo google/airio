@@ -15,7 +15,7 @@
 """Classes for AirIO data loading."""
 
 import typing
-from typing import Any, Iterable, Mapping, Optional, Protocol, Sequence, Union
+from typing import Any, Iterable, List, Mapping, Optional, Protocol, Sequence, Union
 
 from airio import data_sources
 from airio import dataset_iterators
@@ -69,19 +69,58 @@ class Task(DatasetProviderBase):
   def __init__(
       self,
       name: str,
-      source: data_sources.DataSource,
+      source: data_sources.DataSource | None = None,
       preprocessors: Sequence[GrainPreprocessor] | None = None,
   ):
-    self.splits = source.splits
+    if source is None and preprocessors is None:
+      raise ValueError("Either source or preprocessors must be set.")
+
     self.name = name
+    # Default values.
+    self.source = None
+    self.splits = None
+    self._preprocessors = None
+
+    if source is not None:
+      self.source = source
+      self.splits = source.splits
+    if preprocessors is not None:
+      self._preprocessors = list(preprocessors)
+
+  def set_data_source(self, source: data_sources.DataSource) -> None:
+    if self.source is not None:
+      raise ValueError("Source has already been set on this task.")
     self.source = source
-    self._preprocessors = list(preprocessors) if preprocessors else []
+    self.splits = source.splits
+
+  def set_preprocessors(
+      self, preprocessors: Sequence[GrainPreprocessor]
+  ) -> None:
+    if self._preprocessors is not None:
+      raise ValueError("Preprocessors have already been set on this task.")
+    self._preprocessors = list(preprocessors)
+
+  def get_preprocessors(self) -> List[GrainPreprocessor]:
+    if self._preprocessors is None:
+      raise ValueError("Preprocessors have not been set on this task.")
+    return list(self._preprocessors)
 
   def num_input_examples(self, split: str) -> int | None:
+    if self.source is None:
+      raise ValueError("Source has not been set on this task object.")
     return self.source.num_input_examples(split=split)
 
   def _get_data_source_for_split(self, split: str) -> GrainDataSource:
+    if self.source is None:
+      raise ValueError("Source has not been set on this task object.")
     return self.source.get_data_source(split=split)
+
+  def _ensure_fully_defined(self) -> bool:
+    if self.source is None or self._preprocessors is None:
+      raise ValueError(
+          "Both source and preprocessors must be set before calling"
+          " get_dataset()."
+      )
 
   # TODO(sahildua): Add logging.
   def get_dataset(
@@ -96,6 +135,9 @@ class Task(DatasetProviderBase):
       shard_info: seqio.ShardInfo | None = None,
       num_epochs: int | None = 1,
   ) -> clu_dataset_iterator.DatasetIterator:
+    """Returns the dataset iterator as per the task configuration."""
+    self._ensure_fully_defined()
+
     if shard_info is None:
       shard_options = grain.NoSharding()
     else:
@@ -114,7 +156,7 @@ class Task(DatasetProviderBase):
 
     source = self._get_data_source_for_split(split=split)
 
-    ops = self._preprocessors
+    ops = self.get_preprocessors()
     if feature_converter is not None:
       ops.extend(feature_converter.get_operations())
 
@@ -176,6 +218,8 @@ class Task(DatasetProviderBase):
     | Final transformed data      |
     |-----------------------------|
     """
+    self._ensure_fully_defined()
+
     # Validate num_records.
     if num_records < 1:
       num_records = DEFAULT_NUM_RECORDS_TO_INSPECT
@@ -192,7 +236,7 @@ class Task(DatasetProviderBase):
 
     source = self._get_data_source_for_split(split=split)
 
-    all_ops = self._preprocessors
+    all_ops = self.get_preprocessors()
     if feature_converter is not None:
       all_ops.extend(feature_converter.get_operations())
 
