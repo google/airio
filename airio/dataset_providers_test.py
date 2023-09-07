@@ -85,19 +85,6 @@ def _create_source(
     return data_sources.TfdsDataSource(tfds_name=source_name, splits=splits)
 
 
-def _create_task(
-    source: data_sources.DataSource | None,
-    preprocessors: Sequence[dataset_providers.GrainPreprocessor] | None = None,
-    task_name: str = "dummy_airio_task",
-) -> dataset_providers.Task:
-  """Create example AirIO task."""
-  return dataset_providers.Task(
-      name=task_name,
-      source=source,
-      preprocessors=preprocessors,
-  )
-
-
 class DatasetProviderBaseTest(absltest.TestCase):
 
   @mock.patch.multiple(
@@ -112,12 +99,16 @@ class DatasetProviderBaseTest(absltest.TestCase):
 class DatasetProvidersTest(absltest.TestCase):
 
   def test_create_task_with_source_only_succeeds(self):
-    partial_task = _create_task(source=_create_source(), preprocessors=None)
+    partial_task = dataset_providers.Task(
+        name="dummy_airio_task", source=_create_source(), preprocessors=None
+    )
     self.assertIsInstance(partial_task.source, data_sources.DataSource)
     self.assertIsInstance(partial_task.source, data_sources.TfdsDataSource)
 
   def test_create_task_without_preprocessors_get_preprocessors_fails(self):
-    partial_task = _create_task(source=_create_source(), preprocessors=None)
+    partial_task = dataset_providers.Task(
+        name="dummy_airio_task", source=_create_source(), preprocessors=None
+    )
     with self.assertRaisesRegex(
         ValueError, "Preprocessors have not been set on this task."
     ):
@@ -125,12 +116,15 @@ class DatasetProvidersTest(absltest.TestCase):
 
   def test_create_task_with_preprocessors_only_succeeds(self):
     preprocessors = _create_preprocessors()
-    partial_task = _create_task(source=None, preprocessors=preprocessors)
+    partial_task = dataset_providers.Task(
+        name="dummy_airio_task", source=None, preprocessors=preprocessors
+    )
     self.assertEqual(partial_task.get_preprocessors(), preprocessors)
     self.assertIsNone(partial_task.source)
 
   def test_get_dataset_fails_on_partial_task_without_source(self):
-    partial_task = _create_task(
+    partial_task = dataset_providers.Task(
+        name="dummy_airio_task",
         source=None,
         preprocessors=[],
     )
@@ -142,7 +136,8 @@ class DatasetProvidersTest(absltest.TestCase):
       partial_task.get_dataset(split="train")
 
   def test_get_dataset_fails_on_partial_task_without_preprocessors(self):
-    partial_task = _create_task(
+    partial_task = dataset_providers.Task(
+        name="dummy_airio_task",
         source=_create_source(splits=_SOURCE_SPLITS),
         preprocessors=None,
     )
@@ -158,27 +153,35 @@ class DatasetProvidersTest(absltest.TestCase):
     with self.assertRaisesRegex(
         ValueError, "Either source or preprocessors must be set."
     ):
-      _create_task(
-          task_name="dummy_empty_task_no_source_no_preprocessors",
+      dataset_providers.Task(
+          name="dummy_empty_task_no_source_no_preprocessors",
           source=None,
           preprocessors=None,
       )
 
   def test_create_task_without_source_can_set_source(self):
-    task = _create_task(source=None, preprocessors=_create_preprocessors())
+    task = dataset_providers.Task(
+        name="dummy_airio_task",
+        source=None,
+        preprocessors=_create_preprocessors(),
+    )
     task.set_data_source(source=_create_source())
     self.assertIsInstance(task.source, data_sources.DataSource)
     self.assertIsInstance(task.source, data_sources.TfdsDataSource)
 
   def test_create_task_without_preprocessors_can_set_preprocessors(self):
-    task = _create_task(source=_create_source(), preprocessors=None)
+    task = dataset_providers.Task(
+        name="dummy_airio_task", source=_create_source(), preprocessors=None
+    )
     preprocessors = _create_preprocessors()
     task.set_preprocessors(preprocessors)
     self.assertEqual(task.get_preprocessors(), preprocessors)
 
   def test_create_task_with_source_and_preprocessors_cannot_set_either(self):
-    task = _create_task(
-        source=_create_source(), preprocessors=_create_preprocessors()
+    task = dataset_providers.Task(
+        name="dummy_airio_task",
+        source=_create_source(),
+        preprocessors=_create_preprocessors(),
     )
     with self.assertRaisesRegex(
         ValueError, "Source has already been set on this task."
@@ -190,11 +193,10 @@ class DatasetProvidersTest(absltest.TestCase):
       task.set_preprocessors(_create_preprocessors())
 
   def test_create_task(self):
-    source = _create_source(splits=_SOURCE_SPLITS)
-    task = _create_task(
-        source=source,
+    task = dataset_providers.Task(
+        name="dummy_airio_task",
+        source=_create_source(splits=_SOURCE_SPLITS),
         preprocessors=_create_preprocessors(),
-        task_name="dummy_airio_task",
     )
     self.assertIsInstance(task.source, data_sources.DataSource)
     self.assertIsInstance(task.source, data_sources.TfdsDataSource)
@@ -204,7 +206,8 @@ class DatasetProvidersTest(absltest.TestCase):
   def test_empty_splits(self):
     with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
       source = data_sources.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=[])
-    task = _create_task(
+    task = dataset_providers.Task(
+        name="dummy_airio_task",
         source=source,
         preprocessors=_create_preprocessors(),
     )
@@ -213,7 +216,8 @@ class DatasetProvidersTest(absltest.TestCase):
   def test_none_splits(self):
     with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
       source = data_sources.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=None)
-    task = _create_task(
+    task = dataset_providers.Task(
+        name="dummy_airio_task",
         source=source,
         preprocessors=_create_preprocessors(),
     )
@@ -224,7 +228,8 @@ class DatasetProvidersTest(absltest.TestCase):
         splits=_SOURCE_SPLITS,
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
-    task = _create_task(
+    task = dataset_providers.Task(
+        name="dummy_airio_task",
         source=source,
         preprocessors=_create_preprocessors(),
     )
@@ -236,7 +241,8 @@ class DatasetProvidersTest(absltest.TestCase):
         splits=_SOURCE_SPLITS,
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
-    task = _create_task(
+    task = dataset_providers.Task(
+        name="dummy_airio_task",
         source=source,
         preprocessors=_create_preprocessors(),
     )
@@ -251,7 +257,8 @@ class DatasetProvidersTest(absltest.TestCase):
         splits=_SOURCE_SPLITS,
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
-    task = _create_task(
+    task = dataset_providers.Task(
+        name="dummy_airio_task",
         source=source,
         preprocessors=_create_preprocessors(),
     )
@@ -267,7 +274,8 @@ class DatasetProvidersTest(absltest.TestCase):
         source_name=_SOURCE_NAME,
         splits=_SOURCE_SPLITS,
     )
-    task = _create_task(
+    task = dataset_providers.Task(
+        name="dummy_airio_task",
         source=source,
         preprocessors=_create_preprocessors(),
     )
@@ -276,7 +284,8 @@ class DatasetProvidersTest(absltest.TestCase):
 
   def test_task_get_dataset_by_step(self):
     source = _create_source()
-    task = _create_task(
+    task = dataset_providers.Task(
+        name="dummy_airio_task",
         source=source,
         preprocessors=_create_preprocessors(),
     )
@@ -321,10 +330,10 @@ class DatasetProvidersTest(absltest.TestCase):
 
   def test_task_get_dataset_by_step_without_transformations(self):
     source = _create_source()
-    task = _create_task(
+    task = dataset_providers.Task(
+        name="dummy_airio_task",
         source=source,
         preprocessors=[],
-        task_name="dummy_airio_task",
     )
     ds_by_step = task.get_dataset_by_step(num_records=1, shuffle=False)
     expected = [
@@ -337,10 +346,10 @@ class DatasetProvidersTest(absltest.TestCase):
 
   def test_task_get_dataset_by_step_invalid_num_records(self):
     source = _create_source()
-    task = _create_task(
+    task = dataset_providers.Task(
+        name="dummy_airio_task",
         source=source,
         preprocessors=[],
-        task_name="dummy_airio_task",
     )
     ds_by_step = task.get_dataset_by_step(num_records=-1, shuffle=False)
     self.assertLen(
@@ -364,7 +373,11 @@ class DatasetProvidersTest(absltest.TestCase):
         splits=_SOURCE_SPLITS,
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
-    task = _create_task(source=source, preprocessors=_create_preprocessors())
+    task = dataset_providers.Task(
+        name="dummy_airio_task",
+        source=source,
+        preprocessors=_create_preprocessors(),
+    )
     ds = dataset_providers.get_dataset(task, split="train")
     expected = [
         {
@@ -448,8 +461,8 @@ class DatasetProvidersTest(absltest.TestCase):
 
   def test_task_num_input_examples_throws_error(self):
     """Verify that num_input_examples throws error source is not set."""
-    task = _create_task(
-        source=None, task_name="dummy_airio_task", preprocessors=[]
+    task = dataset_providers.Task(
+        name="dummy_airio_task", source=None, preprocessors=[]
     )
     with self.assertRaisesRegex(
         ValueError, "Source has not been set on this task object."
