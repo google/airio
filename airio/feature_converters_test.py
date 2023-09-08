@@ -27,7 +27,6 @@ from airio import test_utils
 from airio import tokenizer
 import grain.python as grain
 import numpy as np
-import seqio
 from seqio import vocabularies
 
 _SOURCE_SPLITS = {"train", "test", "unsupervised"}
@@ -158,41 +157,6 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
         },
     ]
     test_utils.assert_datasets_equal(ds, expected)
-
-
-class PyGrainFeatureConverterTest(absltest.TestCase):
-
-  def test_seqio_to_pygrain(self):
-    seqio_feature_converter = seqio.feature_converters.EncDecFeatureConverter()
-    pygrain_feature_converter = (
-        feature_converters.get_pygrain_feature_converter(
-            feature_converter=seqio_feature_converter,
-            batch_size=1,
-            task_feature_lengths={"inputs": 5, "targets": 4},
-        )
-    )
-    self.assertIsInstance(
-        pygrain_feature_converter, feature_converters.PyGrainFeatureConverter
-    )
-    self.assertIsInstance(
-        pygrain_feature_converter,
-        feature_converters.PyGrainEncDecFeatureConverter,
-    )
-
-  def test_seqio_to_pygrain_not_implemented(self):
-    seqio_feature_converter = (
-        seqio.feature_converters.PassThroughFeatureConverter()
-    )
-    with self.assertRaisesWithLiteralMatch(
-        NotImplementedError,
-        f"Feature Converter '{seqio_feature_converter}' does not have Grain"
-        " FeatureConverter equivalent.",
-    ):
-      feature_converters.get_pygrain_feature_converter(
-          feature_converter=seqio_feature_converter,
-          batch_size=1,
-          task_feature_lengths={"inputs": 5, "targets": 4},
-      )
 
   @mock.patch.multiple(
       feature_converters.PyGrainFeatureConverter, __abstractmethods__=set()

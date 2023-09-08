@@ -20,7 +20,6 @@ from typing import List, Mapping, Protocol
 
 import grain.python as grain
 import numpy as np
-import seqio
 
 
 def _get_non_padding_positions(
@@ -117,40 +116,3 @@ class PyGrainEncDecFeatureConverter:
     ]
 
     return operations
-
-
-def get_pygrain_feature_converter(
-    feature_converter: seqio.FeatureConverter,
-    *,
-    batch_size: int,
-    task_feature_lengths: Mapping[str, int],
-) -> PyGrainFeatureConverter:
-  """Wrapper for converting seqio FeatureConverter into PyGrain operations.
-
-  This method receives a SeqIO feature converter and returns a list of PyGrain
-  operations which resemble the transformations applied in the _convert_features
-  method of SeqIO's FeatureConverters.
-
-  Args:
-    feature_converter: A SeqIO feature converter.
-    batch_size: Batch size for applying PyGrain batching operation.
-    task_feature_lengths: Mapping from feature to corresponing sequence length.
-
-  Returns:
-    A PyGrain equivalent feature converter object.
-  """
-  if isinstance(feature_converter, seqio.EncDecFeatureConverter):
-    return PyGrainEncDecFeatureConverter(
-        batch_size=batch_size,
-        task_feature_lengths=task_feature_lengths,
-        model_feature_lengths=feature_converter.get_model_feature_lengths(
-            task_feature_lengths
-        ),
-        bos_id=feature_converter.bos_id,
-        pack=feature_converter.pack,
-    )
-
-  raise NotImplementedError(
-      f"Feature Converter '{feature_converter}' does not have Grain"
-      " FeatureConverter equivalent."
-  )
