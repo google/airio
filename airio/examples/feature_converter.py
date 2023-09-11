@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tester file to debug task/mixture interfaces."""
+"""Example script that shows use case with a feature converter."""
 
 import functools
 from typing import Dict
@@ -20,6 +20,7 @@ from typing import Dict
 from absl import app
 from airio import data_sources
 from airio import dataset_providers
+from airio import feature_converters
 from airio import tokenizer
 import grain.python as grain
 from seqio import vocabularies
@@ -67,7 +68,11 @@ def main(_) -> None:
   task = create_task()
   print(f"Task name: {task.name}\n")
 
-  ds = task.get_dataset(split="train")
+  ds = task.get_dataset(
+      sequence_lengths={"inputs": 30, "targets": 5},
+      split="train",
+      feature_converter=feature_converters.PyGrainEncDecFeatureConverter(),
+  )
 
   cnt = 0
   for element in ds:

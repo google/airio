@@ -31,8 +31,10 @@ def _get_non_padding_positions(
 
 def _create_pygrain_features(
     orig_example: Mapping[str, np.ndarray],
-    task_feature_lengths: Mapping[str, int],
+    task_feature_lengths: Mapping[str, int] | None,
 ):
+  if task_feature_lengths is None:
+    return orig_example
   return {k: orig_example[k][:l] for k, l in task_feature_lengths.items()}
 
 
@@ -77,7 +79,11 @@ def _construct_pygrain_operation(fn, **args) -> grain.Operation:
 class PyGrainFeatureConverter(Protocol):
   """Interface for PyGrain feature converters."""
 
-  def get_operations(self) -> List[grain.Operation]:
+  def get_operations(
+      self,
+      batch_size: int | None,
+      task_feature_lengths: Mapping[str, int] | None,
+  ) -> List[grain.Operation]:
     ...
 
 
@@ -87,32 +93,58 @@ class PyGrainEncDecFeatureConverter:
   def __init__(
       self,
       *,
-      batch_size: int,
-      task_feature_lengths: Mapping[str, int],
-      model_feature_lengths: Mapping[str, int],
-      bos_id: int,
-      pack: bool,
+      bos_id: int = 0,
+      pack: bool = False,
   ):
-    self._batch_size = batch_size
-    self._task_feature_lengths = task_feature_lengths
-    self._model_feature_lengths = model_feature_lengths
     self._bos_id = bos_id
     self._pack = pack
 
-  def get_operations(self) -> List[grain.Operation]:
-    """Returns a list of PyGrain operations."""
+  def get_operations(
+      self,
+      batch_size: int | None,
+      task_feature_lengths: Mapping[str, int] | None,
+  ) -> List[grain.Operation]:
+    """Returns a list of PyGrain operations.
+
+    Args:
+      batch_size: Batch size. If None, the Batch operation is not added.
+      task_feature_lengths: Mapping of feature key to corresponding sequence
+        length. If None, trim/pad operation is not added.
+    """
     # TODO(sahildua): Implement packing support.
+    model_feature_lengths = None
+    if task_feature_lengths is not None:
+      model_feature_lengths = self._get_model_feature_lengths(
+          task_feature_lengths
+      )
     operations = [
         _construct_pygrain_operation(
             _create_pygrain_features,
-            task_feature_lengths=self._task_feature_lengths,
+            task_feature_lengths=task_feature_lengths,
         ),
         _construct_pygrain_operation(_convert_features_for_enc_dec),
-        _construct_pygrain_operation(
-            _trim_and_pad_features,
-            sequence_lengths=self._model_feature_lengths,
-        ),
-        grain.BatchOperation(self._batch_size, drop_remainder=True),
     ]
-
+    if model_feature_lengths is not None:
+      operations.append(
+          _construct_pygrain_operation(
+              _trim_and_pad_features,
+              sequence_lengths=model_feature_lengths,
+          ),
+      )
+    if batch_size is not None:
+      operations.append(grain.BatchOperation(batch_size=batch_size))
     return operations
+
+  def _get_model_feature_lengths(
+      self, task_feature_lengths: Mapping[str, int]
+  ) -> Mapping[str, int]:
+    """Define the length relationship between input and output features."""
+    encoder_length = task_feature_lengths["inputs"]
+    decoder_length = task_feature_lengths["targets"]
+
+    return {
+        "encoder_input_tokens": encoder_length,
+        "decoder_target_tokens": decoder_length,
+        "decoder_input_tokens": decoder_length,
+        "decoder_loss_weights": decoder_length,
+    }

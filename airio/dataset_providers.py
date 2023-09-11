@@ -15,7 +15,7 @@
 """Classes for AirIO data loading."""
 
 import typing
-from typing import Any, Iterable, List, Mapping, Optional, Protocol, Sequence, Union
+from typing import Any, Iterable, List, Mapping, Protocol, Sequence, Union
 
 from airio import data_sources
 from airio import dataset_iterators
@@ -43,15 +43,15 @@ class DatasetProviderBase(Protocol):
 
   def get_dataset(
       self,
-      sequence_length: Optional[Mapping[str, int]] = None,
+      sequence_lengths: Mapping[str, int] | None = None,
       split: str = tfds.Split.TRAIN,
-      feature_converter: Optional[
-          feature_converters.PyGrainFeatureConverter
-      ] = None,
+      feature_converter: feature_converters.PyGrainFeatureConverter
+      | None = None,
+      batch_size: int | None = None,
       shuffle: bool = True,
-      seed: Optional[int] = 0,
-      shard_info: Optional[seqio.ShardInfo] = None,
-      num_epochs: Optional[int] = 1,
+      seed: int | None = 0,
+      shard_info: seqio.ShardInfo | None = None,
+      num_epochs: int | None = 1,
   ) -> clu_dataset_iterator.DatasetIterator:
     """Returns the dataset iterator."""
     ...
@@ -125,11 +125,11 @@ class Task(DatasetProviderBase):
   # TODO(sahildua): Add logging.
   def get_dataset(
       self,
-      sequence_length: Mapping[str, int] | None = None,
+      sequence_lengths: Mapping[str, int] | None = None,
       split: str = tfds.Split.TRAIN,
-      feature_converter: Optional[
-          feature_converters.PyGrainFeatureConverter
-      ] = None,
+      feature_converter: feature_converters.PyGrainFeatureConverter
+      | None = None,
+      batch_size: int | None = None,
       shuffle: bool = True,
       seed: int | None = 0,
       shard_info: seqio.ShardInfo | None = None,
@@ -158,7 +158,11 @@ class Task(DatasetProviderBase):
 
     ops = self.get_preprocessors()
     if feature_converter is not None:
-      ops.extend(feature_converter.get_operations())
+      ops.extend(
+          feature_converter.get_operations(
+              batch_size=batch_size, task_feature_lengths=sequence_lengths
+          )
+      )
 
     return self._load_data(source=source, sampler=sampler, ops=ops)
 
@@ -190,10 +194,11 @@ class Task(DatasetProviderBase):
   def get_dataset_by_step(
       self,
       num_records: int = DEFAULT_NUM_RECORDS_TO_INSPECT,
+      sequence_lengths: Mapping[str, int] | None = None,
       split: str = tfds.Split.TRAIN,
-      feature_converter: Optional[
-          feature_converters.PyGrainFeatureConverter
-      ] = None,
+      feature_converter: feature_converters.PyGrainFeatureConverter
+      | None = None,
+      batch_size: int | None = None,
       shuffle: bool = True,
       seed: int | None = 0,
   ) -> Iterable[Iterable[Mapping[str, Any]]]:
@@ -204,8 +209,10 @@ class Task(DatasetProviderBase):
 
     Args:
       num_records: the number of records to include in the sample.
+      sequence_lengths: mapping of each feature key to its sequence length.
       split: the split to sample from.
       feature_converter: a feature converter.
+      batch_size: the batch size.
       shuffle: whether to shuffle or not.
       seed: dataset seed.
 
@@ -238,7 +245,11 @@ class Task(DatasetProviderBase):
 
     all_ops = self.get_preprocessors()
     if feature_converter is not None:
-      all_ops.extend(feature_converter.get_operations())
+      all_ops.extend(
+          feature_converter.get_operations(
+              batch_size=batch_size, task_feature_lengths=sequence_lengths
+          )
+      )
 
     # Raw data
     records_step0 = self._load_data(source=source, sampler=sampler, ops=[])
@@ -261,18 +272,20 @@ class Task(DatasetProviderBase):
 
 def get_dataset(
     mixture_or_task: Task,
+    sequence_lengths: Mapping[str, int] | None = None,
     split: str = "train",
-    feature_converter: Optional[
-        feature_converters.PyGrainFeatureConverter
-    ] = None,
+    feature_converter: feature_converters.PyGrainFeatureConverter | None = None,
+    batch_size: int | None = None,
     shuffle: bool = False,
-    num_epochs: Optional[int] = 1,
-    seed: Optional[int] = None,
+    num_epochs: int | None = 1,
+    seed: int | None = None,
 ) -> clu_dataset_iterator.DatasetIterator:
   """Returns the PyGrain dataset iterator."""
   return mixture_or_task.get_dataset(
       split=split,
+      sequence_lengths=sequence_lengths,
       feature_converter=feature_converter,
+      batch_size=batch_size,
       shuffle=shuffle,
       num_epochs=num_epochs,
       seed=seed,

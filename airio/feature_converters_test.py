@@ -100,12 +100,6 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
       self,
   ) -> feature_converters.PyGrainEncDecFeatureConverter:
     return feature_converters.PyGrainEncDecFeatureConverter(
-        batch_size=1,
-        task_feature_lengths={"inputs": 5, "targets": 4},
-        model_feature_lengths={
-            "encoder_input_tokens": 5,
-            "decoder_target_tokens": 4,
-        },
         bos_id=1,
         pack=False,
     )
@@ -116,43 +110,191 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
         feature_converter, feature_converters.PyGrainEncDecFeatureConverter
     )
 
-  def test_get_operations(self):
-    source = self._create_source(
-        splits=_SOURCE_SPLITS,
-    )
-    task = self._create_task(source)
+  def test_get_operations_with_batch_size_and_feature_lengths(self):
     feature_converter = self._create_feature_converter()
-    self.assertLen(feature_converter.get_operations(), 4)
-    ds = task.get_dataset(split="train", feature_converter=feature_converter)
-    num_elements = 0
-    for _ in ds:
-      num_elements += 1
-    self.assertEqual(num_elements, 3)
+    self.assertLen(
+        feature_converter.get_operations(
+            batch_size=4, task_feature_lengths={"inputs": 5, "targets": 4}
+        ),
+        4,
+    )
 
-  def test_convert(self):
+  def test_get_operations_no_batch_op_when_batch_size_not_set(self):
+    feature_converter = self._create_feature_converter()
+    operations = feature_converter.get_operations(
+        batch_size=None,
+        task_feature_lengths={"inputs": 5, "targets": 4},
+    )
+    self.assertLen(operations, 3)
+    for operation in operations:
+      self.assertNotIsInstance(operation, grain.BatchOperation)
+
+  def test_get_operations_no_trim_pad_op_when_feature_lengths_not_set(self):
+    feature_converter = self._create_feature_converter()
+    operations = feature_converter.get_operations(
+        batch_size=4,
+        task_feature_lengths=None,
+    )
+    self.assertLen(operations, 3)
+
+  def test_get_operations_no_trim_pad_batch_op_when_neither_are_set(self):
+    feature_converter = self._create_feature_converter()
+    operations = feature_converter.get_operations(
+        batch_size=None,
+        task_feature_lengths=None,
+    )
+    self.assertLen(operations, 2)
+
+  def test_convert_with_task_feature_lengths_no_batch_size(self):
     source = self._create_source(
         splits=_SOURCE_SPLITS,
     )
     task = self._create_task(source)
     feature_converter = self._create_feature_converter()
-    ds = task.get_dataset(split="train", feature_converter=feature_converter)
+    ds = task.get_dataset(
+        sequence_lengths={"inputs": 5, "targets": 4},
+        split="train",
+        feature_converter=feature_converter,
+        shuffle=False,
+    )
     expected = [
         {
-            "encoder_input_tokens": [[3, 8, 14, 21, 2]],
-            "decoder_target_tokens": [[3, 15, 7, 6]],
-            "decoder_input_tokens": [[3, 15, 7, 6]],
-            "decoder_loss_weights": [[1, 1, 1, 1]],
+            "encoder_input_tokens": [3, 8, 14, 21, 2],
+            "decoder_target_tokens": [3, 15, 7, 6],
+            "decoder_input_tokens": [3, 15, 7, 6],
+            "decoder_loss_weights": [1, 1, 1, 1],
+        },
+        {
+            "encoder_input_tokens": [3, 8, 14, 21, 2],
+            "decoder_target_tokens": [3, 22, 4, 2],
+            "decoder_input_tokens": [3, 22, 4, 2],
+            "decoder_loss_weights": [1, 1, 1, 1],
+        },
+        {
+            "encoder_input_tokens": [3, 8, 14, 21, 2],
+            "decoder_target_tokens": [3, 15, 7, 6],
+            "decoder_input_tokens": [3, 15, 7, 6],
+            "decoder_loss_weights": [1, 1, 1, 1],
+        },
+    ]
+    test_utils.assert_datasets_equal(ds, expected)
+
+  def test_convert_no_task_feature_lengths_no_batch_size(self):
+    source = self._create_source(
+        splits=_SOURCE_SPLITS,
+    )
+    task = self._create_task(source)
+    feature_converter = self._create_feature_converter()
+    ds = task.get_dataset(
+        sequence_lengths=None,
+        split="train",
+        feature_converter=feature_converter,
+        shuffle=False,
+    )
+    expected = [
+        {
+            "encoder_input_tokens": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                4,
+                2,
+                13,
+                3,
+                5,
+                20,
+                2,
+                4,
+                2,
+                20,
+                2,
+                4,
+            ],
+            "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+            "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1],
+        },
+        {
+            "encoder_input_tokens": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                20,
+                2,
+                3,
+                5,
+                8,
+                2,
+                13,
+                8,
+                21,
+                13,
+                8,
+                2,
+                21,
+                2,
+            ],
+            "decoder_target_tokens": [3, 22, 4, 2, 18, 8, 25, 4],
+            "decoder_input_tokens": [3, 22, 4, 2, 18, 8, 25, 4],
+            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1],
+        },
+        {
+            "encoder_input_tokens": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                5,
+                13,
+                21,
+                20,
+                21,
+                5,
+                13,
+                2,
+                20,
+                20,
+                2,
+            ],
+            "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+            "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1],
+        },
+    ]
+    test_utils.assert_datasets_equal(ds, expected)
+
+  def test_convert_with_task_feature_lengths_and_batch_size(self):
+    source = self._create_source(
+        splits=_SOURCE_SPLITS,
+    )
+    task = self._create_task(source)
+    feature_converter = self._create_feature_converter()
+    ds = task.get_dataset(
+        sequence_lengths={"inputs": 5, "targets": 4},
+        split="train",
+        feature_converter=feature_converter,
+        batch_size=2,
+        shuffle=False,
+    )
+    expected = [
+        {
+            "encoder_input_tokens": [[3, 8, 14, 21, 2], [3, 8, 14, 21, 2]],
+            "decoder_target_tokens": [[3, 15, 7, 6], [3, 22, 4, 2]],
+            "decoder_input_tokens": [[3, 15, 7, 6], [3, 22, 4, 2]],
+            "decoder_loss_weights": [[1, 1, 1, 1], [1, 1, 1, 1]],
         },
         {
             "encoder_input_tokens": [[3, 8, 14, 21, 2]],
             "decoder_target_tokens": [[3, 15, 7, 6]],
             "decoder_input_tokens": [[3, 15, 7, 6]],
-            "decoder_loss_weights": [[1, 1, 1, 1]],
-        },
-        {
-            "encoder_input_tokens": [[3, 8, 14, 21, 2]],
-            "decoder_target_tokens": [[3, 22, 4, 2]],
-            "decoder_input_tokens": [[3, 22, 4, 2]],
             "decoder_loss_weights": [[1, 1, 1, 1]],
         },
     ]
@@ -161,9 +303,15 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
   @mock.patch.multiple(
       feature_converters.PyGrainFeatureConverter, __abstractmethods__=set()
   )
-  def test_seqio_to_pygrain_protocol(self):
+  def test_pygrain_feature_converter_protocol(self):
     pygrain_feature_converter = feature_converters.PyGrainFeatureConverter
-    self.assertIsNone(pygrain_feature_converter.get_operations(self))
+    self.assertIsNone(
+        pygrain_feature_converter.get_operations(
+            self,
+            batch_size=4,
+            task_feature_lengths={"inputs": 24, "targets": 12},
+        )
+    )
 
 
 if __name__ == "__main__":

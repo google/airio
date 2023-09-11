@@ -22,6 +22,7 @@ from unittest import mock
 from absl.testing import absltest
 from airio import data_sources
 from airio import dataset_providers
+from airio import feature_converters
 from airio import test_utils
 from airio import tokenizer
 import grain.python as grain
@@ -71,6 +72,10 @@ def _create_preprocessors() -> Sequence[dataset_providers.GrainPreprocessor]:
           )
       ),
   ]
+
+
+def _create_feature_converter() -> feature_converters.PyGrainFeatureConverter:
+  return feature_converters.PyGrainEncDecFeatureConverter()
 
 
 def _create_source(
@@ -240,11 +245,289 @@ class DatasetProvidersTest(absltest.TestCase):
         source=source,
         preprocessors=_create_preprocessors(),
     )
-    ds = task.get_dataset(split="train")
-    num_examples = 0
-    for _ in ds:
-      num_examples += 1
-    self.assertEqual(num_examples, _SOURCE_NUM_EXAMPLES)
+    ds = task.get_dataset(split="train", shuffle=False)
+    expected = [
+        {
+            "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
+            "inputs": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                4,
+                2,
+                13,
+                3,
+                5,
+                20,
+                2,
+                4,
+                2,
+                20,
+                2,
+                4,
+            ],
+            "targets_pretokenized": "positive",
+            "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+        },
+        {
+            "inputs_pretokenized": "imdb hj aijbcidcibdg",
+            "inputs": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                20,
+                2,
+                3,
+                5,
+                8,
+                2,
+                13,
+                8,
+                21,
+                13,
+                8,
+                2,
+                21,
+                2,
+            ],
+            "targets_pretokenized": "negative",
+            "targets": [3, 22, 4, 2, 18, 8, 25, 4],
+        },
+        {
+            "inputs_pretokenized": "imdb acdhdacfhhjb",
+            "inputs": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                5,
+                13,
+                21,
+                20,
+                21,
+                5,
+                13,
+                2,
+                20,
+                20,
+                2,
+            ],
+            "targets_pretokenized": "positive",
+            "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+        },
+    ]
+    test_utils.assert_datasets_equal(ds, expected)
+
+  def test_task_get_dataset_with_feature_converter_without_batching(self):
+    source = _create_source(
+        splits=_SOURCE_SPLITS,
+        num_examples=_SOURCE_NUM_EXAMPLES,
+    )
+    task = _create_task(
+        source=source,
+        preprocessors=_create_preprocessors(),
+    )
+    ds = task.get_dataset(
+        split="train",
+        feature_converter=_create_feature_converter(),
+        shuffle=False,
+    )
+    expected = [
+        {
+            "encoder_input_tokens": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                4,
+                2,
+                13,
+                3,
+                5,
+                20,
+                2,
+                4,
+                2,
+                20,
+                2,
+                4,
+            ],
+            "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+            "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1],
+        },
+        {
+            "encoder_input_tokens": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                20,
+                2,
+                3,
+                5,
+                8,
+                2,
+                13,
+                8,
+                21,
+                13,
+                8,
+                2,
+                21,
+                2,
+            ],
+            "decoder_target_tokens": [3, 22, 4, 2, 18, 8, 25, 4],
+            "decoder_input_tokens": [3, 22, 4, 2, 18, 8, 25, 4],
+            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1],
+        },
+        {
+            "encoder_input_tokens": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                5,
+                13,
+                21,
+                20,
+                21,
+                5,
+                13,
+                2,
+                20,
+                20,
+                2,
+            ],
+            "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+            "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1],
+        },
+    ]
+    test_utils.assert_datasets_equal(ds, expected)
+
+  def test_task_get_dataset_batched_with_sequence_lengths(
+      self,
+  ):
+    source = _create_source(
+        splits=_SOURCE_SPLITS,
+        num_examples=_SOURCE_NUM_EXAMPLES,
+    )
+    task = _create_task(
+        source=source,
+        preprocessors=_create_preprocessors(),
+    )
+    ds = task.get_dataset(
+        sequence_lengths={"inputs": 20, "targets": 10},
+        split="train",
+        feature_converter=_create_feature_converter(),
+        batch_size=2,
+        shuffle=False,
+    )
+    expected_first_batch = [
+        {
+            "encoder_input_tokens": [
+                [
+                    3,
+                    8,
+                    14,
+                    21,
+                    2,
+                    3,
+                    4,
+                    2,
+                    13,
+                    3,
+                    5,
+                    20,
+                    2,
+                    4,
+                    2,
+                    20,
+                    2,
+                    4,
+                    0,
+                    0,
+                ],
+                [
+                    3,
+                    8,
+                    14,
+                    21,
+                    2,
+                    3,
+                    20,
+                    2,
+                    3,
+                    5,
+                    8,
+                    2,
+                    13,
+                    8,
+                    21,
+                    13,
+                    8,
+                    2,
+                    21,
+                    2,
+                ],
+            ],
+            "decoder_target_tokens": [
+                [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
+                [3, 22, 4, 2, 18, 8, 25, 4, 0, 0],
+            ],
+            "decoder_input_tokens": [
+                [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
+                [3, 22, 4, 2, 18, 8, 25, 4, 0, 0],
+            ],
+            "decoder_loss_weights": [
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+                [1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+            ],
+        },
+        {
+            "encoder_input_tokens": [[
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                5,
+                13,
+                21,
+                20,
+                21,
+                5,
+                13,
+                2,
+                20,
+                20,
+                2,
+                0,
+                0,
+                0,
+            ]],
+            "decoder_target_tokens": [[3, 15, 7, 6, 8, 24, 8, 25, 4, 0]],
+            "decoder_input_tokens": [[3, 15, 7, 6, 8, 24, 8, 25, 4, 0]],
+            "decoder_loss_weights": [[1, 1, 1, 1, 1, 1, 1, 1, 1, 0]],
+        },
+    ]
+    test_utils.assert_datasets_equal(ds, expected_first_batch)
 
   def test_task_get_dataset_with_shard_info(self):
     source = _create_source(
@@ -274,7 +557,7 @@ class DatasetProvidersTest(absltest.TestCase):
     with self.assertRaisesRegex(ValueError, "Split nonexistent not found in"):
       task.get_dataset(split="nonexistent")
 
-  def test_task_get_dataset_by_step(self):
+  def test_task_get_dataset_by_step_without_feature_converter(self):
     source = _create_source()
     task = _create_task(
         source=source,
@@ -314,6 +597,161 @@ class DatasetProvidersTest(absltest.TestCase):
             ],
             "targets_pretokenized": "positive",
             "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+        }],
+    ]
+    for i, step in enumerate(expected):
+      test_utils.assert_datasets_equal(ds_by_step[i], step)
+
+  def test_task_get_dataset_by_step_with_feature_converter(self):
+    source = _create_source()
+    task = _create_task(
+        source=source,
+        preprocessors=_create_preprocessors(),
+    )
+    feature_converter = _create_feature_converter()
+    ds_by_step = task.get_dataset_by_step(
+        num_records=1,
+        sequence_lengths={"inputs": 20, "targets": 10},
+        batch_size=2,
+        feature_converter=feature_converter,
+        shuffle=False,
+    )
+    expected = [
+        # Original data.
+        [{"label": 1, "text": "ebc   ahgjefjhfe"}],
+        # IMDB preprocessor.
+        [{"inputs": "imdb ebc   ahgjefjhfe", "targets": "positive"}],
+        # Tokenizer.
+        [{
+            "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
+            "inputs": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                4,
+                2,
+                13,
+                3,
+                5,
+                20,
+                2,
+                4,
+                2,
+                20,
+                2,
+                4,
+            ],
+            "targets_pretokenized": "positive",
+            "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+        }],
+        # Keep features specified in sequence_lengths only.
+        [{
+            "inputs": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                4,
+                2,
+                13,
+                3,
+                5,
+                20,
+                2,
+                4,
+                2,
+                20,
+                2,
+                4,
+            ],
+            "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+        }],
+        # Convert to model features.
+        [{
+            "encoder_input_tokens": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                4,
+                2,
+                13,
+                3,
+                5,
+                20,
+                2,
+                4,
+                2,
+                20,
+                2,
+                4,
+            ],
+            "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+            "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1],
+        }],
+        # Trim/Pad Operation.
+        [{
+            "encoder_input_tokens": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                4,
+                2,
+                13,
+                3,
+                5,
+                20,
+                2,
+                4,
+                2,
+                20,
+                2,
+                4,
+                0,
+                0,
+            ],
+            "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
+            "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
+            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+        }],
+        # Batching.
+        [{
+            "decoder_input_tokens": [[3, 15, 7, 6, 8, 24, 8, 25, 4, 0]],
+            "decoder_loss_weights": [[1, 1, 1, 1, 1, 1, 1, 1, 1, 0]],
+            "decoder_target_tokens": [[3, 15, 7, 6, 8, 24, 8, 25, 4, 0]],
+            "encoder_input_tokens": [[
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                4,
+                2,
+                13,
+                3,
+                5,
+                20,
+                2,
+                4,
+                2,
+                20,
+                2,
+                4,
+                0,
+                0,
+            ]],
         }],
     ]
     for i, step in enumerate(expected):
@@ -365,7 +803,7 @@ class DatasetProvidersTest(absltest.TestCase):
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
     task = _create_task(source=source, preprocessors=_create_preprocessors())
-    ds = dataset_providers.get_dataset(task, split="train")
+    ds = dataset_providers.get_dataset(task, split="train", shuffle=False)
     expected = [
         {
             "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
