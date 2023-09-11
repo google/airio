@@ -270,6 +270,85 @@ class Task(DatasetProviderBase):
     return accumulated_result
 
 
+class TaskBuilder:
+  """Builder class for building Task object.
+
+  In order to create a Task object, build() method should be called on the
+  TaskBuilder object after setting the appropriate data source and
+  preprocessors.
+  """
+
+  def __init__(
+      self,
+      task_name: str,
+      source: data_sources.DataSource | None = None,
+      preprocessors: Sequence[GrainPreprocessor] | None = None,
+  ):
+    """Constructor for TaskBuilder.
+
+    Args:
+      task_name: Name of the task to be created.
+      source: Data source for the task.
+      preprocessors: List of the preprocessors for the task.
+    """
+    self._task_name = task_name
+    self._source = source
+    self._preprocessors = preprocessors
+
+  def build(self) -> Task:
+    """Returns a fully-defined Task object.
+
+    Creates a new task object using properties of the current task builder
+    object as long as neither of source and preprocessors is None.
+
+    Raises:
+      ValueError: when either of the source or preprocessors is None.
+    """
+    if self._source is None:
+      raise ValueError("Source has not been set on this task builder.")
+    if self._preprocessors is None:
+      raise ValueError("Preprocessors have not been set on this task builder.")
+
+    return Task(
+        name=self._task_name,
+        source=self._source,
+        preprocessors=self._preprocessors,
+    )
+
+  def set_task_name(self, task_name: str) -> None:
+    self._task_name = task_name
+
+  def set_data_source(self, source: data_sources.DataSource) -> None:
+    self._source = source
+
+  def set_preprocessors(
+      self, preprocessors: Sequence[GrainPreprocessor]
+  ) -> None:
+    self._preprocessors = list(preprocessors)
+
+  @classmethod
+  def from_task(cls, task: Task) -> "TaskBuilder":
+    """Returns TaskBuilder for the given existing Task object.
+
+    This method takes an existing task, copies its properties into a new
+    TaskBuilder object and returns it.
+
+    Args:
+      task: Existing task object.
+    """
+    return TaskBuilder(
+        task_name=task.name,
+        source=task.source,
+        preprocessors=task.get_preprocessors(),
+    )
+
+  def __repr__(self) -> str:
+    return (
+        f"TaskBuilder(task_name={self._task_name}, source={self._source},"
+        f" preprocessors={self._preprocessors})"
+    )
+
+
 def get_dataset(
     mixture_or_task: Task,
     sequence_lengths: Mapping[str, int] | None = None,

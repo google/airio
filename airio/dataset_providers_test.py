@@ -894,6 +894,114 @@ class DatasetProvidersTest(absltest.TestCase):
     ):
       task.num_input_examples(split="train")
 
+  def test_task_builder_from_task_copies_params_correctly(self):
+    """Verify that the TaskBuilder object is created with correct params."""
+    task = _create_task(
+        source=_create_source(),
+        task_name="dummy_airio_task",
+        preprocessors=_create_preprocessors(),
+    )
+    task_builder = dataset_providers.TaskBuilder.from_task(task)
+    self.assertEqual(task_builder._task_name, "dummy_airio_task")
+    self.assertEqual(task_builder._source, task.source)
+    self.assertEqual(task_builder._preprocessors, task.get_preprocessors())
+
+  def test_task_builder_build_copies_task_correctly(self):
+    task_name = "dummy_airio_task"
+    source = _create_source()
+    preprocessors = _create_preprocessors()
+    task_builder = dataset_providers.TaskBuilder(
+        task_name=task_name,
+        source=source,
+        preprocessors=preprocessors,
+    )
+    new_task = task_builder.build()
+    self.assertEqual(new_task.name, task_name)
+    self.assertEqual(new_task.source, source)
+    self.assertEqual(new_task.get_preprocessors(), preprocessors)
+
+  def test_task_builder_set_name_updates_name_correctly(self):
+    source = _create_source()
+    preprocessors = _create_preprocessors()
+    task_builder = dataset_providers.TaskBuilder(
+        task_name="dummy_airio_task",
+        source=source,
+        preprocessors=preprocessors,
+    )
+    task_builder.set_task_name("new_dummy_task")
+    new_task = task_builder.build()
+    self.assertEqual(new_task.name, "new_dummy_task")
+    # Verify rest of the properties are unchanged.
+    self.assertEqual(new_task.source, source)
+    self.assertEqual(new_task.get_preprocessors(), preprocessors)
+
+  def test_task_builder_set_preprocessors_updates_preprocessors_correctly(self):
+    task_name = "dummy_airio_task"
+    source = _create_source()
+    task_builder = dataset_providers.TaskBuilder(
+        task_name=task_name,
+        source=source,
+        preprocessors=_create_preprocessors(),
+    )
+    new_preprocessors = [grain.MapOperation(map_function=_imdb_preprocessor)]
+    task_builder.set_preprocessors(new_preprocessors)
+    new_task = task_builder.build()
+    self.assertEqual(new_task.get_preprocessors(), new_preprocessors)
+    # Verify rest of the properties are unchanged.
+    self.assertEqual(new_task.name, task_name)
+    self.assertEqual(new_task.source, source)
+
+  def test_task_builder_set_data_source_updates_source_correctly(self):
+    task_name = "dummy_airio_task"
+    preprocessors = _create_preprocessors()
+    task_builder = dataset_providers.TaskBuilder(
+        task_name=task_name,
+        source=_create_source(),
+        preprocessors=preprocessors,
+    )
+    new_splits = ["train"]
+    new_source = _create_source(splits=new_splits)
+    task_builder.set_data_source(new_source)
+    new_task = task_builder.build()
+    self.assertEqual(new_task.source, new_source)
+    # Verify rest of the properties are unchanged.
+    self.assertEqual(new_task.name, task_name)
+    self.assertEqual(new_task.get_preprocessors(), preprocessors)
+
+  def test_task_builder_raises_error_when_source_is_none(self):
+    task_builder = dataset_providers.TaskBuilder(
+        task_name="dummy_airio_task",
+        source=None,
+        preprocessors=_create_preprocessors(),
+    )
+    with self.assertRaisesRegex(
+        ValueError, "Source has not been set on this task builder."
+    ):
+      task_builder.build()
+
+  def test_task_builder_raises_error_when_preprocessors_is_none(self):
+    task_builder = dataset_providers.TaskBuilder(
+        task_name="dummy_airio_task",
+        source=_create_source(),
+        preprocessors=None,
+    )
+    with self.assertRaisesRegex(
+        ValueError, "Preprocessors have not been set on this task builder."
+    ):
+      task_builder.build()
+
+  def test_task_builder_repr(self):
+    task_builder = dataset_providers.TaskBuilder(
+        task_name="dummy_airio_task",
+        source=_create_source(),
+        preprocessors=_create_preprocessors(),
+    )
+    self.assertStartsWith(
+        repr(task_builder),
+        "TaskBuilder(task_name=dummy_airio_task,"
+        " source=<airio.data_sources.TfdsDataSource",
+    )
+
 
 if __name__ == "__main__":
   absltest.main()
