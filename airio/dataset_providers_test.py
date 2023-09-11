@@ -103,6 +103,18 @@ def _create_task(
   )
 
 
+def _create_task_builder(
+    source: data_sources.DataSource | None,
+    preprocessors: Sequence[dataset_providers.GrainPreprocessor] | None = None,
+    task_name: str = "dummy_airio_task",
+) -> dataset_providers.TaskBuilder:
+  return dataset_providers.TaskBuilder(
+      task_name=task_name,
+      source=source,
+      preprocessors=preprocessors,
+  )
+
+
 class DatasetProviderBaseTest(absltest.TestCase):
 
   @mock.patch.multiple(
@@ -135,39 +147,29 @@ class DatasetProvidersTest(absltest.TestCase):
     self.assertIsNone(partial_task.source)
 
   def test_get_dataset_fails_on_partial_task_without_source(self):
-    partial_task = _create_task(
-        source=None,
-        preprocessors=[],
-    )
+    partial_task = _create_task(source=None, preprocessors=[])
     with self.assertRaisesRegex(
         ValueError,
         "Both source and preprocessors must be set before calling"
         " get_dataset().",
     ):
-      partial_task.get_dataset(split="train")
+      partial_task.get_dataset()
 
   def test_get_dataset_fails_on_partial_task_without_preprocessors(self):
-    partial_task = _create_task(
-        source=_create_source(splits=_SOURCE_SPLITS),
-        preprocessors=None,
-    )
+    partial_task = _create_task(source=_create_source(), preprocessors=None)
     with self.assertRaisesRegex(
         ValueError,
         "Both source and preprocessors must be set before calling"
         " get_dataset().",
     ):
-      partial_task.get_dataset(split="train")
+      partial_task.get_dataset()
 
   def test_create_empty_task(self):
     """Verify behavior when neither source nor preprocessors are set."""
     with self.assertRaisesRegex(
         ValueError, "Either source or preprocessors must be set."
     ):
-      _create_task(
-          task_name="dummy_empty_task_no_source_no_preprocessors",
-          source=None,
-          preprocessors=None,
-      )
+      _create_task(source=None, preprocessors=None)
 
   def test_create_task_without_source_can_set_source(self):
     task = _create_task(source=None, preprocessors=_create_preprocessors())
@@ -207,21 +209,14 @@ class DatasetProvidersTest(absltest.TestCase):
     self.assertEqual(task.splits, _SOURCE_SPLITS)
 
   def test_empty_splits(self):
-    with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
-      source = data_sources.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=[])
-    task = _create_task(
-        source=source,
-        preprocessors=_create_preprocessors(),
-    )
+    source = _create_source(splits=[])
+    task = _create_task(source=source, preprocessors=_create_preprocessors())
     self.assertEmpty(task.splits)
 
   def test_none_splits(self):
     with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
       source = data_sources.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=None)
-    task = _create_task(
-        source=source,
-        preprocessors=_create_preprocessors(),
-    )
+    task = _create_task(source=source, preprocessors=_create_preprocessors())
     self.assertEmpty(task.splits)
 
   def test_num_input_examples(self):
@@ -229,22 +224,17 @@ class DatasetProvidersTest(absltest.TestCase):
         splits=_SOURCE_SPLITS,
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
-    task = _create_task(
-        source=source,
-        preprocessors=_create_preprocessors(),
-    )
+    task = _create_task(source=source, preprocessors=_create_preprocessors())
     num_examples = task.num_input_examples(split="train")
     self.assertEqual(num_examples, _SOURCE_NUM_EXAMPLES)
 
   def test_task_get_dataset(self):
     source = _create_source(
+        source_name=_SOURCE_NAME,
         splits=_SOURCE_SPLITS,
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
-    task = _create_task(
-        source=source,
-        preprocessors=_create_preprocessors(),
-    )
+    task = _create_task(source=source, preprocessors=_create_preprocessors())
     ds = task.get_dataset(split="train", shuffle=False)
     expected = [
         {
@@ -328,13 +318,11 @@ class DatasetProvidersTest(absltest.TestCase):
 
   def test_task_get_dataset_with_feature_converter_without_batching(self):
     source = _create_source(
+        source_name=_SOURCE_NAME,
         splits=_SOURCE_SPLITS,
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
-    task = _create_task(
-        source=source,
-        preprocessors=_create_preprocessors(),
-    )
+    task = _create_task(source=source, preprocessors=_create_preprocessors())
     ds = task.get_dataset(
         split="train",
         feature_converter=_create_feature_converter(),
@@ -420,17 +408,13 @@ class DatasetProvidersTest(absltest.TestCase):
     ]
     test_utils.assert_datasets_equal(ds, expected)
 
-  def test_task_get_dataset_batched_with_sequence_lengths(
-      self,
-  ):
+  def test_task_get_dataset_batched_with_sequence_lengths(self):
     source = _create_source(
+        source_name=_SOURCE_NAME,
         splits=_SOURCE_SPLITS,
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
-    task = _create_task(
-        source=source,
-        preprocessors=_create_preprocessors(),
-    )
+    task = _create_task(source=source, preprocessors=_create_preprocessors())
     ds = task.get_dataset(
         sequence_lengths={"inputs": 20, "targets": 10},
         split="train",
@@ -530,40 +514,24 @@ class DatasetProvidersTest(absltest.TestCase):
     test_utils.assert_datasets_equal(ds, expected_first_batch)
 
   def test_task_get_dataset_with_shard_info(self):
-    source = _create_source(
-        splits=_SOURCE_SPLITS,
-        num_examples=_SOURCE_NUM_EXAMPLES,
-    )
-    task = _create_task(
-        source=source,
-        preprocessors=_create_preprocessors(),
-    )
-    shard_info = seqio.ShardInfo(index=0, num_shards=1)
-    ds = task.get_dataset(split="train", shard_info=shard_info)
+    source = _create_source(num_examples=_SOURCE_NUM_EXAMPLES)
+    task = _create_task(source=source, preprocessors=_create_preprocessors())
+    ds = task.get_dataset(shard_info=seqio.ShardInfo(index=0, num_shards=1))
     num_examples = 0
     for _ in ds:
       num_examples += 1
     self.assertEqual(num_examples, _SOURCE_NUM_EXAMPLES)
 
   def test_task_get_dataset_nonexistent_split(self):
-    source = _create_source(
-        source_name=_SOURCE_NAME,
-        splits=_SOURCE_SPLITS,
-    )
-    task = _create_task(
-        source=source,
-        preprocessors=_create_preprocessors(),
-    )
+    source = _create_source(splits=_SOURCE_SPLITS)
+    task = _create_task(source=source, preprocessors=_create_preprocessors())
     with self.assertRaisesRegex(ValueError, "Split nonexistent not found in"):
       task.get_dataset(split="nonexistent")
 
   def test_task_get_dataset_by_step_without_feature_converter(self):
-    source = _create_source()
-    task = _create_task(
-        source=source,
-        preprocessors=_create_preprocessors(),
-    )
-    ds_by_step = task.get_dataset_by_step(num_records=1, shuffle=False)
+    source = _create_source(source_name=_SOURCE_NAME)
+    task = _create_task(source=source, preprocessors=_create_preprocessors())
+    ds_by_step = task.get_dataset_by_step(num_records=1)
     expected = [
         [{
             "text": "ebc   ahgjefjhfe",
@@ -604,10 +572,7 @@ class DatasetProvidersTest(absltest.TestCase):
 
   def test_task_get_dataset_by_step_with_feature_converter(self):
     source = _create_source()
-    task = _create_task(
-        source=source,
-        preprocessors=_create_preprocessors(),
-    )
+    task = _create_task(source=source, preprocessors=_create_preprocessors())
     feature_converter = _create_feature_converter()
     ds_by_step = task.get_dataset_by_step(
         num_records=1,
@@ -758,13 +723,9 @@ class DatasetProvidersTest(absltest.TestCase):
       test_utils.assert_datasets_equal(ds_by_step[i], step)
 
   def test_task_get_dataset_by_step_without_transformations(self):
-    source = _create_source()
-    task = _create_task(
-        source=source,
-        preprocessors=[],
-        task_name="dummy_airio_task",
-    )
-    ds_by_step = task.get_dataset_by_step(num_records=1, shuffle=False)
+    source = _create_source(source_name=_SOURCE_NAME)
+    task = _create_task(source=source, preprocessors=[])
+    ds_by_step = task.get_dataset_by_step(num_records=1)
     expected = [
         [{
             "text": "ebc   ahgjefjhfe",
@@ -775,22 +736,17 @@ class DatasetProvidersTest(absltest.TestCase):
 
   def test_task_get_dataset_by_step_invalid_num_records(self):
     source = _create_source()
-    task = _create_task(
-        source=source,
-        preprocessors=[],
-        task_name="dummy_airio_task",
-    )
-    ds_by_step = task.get_dataset_by_step(num_records=-1, shuffle=False)
+    task = _create_task(source=source, preprocessors=[])
+    ds_by_step = task.get_dataset_by_step(num_records=-1)
     self.assertLen(
         list(ds_by_step[0]), dataset_providers.DEFAULT_NUM_RECORDS_TO_INSPECT
     )
-    ds_by_step = task.get_dataset_by_step(num_records=0, shuffle=False)
+    ds_by_step = task.get_dataset_by_step(num_records=0)
     self.assertLen(
         list(ds_by_step[0]), dataset_providers.DEFAULT_NUM_RECORDS_TO_INSPECT
     )
     ds_by_step = task.get_dataset_by_step(
         num_records=dataset_providers.MAX_NUM_RECORDS_TO_INSPECT + 1,
-        shuffle=False,
     )
     self.assertLen(
         list(ds_by_step[0]), dataset_providers.MAX_NUM_RECORDS_TO_INSPECT
@@ -799,11 +755,10 @@ class DatasetProvidersTest(absltest.TestCase):
   def test_get_dataset(self):
     source = _create_source(
         source_name=_SOURCE_NAME,
-        splits=_SOURCE_SPLITS,
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
     task = _create_task(source=source, preprocessors=_create_preprocessors())
-    ds = dataset_providers.get_dataset(task, split="train", shuffle=False)
+    ds = dataset_providers.get_dataset(task)
     expected = [
         {
             "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
@@ -885,10 +840,8 @@ class DatasetProvidersTest(absltest.TestCase):
     test_utils.assert_datasets_equal(ds, expected)
 
   def test_task_num_input_examples_throws_error(self):
-    """Verify that num_input_examples throws error source is not set."""
-    task = _create_task(
-        source=None, task_name="dummy_airio_task", preprocessors=[]
-    )
+    """Verify that num_input_examples throws error when source is not set."""
+    task = _create_task(source=None, preprocessors=[])
     with self.assertRaisesRegex(
         ValueError, "Source has not been set on this task object."
     ):
@@ -910,10 +863,10 @@ class DatasetProvidersTest(absltest.TestCase):
     task_name = "dummy_airio_task"
     source = _create_source()
     preprocessors = _create_preprocessors()
-    task_builder = dataset_providers.TaskBuilder(
-        task_name=task_name,
+    task_builder = _create_task_builder(
         source=source,
         preprocessors=preprocessors,
+        task_name=task_name,
     )
     new_task = task_builder.build()
     self.assertEqual(new_task.name, task_name)
@@ -923,10 +876,10 @@ class DatasetProvidersTest(absltest.TestCase):
   def test_task_builder_set_name_updates_name_correctly(self):
     source = _create_source()
     preprocessors = _create_preprocessors()
-    task_builder = dataset_providers.TaskBuilder(
-        task_name="dummy_airio_task",
+    task_builder = _create_task_builder(
         source=source,
         preprocessors=preprocessors,
+        task_name="dummy_airio_task",
     )
     task_builder.set_task_name("new_dummy_task")
     new_task = task_builder.build()
@@ -938,10 +891,10 @@ class DatasetProvidersTest(absltest.TestCase):
   def test_task_builder_set_preprocessors_updates_preprocessors_correctly(self):
     task_name = "dummy_airio_task"
     source = _create_source()
-    task_builder = dataset_providers.TaskBuilder(
-        task_name=task_name,
+    task_builder = _create_task_builder(
         source=source,
         preprocessors=_create_preprocessors(),
+        task_name=task_name,
     )
     new_preprocessors = [grain.MapOperation(map_function=_imdb_preprocessor)]
     task_builder.set_preprocessors(new_preprocessors)
@@ -954,10 +907,10 @@ class DatasetProvidersTest(absltest.TestCase):
   def test_task_builder_set_data_source_updates_source_correctly(self):
     task_name = "dummy_airio_task"
     preprocessors = _create_preprocessors()
-    task_builder = dataset_providers.TaskBuilder(
-        task_name=task_name,
+    task_builder = _create_task_builder(
         source=_create_source(),
         preprocessors=preprocessors,
+        task_name=task_name,
     )
     new_splits = ["train"]
     new_source = _create_source(splits=new_splits)
@@ -969,10 +922,8 @@ class DatasetProvidersTest(absltest.TestCase):
     self.assertEqual(new_task.get_preprocessors(), preprocessors)
 
   def test_task_builder_raises_error_when_source_is_none(self):
-    task_builder = dataset_providers.TaskBuilder(
-        task_name="dummy_airio_task",
-        source=None,
-        preprocessors=_create_preprocessors(),
+    task_builder = _create_task_builder(
+        source=None, preprocessors=_create_preprocessors()
     )
     with self.assertRaisesRegex(
         ValueError, "Source has not been set on this task builder."
@@ -980,10 +931,8 @@ class DatasetProvidersTest(absltest.TestCase):
       task_builder.build()
 
   def test_task_builder_raises_error_when_preprocessors_is_none(self):
-    task_builder = dataset_providers.TaskBuilder(
-        task_name="dummy_airio_task",
-        source=_create_source(),
-        preprocessors=None,
+    task_builder = _create_task_builder(
+        source=_create_source(), preprocessors=None
     )
     with self.assertRaisesRegex(
         ValueError, "Preprocessors have not been set on this task builder."
@@ -991,10 +940,8 @@ class DatasetProvidersTest(absltest.TestCase):
       task_builder.build()
 
   def test_task_builder_repr(self):
-    task_builder = dataset_providers.TaskBuilder(
-        task_name="dummy_airio_task",
-        source=_create_source(),
-        preprocessors=_create_preprocessors(),
+    task_builder = _create_task_builder(
+        source=_create_source(), task_name="dummy_airio_task"
     )
     self.assertStartsWith(
         repr(task_builder),
