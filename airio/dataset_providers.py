@@ -14,6 +14,7 @@
 
 """Classes for AirIO data loading."""
 
+import dataclasses
 import typing
 from typing import Any, Iterable, List, Mapping, Protocol, Sequence, Union
 
@@ -22,7 +23,6 @@ from airio import dataset_iterators
 from airio import feature_converters
 from clu.data import dataset_iterator as clu_dataset_iterator
 import grain.python as grain
-import seqio
 import tensorflow_datasets as tfds
 
 
@@ -33,6 +33,14 @@ MAX_NUM_RECORDS_TO_INSPECT = 1000
 # TODO(sahildua): Expose these data sources as AirIO data sources?
 GrainDataSource = grain.TfdsDataSource
 GrainPreprocessor = grain.Transformation | grain.Operation
+
+
+@dataclasses.dataclass(frozen=True)
+class ShardInfo:
+  """A container for specifying sharding info."""
+
+  index: int
+  num_shards: int
 
 
 @typing.runtime_checkable
@@ -50,7 +58,7 @@ class DatasetProviderBase(Protocol):
       batch_size: int | None = None,
       shuffle: bool = True,
       seed: int | None = 0,
-      shard_info: seqio.ShardInfo | None = None,
+      shard_info: ShardInfo | None = None,
       num_epochs: int | None = 1,
   ) -> clu_dataset_iterator.DatasetIterator:
     """Returns the dataset iterator."""
@@ -132,7 +140,7 @@ class Task(DatasetProviderBase):
       batch_size: int | None = None,
       shuffle: bool = True,
       seed: int | None = 0,
-      shard_info: seqio.ShardInfo | None = None,
+      shard_info: ShardInfo | None = None,
       num_epochs: int | None = 1,
   ) -> clu_dataset_iterator.DatasetIterator:
     """Returns the dataset iterator as per the task configuration."""

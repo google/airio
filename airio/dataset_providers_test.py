@@ -26,7 +26,6 @@ from airio import feature_converters
 from airio import test_utils
 from airio import tokenizer
 import grain.python as grain
-import seqio
 from seqio import vocabularies
 import tensorflow_datasets as tfds
 
@@ -516,7 +515,9 @@ class DatasetProvidersTest(absltest.TestCase):
   def test_task_get_dataset_with_shard_info(self):
     source = _create_source(num_examples=_SOURCE_NUM_EXAMPLES)
     task = _create_task(source=source, preprocessors=_create_preprocessors())
-    ds = task.get_dataset(shard_info=seqio.ShardInfo(index=0, num_shards=1))
+    ds = task.get_dataset(
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=1)
+    )
     num_examples = 0
     for _ in ds:
       num_examples += 1
