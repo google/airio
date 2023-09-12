@@ -77,36 +77,15 @@ class Task(DatasetProviderBase):
   def __init__(
       self,
       name: str,
-      source: data_sources.DataSource | None = None,
+      source: data_sources.DataSource,
       preprocessors: Sequence[GrainPreprocessor] | None = None,
   ):
-    if source is None and preprocessors is None:
-      raise ValueError("Either source or preprocessors must be set.")
-
     self.name = name
-    # Default values.
-    self.source = None
-    self.splits = None
-    self._preprocessors = None
-
-    if source is not None:
-      self.source = source
-      self.splits = source.splits
-    if preprocessors is not None:
-      self._preprocessors = list(preprocessors)
-
-  def set_data_source(self, source: data_sources.DataSource) -> None:
-    if self.source is not None:
-      raise ValueError("Source has already been set on this task.")
     self.source = source
     self.splits = source.splits
-
-  def set_preprocessors(
-      self, preprocessors: Sequence[GrainPreprocessor]
-  ) -> None:
-    if self._preprocessors is not None:
-      raise ValueError("Preprocessors have already been set on this task.")
-    self._preprocessors = list(preprocessors)
+    self._preprocessors = (
+        list(preprocessors) if preprocessors is not None else []
+    )
 
   def get_preprocessors(self) -> List[GrainPreprocessor]:
     if self._preprocessors is None:
@@ -123,13 +102,6 @@ class Task(DatasetProviderBase):
       raise ValueError("Source has not been set on this task object.")
     return self.source.get_data_source(split=split)
 
-  def _ensure_fully_defined(self) -> bool:
-    if self.source is None or self._preprocessors is None:
-      raise ValueError(
-          "Both source and preprocessors must be set before calling"
-          " get_dataset()."
-      )
-
   # TODO(sahildua): Add logging.
   def get_dataset(
       self,
@@ -144,8 +116,6 @@ class Task(DatasetProviderBase):
       num_epochs: int | None = 1,
   ) -> clu_dataset_iterator.DatasetIterator:
     """Returns the dataset iterator as per the task configuration."""
-    self._ensure_fully_defined()
-
     if shard_info is None:
       shard_options = grain.NoSharding()
     else:
@@ -233,8 +203,6 @@ class Task(DatasetProviderBase):
     | Final transformed data      |
     |-----------------------------|
     """
-    self._ensure_fully_defined()
-
     # Validate num_records.
     if num_records < 1:
       num_records = DEFAULT_NUM_RECORDS_TO_INSPECT

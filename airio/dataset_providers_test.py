@@ -128,72 +128,16 @@ class DatasetProviderBaseTest(absltest.TestCase):
 class DatasetProvidersTest(absltest.TestCase):
 
   def test_create_task_with_source_only_succeeds(self):
-    partial_task = _create_task(source=_create_source(), preprocessors=None)
-    self.assertIsInstance(partial_task.source, data_sources.DataSource)
-    self.assertIsInstance(partial_task.source, data_sources.TfdsDataSource)
-
-  def test_create_task_without_preprocessors_get_preprocessors_fails(self):
-    partial_task = _create_task(source=_create_source(), preprocessors=None)
-    with self.assertRaisesRegex(
-        ValueError, "Preprocessors have not been set on this task."
-    ):
-      partial_task.get_preprocessors()
-
-  def test_create_task_with_preprocessors_only_succeeds(self):
-    preprocessors = _create_preprocessors()
-    partial_task = _create_task(source=None, preprocessors=preprocessors)
-    self.assertEqual(partial_task.get_preprocessors(), preprocessors)
-    self.assertIsNone(partial_task.source)
-
-  def test_get_dataset_fails_on_partial_task_without_source(self):
-    partial_task = _create_task(source=None, preprocessors=[])
-    with self.assertRaisesRegex(
-        ValueError,
-        "Both source and preprocessors must be set before calling"
-        " get_dataset().",
-    ):
-      partial_task.get_dataset()
-
-  def test_get_dataset_fails_on_partial_task_without_preprocessors(self):
-    partial_task = _create_task(source=_create_source(), preprocessors=None)
-    with self.assertRaisesRegex(
-        ValueError,
-        "Both source and preprocessors must be set before calling"
-        " get_dataset().",
-    ):
-      partial_task.get_dataset()
-
-  def test_create_empty_task(self):
-    """Verify behavior when neither source nor preprocessors are set."""
-    with self.assertRaisesRegex(
-        ValueError, "Either source or preprocessors must be set."
-    ):
-      _create_task(source=None, preprocessors=None)
-
-  def test_create_task_without_source_can_set_source(self):
-    task = _create_task(source=None, preprocessors=_create_preprocessors())
-    task.set_data_source(source=_create_source())
+    task = _create_task(source=_create_source(), preprocessors=None)
     self.assertIsInstance(task.source, data_sources.DataSource)
     self.assertIsInstance(task.source, data_sources.TfdsDataSource)
+    self.assertEmpty(task.get_preprocessors())
 
-  def test_create_task_without_preprocessors_can_set_preprocessors(self):
-    task = _create_task(source=_create_source(), preprocessors=None)
-    preprocessors = _create_preprocessors()
-    task.set_preprocessors(preprocessors)
-    self.assertEqual(task.get_preprocessors(), preprocessors)
-
-  def test_create_task_with_source_and_preprocessors_cannot_set_either(self):
-    task = _create_task(
-        source=_create_source(), preprocessors=_create_preprocessors()
-    )
-    with self.assertRaisesRegex(
-        ValueError, "Source has already been set on this task."
-    ):
-      task.set_data_source(source=_create_source())
-    with self.assertRaisesRegex(
-        ValueError, "Preprocessors have already been set on this task."
-    ):
-      task.set_preprocessors(_create_preprocessors())
+  def test_create_task_with_source_and_empty_preprocessors_succeeds(self):
+    task = _create_task(source=_create_source(), preprocessors=[])
+    self.assertIsInstance(task.source, data_sources.DataSource)
+    self.assertIsInstance(task.source, data_sources.TfdsDataSource)
+    self.assertEmpty(task.get_preprocessors())
 
   def test_create_task(self):
     source = _create_source(splits=_SOURCE_SPLITS)
@@ -839,14 +783,6 @@ class DatasetProvidersTest(absltest.TestCase):
         },
     ]
     test_utils.assert_datasets_equal(ds, expected)
-
-  def test_task_num_input_examples_throws_error(self):
-    """Verify that num_input_examples throws error when source is not set."""
-    task = _create_task(source=None, preprocessors=[])
-    with self.assertRaisesRegex(
-        ValueError, "Source has not been set on this task object."
-    ):
-      task.num_input_examples(split="train")
 
   def test_task_builder_from_task_copies_params_correctly(self):
     """Verify that the TaskBuilder object is created with correct params."""
