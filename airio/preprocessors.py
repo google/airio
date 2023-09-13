@@ -18,6 +18,10 @@ import dataclasses
 from typing import Any, Callable
 
 import grain.python as grain
+import numpy as np
+
+# TODO(b/294122943): Add support for injecting runtime args, e.g. seq lens.
+# TODO(b/294122943): Implement flat_map.
 
 
 @dataclasses.dataclass
@@ -27,8 +31,27 @@ class MapFnTransform(grain.MapTransform):
   map_fn: Callable[..., Any]
 
   def map(self, element):
-    # TODO(b/294122943): Add support for injecting runtime args, e.g. seq lens.
+    """Maps a single element."""
     return self.map_fn(element)
 
 
-# TODO(b/294122943): Implement random_map, filter and flat_map.
+@dataclasses.dataclass
+class RandomMapFnTransform(grain.RandomMapTransform):
+  """Grain Transform to represent AirIO random map preprocessors."""
+
+  map_fn: Callable[..., Any]
+
+  def random_map(self, element, rng: np.random.Generator):
+    """Maps a single element."""
+    return self.map_fn(element, rng)
+
+
+@dataclasses.dataclass
+class FilterFnTransform(grain.FilterTransform):
+  """Grain Transform to represent AirIO filter preprocessors."""
+
+  filter_fn: Callable[..., Any]
+
+  def filter(self, element) -> bool:
+    """Filters a single element."""
+    return self.filter_fn(element)
