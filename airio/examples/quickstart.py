@@ -20,8 +20,8 @@ from typing import Dict
 from absl import app
 from airio import data_sources
 from airio import dataset_providers
+from airio import preprocessors
 from airio import tokenizer
-import grain.python as grain
 from seqio import vocabularies
 
 
@@ -49,8 +49,8 @@ def create_task() -> dataset_providers.Task:
           tfds_name="imdb_reviews/plain_text:1.0.0", splits=["train"]
       ),
       preprocessors=[
-          grain.MapOperation(map_function=_imdb_preprocessor),
-          grain.MapOperation(
+          preprocessors.MapFnTransform(_imdb_preprocessor),
+          preprocessors.MapFnTransform(
               functools.partial(
                   tokenizer.tokenize,
                   tokenizer_configs={

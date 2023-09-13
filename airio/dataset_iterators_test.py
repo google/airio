@@ -22,6 +22,7 @@ from typing import Dict
 
 from absl.testing import absltest
 from airio import dataset_iterators
+from airio import preprocessors
 from airio import tokenizer
 from clu.data import dataset_iterator
 import grain.python as grain
@@ -65,8 +66,8 @@ class DatasetIteratorsTest(absltest.TestCase):
             num_records=5, shard_options=grain.NoSharding()
         ),
         operations=[
-            grain.MapOperation(map_function=_parse_and_preprocess),
-            grain.MapOperation(
+            preprocessors.MapFnTransform(_parse_and_preprocess),
+            preprocessors.MapFnTransform(
                 functools.partial(
                     tokenizer.tokenize,
                     tokenizer_configs={

@@ -137,8 +137,10 @@ class Task(DatasetProviderBase):
     ops = self.get_preprocessors()
     if feature_converter is not None:
       ops.extend(
-          feature_converter.get_operations(
-              batch_size=batch_size, task_feature_lengths=sequence_lengths
+          _replace_batch_transform(
+              feature_converter.get_transforms(
+                  batch_size=batch_size, task_feature_lengths=sequence_lengths
+              )
           )
       )
 
@@ -222,8 +224,10 @@ class Task(DatasetProviderBase):
     all_ops = self.get_preprocessors()
     if feature_converter is not None:
       all_ops.extend(
-          feature_converter.get_operations(
-              batch_size=batch_size, task_feature_lengths=sequence_lengths
+          _replace_batch_transform(
+              feature_converter.get_transforms(
+                  batch_size=batch_size, task_feature_lengths=sequence_lengths
+              )
           )
       )
 
@@ -345,3 +349,16 @@ def get_dataset(
       num_epochs=num_epochs,
       seed=seed,
   )
+
+
+def _replace_batch_transform(transforms):
+  # Temporary workaround until Grain supports Batch transform.
+  new_transforms = []
+  for transform in transforms:
+    if isinstance(transform, grain.Batch):
+      transform = grain.BatchOperation(
+          batch_size=transform.batch_size,
+          drop_remainder=transform.drop_remainder,
+      )
+    new_transforms.append(transform)
+  return new_transforms

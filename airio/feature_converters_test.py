@@ -23,6 +23,7 @@ from absl.testing import absltest
 from airio import data_sources
 from airio import dataset_providers
 from airio import feature_converters
+from airio import preprocessors
 from airio import test_utils
 from airio import tokenizer
 import grain.python as grain
@@ -83,8 +84,8 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
         name=task_name,
         source=source,
         preprocessors=[
-            grain.MapOperation(map_function=_imdb_preprocessor),
-            grain.MapOperation(
+            preprocessors.MapFnTransform(_imdb_preprocessor),
+            preprocessors.MapFnTransform(
                 functools.partial(
                     tokenizer.tokenize,
                     tokenizer_configs={
@@ -110,40 +111,40 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
         feature_converter, feature_converters.PyGrainEncDecFeatureConverter
     )
 
-  def test_get_operations_with_batch_size_and_feature_lengths(self):
+  def test_get_transforms_with_batch_size_and_feature_lengths(self):
     feature_converter = self._create_feature_converter()
     self.assertLen(
-        feature_converter.get_operations(
+        feature_converter.get_transforms(
             batch_size=4, task_feature_lengths={"inputs": 5, "targets": 4}
         ),
         4,
     )
 
-  def test_get_operations_no_batch_op_when_batch_size_not_set(self):
+  def test_get_transforms_no_batch_op_when_batch_size_not_set(self):
     feature_converter = self._create_feature_converter()
-    operations = feature_converter.get_operations(
+    transforms = feature_converter.get_transforms(
         batch_size=None,
         task_feature_lengths={"inputs": 5, "targets": 4},
     )
-    self.assertLen(operations, 3)
-    for operation in operations:
-      self.assertNotIsInstance(operation, grain.BatchOperation)
+    self.assertLen(transforms, 3)
+    for transform in transforms:
+      self.assertNotIsInstance(transform, grain.Batch)
 
-  def test_get_operations_no_trim_pad_op_when_feature_lengths_not_set(self):
+  def test_get_transforms_no_trim_pad_op_when_feature_lengths_not_set(self):
     feature_converter = self._create_feature_converter()
-    operations = feature_converter.get_operations(
+    transforms = feature_converter.get_transforms(
         batch_size=4,
         task_feature_lengths=None,
     )
-    self.assertLen(operations, 3)
+    self.assertLen(transforms, 3)
 
-  def test_get_operations_no_trim_pad_batch_op_when_neither_are_set(self):
+  def test_get_transforms_no_trim_pad_batch_op_when_neither_are_set(self):
     feature_converter = self._create_feature_converter()
-    operations = feature_converter.get_operations(
+    transforms = feature_converter.get_transforms(
         batch_size=None,
         task_feature_lengths=None,
     )
-    self.assertLen(operations, 2)
+    self.assertLen(transforms, 2)
 
   def test_convert_with_task_feature_lengths_no_batch_size(self):
     source = self._create_source(
@@ -306,7 +307,7 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
   def test_pygrain_feature_converter_protocol(self):
     pygrain_feature_converter = feature_converters.PyGrainFeatureConverter
     self.assertIsNone(
-        pygrain_feature_converter.get_operations(
+        pygrain_feature_converter.get_transforms(
             self,
             batch_size=4,
             task_feature_lengths={"inputs": 24, "targets": 12},

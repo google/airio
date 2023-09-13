@@ -18,6 +18,7 @@ import functools
 import typing
 from typing import List, Mapping, Protocol
 
+from airio import preprocessors
 import grain.python as grain
 import numpy as np
 
@@ -71,24 +72,24 @@ def _trim_and_pad_features(
   return {k: _trim_and_pad_inner(k, v) for k, v in features.items()}
 
 
-def _construct_pygrain_operation(fn, **args) -> grain.Operation:
-  return grain.MapOperation(functools.partial(fn, **args))
+def _construct_pygrain_transform(fn, **args) -> grain.Transformation:
+  return preprocessors.MapFnTransform(functools.partial(fn, **args))
 
 
 @typing.runtime_checkable
 class PyGrainFeatureConverter(Protocol):
   """Interface for PyGrain feature converters."""
 
-  def get_operations(
+  def get_transforms(
       self,
       batch_size: int | None,
       task_feature_lengths: Mapping[str, int] | None,
-  ) -> List[grain.Operation]:
+  ) -> List[grain.Transformation]:
     ...
 
 
 class PyGrainEncDecFeatureConverter:
-  """Builder for PyGrain's operations for seqio.EncDecFeatureConverter."""
+  """Builder for PyGrain's transforms for seqio.EncDecFeatureConverter."""
 
   def __init__(
       self,
@@ -99,17 +100,17 @@ class PyGrainEncDecFeatureConverter:
     self._bos_id = bos_id
     self._pack = pack
 
-  def get_operations(
+  def get_transforms(
       self,
       batch_size: int | None,
       task_feature_lengths: Mapping[str, int] | None,
-  ) -> List[grain.Operation]:
-    """Returns a list of PyGrain operations.
+  ) -> List[grain.Transformation]:
+    """Returns a list of PyGrain transforms.
 
     Args:
-      batch_size: Batch size. If None, the Batch operation is not added.
+      batch_size: Batch size. If None, the Batch transform is not added.
       task_feature_lengths: Mapping of feature key to corresponding sequence
-        length. If None, trim/pad operation is not added.
+        length. If None, trim/pad transform is not added.
     """
     # TODO(sahildua): Implement packing support.
     model_feature_lengths = None
@@ -117,23 +118,23 @@ class PyGrainEncDecFeatureConverter:
       model_feature_lengths = self._get_model_feature_lengths(
           task_feature_lengths
       )
-    operations = [
-        _construct_pygrain_operation(
+    transforms = [
+        _construct_pygrain_transform(
             _create_pygrain_features,
             task_feature_lengths=task_feature_lengths,
         ),
-        _construct_pygrain_operation(_convert_features_for_enc_dec),
+        _construct_pygrain_transform(_convert_features_for_enc_dec),
     ]
     if model_feature_lengths is not None:
-      operations.append(
-          _construct_pygrain_operation(
+      transforms.append(
+          _construct_pygrain_transform(
               _trim_and_pad_features,
               sequence_lengths=model_feature_lengths,
           ),
       )
     if batch_size is not None:
-      operations.append(grain.BatchOperation(batch_size=batch_size))
-    return operations
+      transforms.append(grain.Batch(batch_size=batch_size))
+    return transforms
 
   def _get_model_feature_lengths(
       self, task_feature_lengths: Mapping[str, int]
