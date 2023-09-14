@@ -21,11 +21,12 @@ from typing import Any, Iterable, List, Mapping, Protocol, Sequence, Union
 from airio import data_sources
 from airio import dataset_iterators
 from airio import feature_converters
+from airio import preprocessors as airio_preps
 from clu.data import dataset_iterator as clu_dataset_iterator
 import grain.python as grain
 import tensorflow_datasets as tfds
 
-
+lazy_dataset = grain.experimental.lazy_dataset
 SHUFFLE_BUFFER_SIZE = 1000
 DEFAULT_NUM_RECORDS_TO_INSPECT = 2
 MAX_NUM_RECORDS_TO_INSPECT = 1000
@@ -248,6 +249,135 @@ class Task(DatasetProviderBase):
       accumulated_result.append(list(records_next_step))
 
     return accumulated_result
+
+
+class Mixture(DatasetProviderBase):
+  """A class for mixture of Tasks."""
+
+  def __init__(
+      self,
+      name: str,
+      tasks: Sequence[Task],
+      proportions: Sequence[float],
+  ):
+    # TODO(b/294122943): Add support for mixture of mixtures.
+    if len(tasks) != len(proportions):
+      raise ValueError(
+          f"Number of tasks and proportions must be the same. tasks: {tasks}, "
+          f"proportions: {proportions}."
+      )
+    self.name = name
+    self._tasks = tasks
+    self.proportions = dict(zip([t.name for t in tasks], proportions))
+
+  def get_task_lazy_dataset(
+      self,
+      task: Task,
+      sequence_lengths: Mapping[str, int] | None,
+      split: str,
+      feature_converter: feature_converters.PyGrainFeatureConverter | None,
+      batch_size: int | None,
+      shuffle: bool,
+      seed: int | None,
+      shard_info: ShardInfo | None,
+      num_epochs: int | None,
+  ) -> lazy_dataset.LazyMapDataset:
+    """Returns a lazy dataset for Task source and preprocessors."""
+    # TODO(b/300282178): Merge with Task.get_dataset when lazy dataset is
+    # released.
+    # TODO(b/294122943): Incorporate sharding, shuffling and repeating as
+    # lazy dataset transforms.
+    del shuffle, shard_info, num_epochs
+    # pylint:disable=protected-access
+    ds = lazy_dataset.SourceLazyMapDataset(
+        task._get_data_source_for_split(split=split)
+    )
+    preps = task._preprocessors
+    if feature_converter is not None:
+      preps.extend(
+          feature_converter.get_transforms(batch_size, sequence_lengths)
+      )
+    for prep in preps:
+      ds = airio_preps.LazyDatasetTransform(prep)(ds, seed)
+    # pylint:enable=protected-access
+    return ds
+
+  def get_dataset(
+      self,
+      sequence_lengths: Mapping[str, int] | None = None,
+      split: str = tfds.Split.TRAIN,
+      feature_converter: feature_converters.PyGrainFeatureConverter
+      | None = None,
+      batch_size: int | None = None,
+      shuffle: bool = True,
+      seed: int | None = 0,
+      shard_info: ShardInfo | None = None,
+      num_epochs: int | None = 1,
+  ) -> clu_dataset_iterator.DatasetIterator:
+    """Returns the dataset iterator."""
+    # TODO(b/294122943): Support sharding, shuffling and repeating.
+    if shuffle:
+      raise NotImplementedError("Shuffling mixtures isn't supported yet.")
+    if shard_info:
+      raise NotImplementedError("Sharding mixtures isn't supported yet.")
+    if num_epochs and num_epochs > 1:
+      raise NotImplementedError("Repeating mixtures isn't supported yet.")
+
+    datasets = []
+    for task in self.tasks:
+      datasets.append(
+          self.get_task_lazy_dataset(
+              task=task,
+              sequence_lengths=sequence_lengths,
+              split=split,
+              feature_converter=feature_converter,
+              batch_size=batch_size,
+              shuffle=shuffle,
+              seed=seed,
+              shard_info=shard_info,
+              num_epochs=num_epochs,
+          )
+      )
+    ds = lazy_dataset.MixedLazyMapDataset(
+        datasets, list(self.proportions.values())
+    )
+
+    sampler = grain.IndexSampler(
+        num_records=self.num_input_examples(split),
+        shard_options=grain.NoSharding(),
+        shuffle=False,
+        num_epochs=1,
+        seed=seed,
+    )
+    ds = grain.DataLoader(
+        data_source=ds,
+        sampler=sampler,
+        operations=[],
+    )
+    return dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader=ds)
+
+  def num_input_examples(self, split: str) -> int | None:
+    return sum(
+        t.num_input_examples(split) for t in self.tasks if split in t.splits
+    )
+
+  @property
+  def tasks(self) -> Sequence[Task]:
+    return self._tasks
+
+  @property
+  def total_rate(self) -> float:
+    return sum(self.proportions.values())
+
+  def get_rate(self, task: Task) -> float:
+    return self.proportions[task.name]
+
+  @property
+  def splits(self) -> Sequence[str]:
+    splits = set()
+    for task in self.tasks:
+      splits.update(task.splits)
+    return tuple(splits)
 
 
 class TaskBuilder:

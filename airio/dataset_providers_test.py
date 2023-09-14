@@ -27,6 +27,7 @@ from airio import preprocessors as airio_preps
 from airio import test_utils
 from airio import tokenizer
 import grain.python as grain
+import numpy as np
 from seqio import vocabularies
 import tensorflow_datasets as tfds
 
@@ -904,6 +905,94 @@ class DatasetProvidersTest(absltest.TestCase):
         grain.BatchOperation(batch_size=10),
     ]
     self.assertListEqual(new_transforms, expected_transforms)
+
+
+class MixtureTest(absltest.TestCase):
+
+  def _get_test_src(self, num_elements=5):
+    def _dataset_fn(split: str):
+      del split
+      return np.arange(num_elements)
+
+    return data_sources.FunctionDataSource(
+        dataset_fn=_dataset_fn, splits=["train"]
+    )
+
+  def test_simple_mixture(self):
+    def test_map_fn(ex, idx):
+      return {"idx": idx, "val": ex}
+
+    task1 = _create_task(
+        task_name="test_task1",
+        source=self._get_test_src(),
+        preprocessors=[
+            airio_preps.MapFnTransform(functools.partial(test_map_fn, idx=1))
+        ],
+    )
+    task2 = _create_task(
+        task_name="test_task2",
+        source=self._get_test_src(),
+        preprocessors=[
+            airio_preps.MapFnTransform(functools.partial(test_map_fn, idx=2))
+        ],
+    )
+    mix = dataset_providers.Mixture(
+        name="test_mix", tasks=[task1, task2], proportions=[1.0, 1.0]
+    )
+    ds = mix.get_dataset(None, "train", shuffle=False)
+    self.assertListEqual(
+        list(ds),
+        [
+            {"idx": 1, "val": 0},
+            {"idx": 2, "val": 0},
+            {"idx": 1, "val": 1},
+            {"idx": 2, "val": 1},
+            {"idx": 1, "val": 2},
+            {"idx": 2, "val": 2},
+            {"idx": 1, "val": 3},
+            {"idx": 2, "val": 3},
+            {"idx": 1, "val": 4},
+            {"idx": 2, "val": 4},
+        ],
+    )
+
+  def test_simple_mixture_oversampling(self):
+    def test_map_fn(ex, idx):
+      return {"idx": idx, "val": ex}
+
+    task1 = _create_task(
+        task_name="test_task1",
+        source=self._get_test_src(),
+        preprocessors=[
+            airio_preps.MapFnTransform(functools.partial(test_map_fn, idx=1))
+        ],
+    )
+    task2 = _create_task(
+        task_name="test_task2",
+        source=self._get_test_src(),
+        preprocessors=[
+            airio_preps.MapFnTransform(functools.partial(test_map_fn, idx=2))
+        ],
+    )
+    mix = dataset_providers.Mixture(
+        name="test_mix", tasks=[task1, task2], proportions=[2.0, 1.0]
+    )
+    ds = mix.get_dataset(None, "train", shuffle=False)
+    self.assertListEqual(
+        list(ds),
+        [
+            {"idx": 1, "val": 0},
+            {"idx": 1, "val": 1},
+            {"idx": 2, "val": 0},
+            {"idx": 1, "val": 2},
+            {"idx": 1, "val": 3},
+            {"idx": 2, "val": 1},
+            {"idx": 1, "val": 4},
+            {"idx": 1, "val": 0},
+            {"idx": 2, "val": 2},
+            {"idx": 1, "val": 1},
+        ],
+    )
 
 
 if __name__ == "__main__":
