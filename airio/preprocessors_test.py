@@ -18,7 +18,10 @@ from absl.testing import absltest
 from airio import data_sources
 from airio import dataset_providers
 from airio import preprocessors
+import grain.python as grain
 import numpy as np
+
+lazy_dataset = grain.experimental.lazy_dataset
 
 
 class PreprocessorsTest(absltest.TestCase):
@@ -119,6 +122,51 @@ class PreprocessorsTest(absltest.TestCase):
     )
     ds = task.get_dataset(None, "train", shuffle=False, seed=42)
     self.assertListEqual(list(ds), [])
+
+  def test_map_lazydataset_transform(self):
+    def test_map_fn(ex):
+      return ex + 1
+
+    transform = preprocessors.MapFnTransform(test_map_fn)
+    lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
+    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    ds = lazy_dataset_transform(ds)
+    self.assertListEqual(list(ds), list(range(1, 6)))
+
+  def test_random_map_lazydataset_transform(self):
+    def test_random_map_fn(ex, rng):
+      return ex + rng.integers(0, 10)
+
+    transform = preprocessors.RandomMapFnTransform(test_random_map_fn)
+    lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
+    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    unused_ds = lazy_dataset_transform(ds, seed=42)
+    # TODO(b/294122943): Enable test after MapLazyMapDataset is reproducible.
+    # self.assertListEqual(list(ds), [9, 1, 6, 7, 4])
+
+  def test_filter_lazydataset_transform(self):
+    def test_filter_fn(ex):
+      return ex > 2
+
+    transform = preprocessors.FilterFnTransform(test_filter_fn)
+    lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
+    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    ds = lazy_dataset_transform(ds)
+    self.assertListEqual(list(ds), [3, 4])
+
+  def test_batch_lazydataset_transform(self):
+    transform = grain.Batch(batch_size=2)
+    lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
+    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    ds = lazy_dataset_transform(ds)
+    self.assertListEqual([t.tolist() for t in list(ds)], [[0, 1], [2, 3]])
+
+  def test_invalid_lazydataset_transform(self):
+    error_msg = (
+        r"BatchOperation\(batch_size=5, drop_remainder=False\) is not supported"
+    )
+    with self.assertRaisesRegex(ValueError, error_msg):
+      _ = preprocessors.LazyDatasetTransform(grain.BatchOperation(5))
 
 
 if __name__ == "__main__":

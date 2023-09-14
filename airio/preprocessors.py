@@ -23,6 +23,8 @@ import numpy as np
 # TODO(b/294122943): Add support for injecting runtime args, e.g. seq lens.
 # TODO(b/294122943): Implement flat_map.
 
+lazy_dataset = grain.experimental.lazy_dataset
+
 
 @dataclasses.dataclass
 class MapFnTransform(grain.MapTransform):
@@ -55,3 +57,30 @@ class FilterFnTransform(grain.FilterTransform):
   def filter(self, element) -> bool:
     """Filters a single element."""
     return self.filter_fn(element)
+
+
+@dataclasses.dataclass
+class LazyDatasetTransform:
+  """A convenience function to map Transforms to LazyDatasets."""
+  transform: grain.Transformation | grain.Operation
+
+  def __post_init__(self):
+    # TODO(b/300282178): Support flat-maps and many-to-one/many transforms.
+    if not isinstance(self.transform, grain.Transformation):
+      raise ValueError("%s is not supported" % str(self.transform))
+
+  def __call__(self, ds: lazy_dataset.LazyMapDataset, seed: int | None = None):
+    # pytype: disable=attribute-error
+    match self.transform:
+      case grain.MapTransform():
+        return lazy_dataset.MapLazyMapDataset(ds, self.transform)
+      case grain.RandomMapTransform():
+        return lazy_dataset.MapLazyMapDataset(ds, self.transform, seed)
+      case grain.FilterTransform():
+        return lazy_dataset.FilterLazyMapDataset(ds, self.transform)
+      case grain.Batch():
+        return lazy_dataset.BatchLazyMapDataset(ds, self.transform.batch_size)
+      case _:
+        # Should be taken care of by post init validation.
+        raise ValueError("%s is not supported" % str(self.transform))
+    # pytype: enable=attribute-error
