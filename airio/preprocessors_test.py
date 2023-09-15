@@ -140,9 +140,8 @@ class PreprocessorsTest(absltest.TestCase):
     transform = preprocessors.RandomMapFnTransform(test_random_map_fn)
     lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
     ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
-    unused_ds = lazy_dataset_transform(ds, seed=42)
-    # TODO(b/294122943): Enable test after MapLazyMapDataset is reproducible.
-    # self.assertListEqual(list(ds), [9, 1, 6, 7, 4])
+    ds = lazy_dataset_transform(ds, seed=42)
+    self.assertListEqual([ds[i] for i in range(len(ds))], [9, 1, 6, 7, 4])
 
   def test_filter_lazydataset_transform(self):
     def test_filter_fn(ex):
