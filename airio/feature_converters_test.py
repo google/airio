@@ -26,7 +26,6 @@ from airio import feature_converters
 from airio import preprocessors
 from airio import test_utils
 from airio import tokenizer
-import grain.python as grain
 import numpy as np
 from seqio import vocabularies
 
@@ -111,42 +110,30 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
         feature_converter, feature_converters.PyGrainEncDecFeatureConverter
     )
 
-  def test_get_transforms_with_batch_size_and_feature_lengths(self):
+  def test_get_transforms_with_feature_lengths(self):
     feature_converter = self._create_feature_converter()
     self.assertLen(
         feature_converter.get_transforms(
-            batch_size=4, task_feature_lengths={"inputs": 5, "targets": 4}
+            task_feature_lengths={"inputs": 5, "targets": 4}
         ),
-        4,
+        3,
     )
-
-  def test_get_transforms_no_batch_op_when_batch_size_not_set(self):
-    feature_converter = self._create_feature_converter()
-    transforms = feature_converter.get_transforms(
-        batch_size=None,
-        task_feature_lengths={"inputs": 5, "targets": 4},
-    )
-    self.assertLen(transforms, 3)
-    for transform in transforms:
-      self.assertNotIsInstance(transform, grain.Batch)
 
   def test_get_transforms_no_trim_pad_op_when_feature_lengths_not_set(self):
     feature_converter = self._create_feature_converter()
     transforms = feature_converter.get_transforms(
-        batch_size=4,
-        task_feature_lengths=None,
-    )
-    self.assertLen(transforms, 3)
-
-  def test_get_transforms_no_trim_pad_batch_op_when_neither_are_set(self):
-    feature_converter = self._create_feature_converter()
-    transforms = feature_converter.get_transforms(
-        batch_size=None,
         task_feature_lengths=None,
     )
     self.assertLen(transforms, 2)
 
-  def test_convert_with_task_feature_lengths_no_batch_size(self):
+  def test_get_transforms_no_trim_pad_op_when_neither_are_set(self):
+    feature_converter = self._create_feature_converter()
+    transforms = feature_converter.get_transforms(
+        task_feature_lengths=None,
+    )
+    self.assertLen(transforms, 2)
+
+  def test_convert_with_task_feature_lengths(self):
     source = self._create_source(
         splits=_SOURCE_SPLITS,
     )
@@ -180,7 +167,7 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
     ]
     test_utils.assert_datasets_equal(ds, expected)
 
-  def test_convert_no_task_feature_lengths_no_batch_size(self):
+  def test_convert_no_task_feature_lengths(self):
     source = self._create_source(
         splits=_SOURCE_SPLITS,
     )
@@ -272,35 +259,6 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
     ]
     test_utils.assert_datasets_equal(ds, expected)
 
-  def test_convert_with_task_feature_lengths_and_batch_size(self):
-    source = self._create_source(
-        splits=_SOURCE_SPLITS,
-    )
-    task = self._create_task(source)
-    feature_converter = self._create_feature_converter()
-    ds = task.get_dataset(
-        sequence_lengths={"inputs": 5, "targets": 4},
-        split="train",
-        feature_converter=feature_converter,
-        batch_size=2,
-        shuffle=False,
-    )
-    expected = [
-        {
-            "encoder_input_tokens": [[3, 8, 14, 21, 2], [3, 8, 14, 21, 2]],
-            "decoder_target_tokens": [[3, 15, 7, 6], [3, 22, 4, 2]],
-            "decoder_input_tokens": [[3, 15, 7, 6], [3, 22, 4, 2]],
-            "decoder_loss_weights": [[1, 1, 1, 1], [1, 1, 1, 1]],
-        },
-        {
-            "encoder_input_tokens": [[3, 8, 14, 21, 2]],
-            "decoder_target_tokens": [[3, 15, 7, 6]],
-            "decoder_input_tokens": [[3, 15, 7, 6]],
-            "decoder_loss_weights": [[1, 1, 1, 1]],
-        },
-    ]
-    test_utils.assert_datasets_equal(ds, expected)
-
   @mock.patch.multiple(
       feature_converters.PyGrainFeatureConverter, __abstractmethods__=set()
   )
@@ -309,7 +267,6 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
     self.assertIsNone(
         pygrain_feature_converter.get_transforms(
             self,
-            batch_size=4,
             task_feature_lengths={"inputs": 24, "targets": 12},
         )
     )

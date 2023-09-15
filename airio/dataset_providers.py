@@ -138,11 +138,14 @@ class Task(DatasetProviderBase):
     ops = self.get_preprocessors()
     if feature_converter is not None:
       ops.extend(
-          _replace_batch_transform(
-              feature_converter.get_transforms(
-                  batch_size=batch_size, task_feature_lengths=sequence_lengths
-              )
+          feature_converter.get_transforms(
+              task_feature_lengths=sequence_lengths
           )
+      )
+    if batch_size:
+      # TODO(b/300282178): Use grain.Batch when ready.
+      ops.append(
+          grain.BatchOperation(batch_size=batch_size, drop_remainder=False)
       )
 
     return self._load_data(source=source, sampler=sampler, ops=ops)
@@ -225,11 +228,14 @@ class Task(DatasetProviderBase):
     all_ops = self.get_preprocessors()
     if feature_converter is not None:
       all_ops.extend(
-          _replace_batch_transform(
-              feature_converter.get_transforms(
-                  batch_size=batch_size, task_feature_lengths=sequence_lengths
-              )
+          feature_converter.get_transforms(
+              task_feature_lengths=sequence_lengths
           )
+      )
+    if batch_size:
+      # TODO(b/300282178): Use grain.Batch when ready.
+      all_ops.append(
+          grain.BatchOperation(batch_size=batch_size, drop_remainder=False)
       )
 
     # Raw data
@@ -295,7 +301,12 @@ class Mixture(DatasetProviderBase):
     preps = task._preprocessors
     if feature_converter is not None:
       preps.extend(
-          feature_converter.get_transforms(batch_size, sequence_lengths)
+          feature_converter.get_transforms(sequence_lengths)
+      )
+    if batch_size:
+      # TODO(b/300282178): This doesn't support drop_remainder=False yet.
+      preps.append(
+          grain.Batch(batch_size=batch_size)
       )
     for prep in preps:
       ds = airio_preps.LazyDatasetTransform(prep)(ds, seed)
@@ -479,16 +490,3 @@ def get_dataset(
       num_epochs=num_epochs,
       seed=seed,
   )
-
-
-def _replace_batch_transform(transforms):
-  # Temporary workaround until Grain supports Batch transform.
-  new_transforms = []
-  for transform in transforms:
-    if isinstance(transform, grain.Batch):
-      transform = grain.BatchOperation(
-          batch_size=transform.batch_size,
-          drop_remainder=transform.drop_remainder,
-      )
-    new_transforms.append(transform)
-  return new_transforms

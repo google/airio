@@ -26,7 +26,6 @@ from airio import feature_converters
 from airio import preprocessors as airio_preps
 from airio import test_utils
 from airio import tokenizer
-import grain.python as grain
 import numpy as np
 from seqio import vocabularies
 import tensorflow_datasets as tfds
@@ -887,24 +886,6 @@ class DatasetProvidersTest(absltest.TestCase):
         "TaskBuilder(task_name=dummy_airio_task,"
         " source=<airio.data_sources.TfdsDataSource",
     )
-
-  def test_replace_batch_transform_workaround(self):
-    map_fn_1 = airio_preps.MapFnTransform(lambda x: x + 1)
-    map_fn_2 = airio_preps.MapFnTransform(lambda x: x + 2)
-    old_transforms = [
-        map_fn_1,
-        grain.Batch(batch_size=5),
-        map_fn_2,
-        grain.Batch(batch_size=10),
-    ]
-    new_transforms = dataset_providers._replace_batch_transform(old_transforms)
-    expected_transforms = [
-        map_fn_1,
-        grain.BatchOperation(batch_size=5),
-        map_fn_2,
-        grain.BatchOperation(batch_size=10),
-    ]
-    self.assertListEqual(new_transforms, expected_transforms)
 
 
 class MixtureTest(absltest.TestCase):

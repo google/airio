@@ -82,7 +82,6 @@ class PyGrainFeatureConverter(Protocol):
 
   def get_transforms(
       self,
-      batch_size: int | None,
       task_feature_lengths: Mapping[str, int] | None,
   ) -> List[grain.Transformation]:
     ...
@@ -102,13 +101,11 @@ class PyGrainEncDecFeatureConverter:
 
   def get_transforms(
       self,
-      batch_size: int | None,
       task_feature_lengths: Mapping[str, int] | None,
   ) -> List[grain.Transformation]:
     """Returns a list of PyGrain transforms.
 
     Args:
-      batch_size: Batch size. If None, the Batch transform is not added.
       task_feature_lengths: Mapping of feature key to corresponding sequence
         length. If None, trim/pad transform is not added.
     """
@@ -132,8 +129,6 @@ class PyGrainEncDecFeatureConverter:
               sequence_lengths=model_feature_lengths,
           ),
       )
-    if batch_size is not None:
-      transforms.append(grain.Batch(batch_size=batch_size))
     return transforms
 
   def _get_model_feature_lengths(
