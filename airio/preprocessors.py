@@ -79,7 +79,11 @@ class LazyDatasetTransform:
       case grain.FilterTransform():
         return lazy_dataset.FilterLazyMapDataset(ds, self.transform)
       case grain.Batch():
-        return lazy_dataset.BatchLazyMapDataset(ds, self.transform.batch_size)
+        return lazy_dataset.BatchLazyMapDataset(
+            ds,
+            batch_size=self.transform.batch_size,
+            drop_remainder=self.transform.drop_remainder,
+        )
       case _:
         # Should be taken care of by post init validation.
         raise ValueError("%s is not supported" % str(self.transform))

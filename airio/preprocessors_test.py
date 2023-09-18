@@ -153,12 +153,19 @@ class PreprocessorsTest(absltest.TestCase):
     ds = lazy_dataset_transform(ds)
     self.assertListEqual(list(ds), [3, 4])
 
-  def test_batch_lazydataset_transform(self):
-    transform = grain.Batch(batch_size=2)
+  def test_batch_lazydataset_transform_with_drop_remainder(self):
+    transform = grain.Batch(batch_size=2, drop_remainder=True)
     lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
     ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
     ds = lazy_dataset_transform(ds)
     self.assertListEqual([t.tolist() for t in list(ds)], [[0, 1], [2, 3]])
+
+  def test_batch_lazydataset_transform_without_drop_remainder(self):
+    transform = grain.Batch(batch_size=2)
+    lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
+    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    ds = lazy_dataset_transform(ds)
+    self.assertListEqual([t.tolist() for t in list(ds)], [[0, 1], [2, 3], [4]])
 
   def test_invalid_lazydataset_transform(self):
     error_msg = (

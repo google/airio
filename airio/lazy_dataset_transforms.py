@@ -69,7 +69,7 @@ def even_split(
   return shard_start, shard_end
 
 
-# TODO(b/300282178): These should upstreamed to the grain codebase.
+# TODO(b/300282178): These should be upstreamed to the grain codebase.
 @dataclasses.dataclass(frozen=False)
 class ShardLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
   """Shards a LazyMapDataset based on provided shard options."""

@@ -16,14 +16,16 @@
 
 import dataclasses
 import typing
-from typing import Any, Iterable, List, Mapping, Protocol, Sequence, Union
+from typing import Any, Iterable, List, Mapping, Protocol, Sequence, Tuple, Union
 
 from airio import data_sources
 from airio import dataset_iterators
 from airio import feature_converters
+from airio import lazy_dataset_transforms
 from airio import preprocessors as airio_preps
 from clu.data import dataset_iterator as clu_dataset_iterator
 import grain.python as grain
+import numpy as np
 import tensorflow_datasets as tfds
 
 lazy_dataset = grain.experimental.lazy_dataset
@@ -291,13 +293,25 @@ class Mixture(DatasetProviderBase):
     """Returns a lazy dataset for Task source and preprocessors."""
     # TODO(b/300282178): Merge with Task.get_dataset when lazy dataset is
     # released.
-    # TODO(b/294122943): Incorporate sharding, shuffling and repeating as
-    # lazy dataset transforms.
-    del shuffle, shard_info, num_epochs
     # pylint:disable=protected-access
+    # Step 1: Get Source.
     ds = lazy_dataset.SourceLazyMapDataset(
         task._get_data_source_for_split(split=split)
     )
+    if shard_info:
+      shard_options = grain.ShardOptions(
+          shard_index=shard_info.index, shard_count=shard_info.num_shards
+      )
+      ds = lazy_dataset_transforms.ShardLazyMapDataset(ds, shard_options)
+
+    # Step 2: Make epochs.
+    if num_epochs:
+      dss = [ds] * num_epochs
+    else:
+      # Skip repeating here, repeat the mixed dataset.
+      dss = [ds]
+
+    # Step 3: Run preprocessors and shuffle each epoch (if needed)
     preps = task._preprocessors
     if feature_converter is not None:
       preps.extend(
@@ -308,9 +322,80 @@ class Mixture(DatasetProviderBase):
       preps.append(
           grain.Batch(batch_size=batch_size)
       )
-    for prep in preps:
-      ds = airio_preps.LazyDatasetTransform(prep)(ds, seed)
+    preprocessed_dss = []
+    next_epoch_seed = seed
+    for ds in dss:
+      next_epoch_seed, prep_seed = _split_seed(next_epoch_seed)
+      prep_seed, shuffle_seed = _split_seed(prep_seed)
+      for prep in preps:
+        ds = airio_preps.LazyDatasetTransform(prep)(ds, prep_seed)
+        prep_seed, _ = _split_seed(prep_seed)
+      if shuffle:
+        ds = lazy_dataset.ShuffleLazyMapDataset(ds, seed=shuffle_seed)
+      preprocessed_dss.append(ds)
     # pylint:enable=protected-access
+
+    # Step 4: Combine epochs if needed
+    if len(preprocessed_dss) == 1:
+      return preprocessed_dss[0]
+    return lazy_dataset_transforms.ConcatLazyMapDataset(preprocessed_dss)
+
+  def get_lazy_dataset(
+      self,
+      sequence_lengths: Mapping[str, int] | None = None,
+      split: str = tfds.Split.TRAIN,
+      feature_converter: feature_converters.PyGrainFeatureConverter
+      | None = None,
+      batch_size: int | None = None,
+      shuffle: bool = True,
+      seed: int | None = 0,
+      shard_info: ShardInfo | None = None,
+      num_epochs: int | None = 1,
+  ) -> lazy_dataset.LazyMapDataset:
+    """Returns a lazy dataset for the Mixture."""
+    if num_epochs is None and shuffle:
+      raise ValueError(
+          "Repeating indefinitely with shuffling turned on isn't supported."
+      )
+    datasets = []
+    for task in self.tasks:
+      datasets.append(
+          self.get_task_lazy_dataset(
+              task=task,
+              sequence_lengths=sequence_lengths,
+              split=split,
+              feature_converter=None,
+              batch_size=None,
+              shuffle=shuffle,
+              seed=seed,
+              shard_info=shard_info,
+              num_epochs=num_epochs,
+          )
+      )
+      # Note: We will run feature converter on and batch the mixed dataset, but
+      # these can be done before mixing by setting feature_converter and
+      # batch_size above and disabling them below if needed in the future.
+      # Note: We may not need N epochs of a Task to populate N epochs of the
+      # Mixture, but since these are lazily populated, we can skip calculating
+      # the exact number of epochs required.
+    ds = lazy_dataset_transforms.MixedLazyMapDataset(
+        datasets, list(self.proportions.values()), stop_on_empty_dataset=True
+    )
+    post_mix_preps = []
+    if feature_converter:
+      post_mix_preps.extend(feature_converter.get_transforms(sequence_lengths))
+    if batch_size:
+      post_mix_preps.append(
+          grain.Batch(batch_size=batch_size, drop_remainder=False)
+      )
+    if post_mix_preps:
+      post_mix_transforms = [
+          airio_preps.LazyDatasetTransform(p) for p in post_mix_preps
+      ]
+      for t in post_mix_transforms:
+        ds = t(ds, seed=None)
+    if num_epochs is None:
+      ds = lazy_dataset.RepeatLazyMapDataset(ds, num_epochs=None)
     return ds
 
   def get_dataset(
@@ -326,35 +411,21 @@ class Mixture(DatasetProviderBase):
       num_epochs: int | None = 1,
   ) -> clu_dataset_iterator.DatasetIterator:
     """Returns the dataset iterator."""
-    # TODO(b/294122943): Support sharding, shuffling and repeating.
-    if shuffle:
-      raise NotImplementedError("Shuffling mixtures isn't supported yet.")
-    if shard_info:
-      raise NotImplementedError("Sharding mixtures isn't supported yet.")
-    if num_epochs and num_epochs > 1:
-      raise NotImplementedError("Repeating mixtures isn't supported yet.")
-
-    datasets = []
-    for task in self.tasks:
-      datasets.append(
-          self.get_task_lazy_dataset(
-              task=task,
-              sequence_lengths=sequence_lengths,
-              split=split,
-              feature_converter=feature_converter,
-              batch_size=batch_size,
-              shuffle=shuffle,
-              seed=seed,
-              shard_info=shard_info,
-              num_epochs=num_epochs,
-          )
-      )
-    ds = lazy_dataset.MixedLazyMapDataset(
-        datasets, list(self.proportions.values())
+    ds = self.get_lazy_dataset(
+        sequence_lengths=sequence_lengths,
+        split=split,
+        feature_converter=feature_converter,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        seed=seed,
+        shard_info=shard_info,
+        num_epochs=num_epochs,
     )
-
+    # The sampler below is a no-op because sharding, shuffling and repeats are
+    # done using the lazy_dataset API. It may be removed when lazy_dataset
+    # releases.
     sampler = grain.IndexSampler(
-        num_records=self.num_input_examples(split),
+        num_records=len(ds),
         shard_options=grain.NoSharding(),
         shuffle=False,
         num_epochs=1,
@@ -436,16 +507,19 @@ class TaskBuilder:
         preprocessors=self._preprocessors,
     )
 
-  def set_task_name(self, task_name: str) -> None:
+  def set_task_name(self, task_name: str) -> "TaskBuilder":
     self._task_name = task_name
+    return self
 
-  def set_data_source(self, source: data_sources.DataSource) -> None:
+  def set_data_source(self, source: data_sources.DataSource) -> "TaskBuilder":
     self._source = source
+    return self
 
   def set_preprocessors(
       self, preprocessors: Sequence[GrainPreprocessor]
-  ) -> None:
+  ) -> "TaskBuilder":
     self._preprocessors = list(preprocessors)
+    return self
 
   @classmethod
   def from_task(cls, task: Task) -> "TaskBuilder":
@@ -490,3 +564,8 @@ def get_dataset(
       num_epochs=num_epochs,
       seed=seed,
   )
+
+
+def _split_seed(seed: int) -> Tuple[int, int]:
+  rst = np.random.RandomState(seed)
+  return rst.randint(0, 2**16 - 1), rst.randint(0, 2**16 - 1)

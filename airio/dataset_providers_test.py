@@ -889,6 +889,52 @@ class DatasetProvidersTest(absltest.TestCase):
 
 
 class MixtureTest(absltest.TestCase):
+  def setUp(self):
+    super().setUp()
+
+    def test_map_fn(ex, idx):
+      return {"idx": idx, "val": ex}
+
+    # TODO(b/294122943): Pass runtime args to this preprocessor.
+    def simple_to_imdb_map_fn(ex):
+      return {
+          "inputs_pretokenized": f"{ex}",
+          "inputs": np.array([ex] * 20),
+          "targets_pretokenized": f"{ex + 1}",
+          "targets": np.array([ex + 1] * 10),
+      }
+
+    imdb_source = _create_source(
+        source_name=_SOURCE_NAME,
+        splits=_SOURCE_SPLITS,
+        num_examples=_SOURCE_NUM_EXAMPLES,
+    )
+    self._map_transform_idx_1 = airio_preps.MapFnTransform(
+        functools.partial(test_map_fn, idx=1)
+    )
+    self._map_transform_idx_2 = airio_preps.MapFnTransform(
+        functools.partial(test_map_fn, idx=2)
+    )
+    self._simple_task_1 = _create_task(
+        task_name="test_task1",
+        source=self._get_test_src(),
+        preprocessors=[self._map_transform_idx_1],
+    )
+    self._simple_task_2 = _create_task(
+        task_name="test_task2",
+        source=self._get_test_src(),
+        preprocessors=[self._map_transform_idx_2],
+    )
+    self._imdb_task = _create_task(
+        source=imdb_source, preprocessors=_create_preprocessors()
+    )
+    self._simple_to_imdb_task = (
+        dataset_providers.TaskBuilder.from_task(self._simple_task_1)
+        .set_preprocessors([
+            airio_preps.MapFnTransform(simple_to_imdb_map_fn),
+        ])
+        .build()
+    )
 
   def _get_test_src(self, num_elements=5):
     def _dataset_fn(split: str):
@@ -900,79 +946,492 @@ class MixtureTest(absltest.TestCase):
     )
 
   def test_simple_mixture(self):
-    def test_map_fn(ex, idx):
-      return {"idx": idx, "val": ex}
-
-    task1 = _create_task(
-        task_name="test_task1",
-        source=self._get_test_src(),
-        preprocessors=[
-            airio_preps.MapFnTransform(functools.partial(test_map_fn, idx=1))
-        ],
-    )
-    task2 = _create_task(
-        task_name="test_task2",
-        source=self._get_test_src(),
-        preprocessors=[
-            airio_preps.MapFnTransform(functools.partial(test_map_fn, idx=2))
-        ],
-    )
     mix = dataset_providers.Mixture(
-        name="test_mix", tasks=[task1, task2], proportions=[1.0, 1.0]
+        name="test_mix",
+        tasks=[self._simple_task_1, self._simple_task_2],
+        proportions=[1.0, 1.0],
     )
-    ds = mix.get_dataset(None, "train", shuffle=False)
+    ds = mix.get_dataset(shuffle=False)
     self.assertListEqual(
         list(ds),
         [
+            {"idx": 1, "val": 0},  # task 1, ex 0
+            {"idx": 2, "val": 0},  # task 2, ex 0
+            {"idx": 1, "val": 1},  # task 1, ex 1
+            {"idx": 2, "val": 1},  # task 2, ex 1
+            {"idx": 1, "val": 2},  # task 1, ex 2
+            {"idx": 2, "val": 2},  # task 2, ex 2
+            {"idx": 1, "val": 3},  # task 1, ex 3
+            {"idx": 2, "val": 3},  # task 2, ex 3
+            {"idx": 1, "val": 4},  # task 1, ex 4
+            {"idx": 2, "val": 4},  # task 2, ex 4
+        ],
+    )
+
+  def test_simple_mixture_stop_on_empty(self):
+    mix = dataset_providers.Mixture(
+        name="test_mix",
+        tasks=[self._simple_task_1, self._simple_task_2],
+        proportions=[2.0, 1.0],
+    )
+    ds = mix.get_dataset(shuffle=False)
+    self.assertListEqual(
+        list(ds),
+        [
+            {"idx": 1, "val": 0},  # task 1, ex 0
+            {"idx": 1, "val": 1},  # task 1, ex 1
+            {"idx": 2, "val": 0},  # task 2, ex 0
+            {"idx": 1, "val": 2},  # task 1, ex 2
+            {"idx": 1, "val": 3},  # task 1, ex 3
+            {"idx": 2, "val": 1},  # task 2, ex 1
+            {"idx": 1, "val": 4},  # task 1, ex 4
+            # task 1 dataset now empty
+        ],
+    )
+
+  def test_mixture_sharding(self):
+    mix = dataset_providers.Mixture(
+        name="test_mix",
+        tasks=[self._simple_task_1, self._simple_task_2],
+        proportions=[2.0, 1.0],
+    )
+    ds = mix.get_dataset(
+        shuffle=False,
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
+    )
+    self.assertListEqual(
+        list(ds),
+        [
+            {"idx": 1, "val": 0},  # task 1, ex 0
+            {"idx": 1, "val": 1},  # task 1, ex 1
+            {"idx": 2, "val": 0},  # task 2, ex 0
+            {"idx": 1, "val": 2},  # task 1, ex 2
+            # task 1 dataset now empty
+        ],
+    )
+
+  def test_mixture_shuffling(self):
+    mix = dataset_providers.Mixture(
+        name="test_mix",
+        tasks=[self._simple_task_1, self._simple_task_2],
+        proportions=[2.0, 1.0],
+    )
+    ds = mix.get_dataset(
+        shuffle=True,
+        seed=42,
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
+    )
+    self.assertListEqual(
+        list(ds),
+        [
+            {"idx": 1, "val": 2},
+            {"idx": 1, "val": 1},
+            {"idx": 2, "val": 2},
             {"idx": 1, "val": 0},
-            {"idx": 2, "val": 0},
+            # task 1 dataset now empty
+        ],
+    )
+
+  @mock.patch(
+      "airio.lazy_dataset_transforms.ConcatLazyMapDataset",
+      new_callable=mock.NonCallableMock,
+  )
+  def test_single_epoch_concat_not_called(self, unused_mock_concat_fn):
+    mix = dataset_providers.Mixture(
+        name="test_mix",
+        tasks=[self._simple_task_1, self._simple_task_2],
+        proportions=[1.0, 1.0],
+    )
+    ds = mix.get_dataset(shuffle=False)
+    self.assertListEqual(
+        list(ds),
+        [
+            {"idx": 1, "val": 0},  # task 1, ex 0
+            {"idx": 2, "val": 0},  # task 2, ex 0
+            {"idx": 1, "val": 1},  # task 1, ex 1
+            {"idx": 2, "val": 1},  # task 2, ex 1
+            {"idx": 1, "val": 2},  # task 1, ex 2
+            {"idx": 2, "val": 2},  # task 2, ex 2
+            {"idx": 1, "val": 3},  # task 1, ex 3
+            {"idx": 2, "val": 3},  # task 2, ex 3
+            {"idx": 1, "val": 4},  # task 1, ex 4
+            {"idx": 2, "val": 4},  # task 2, ex 4
+        ],
+    )
+    with self.assertRaisesRegex(
+        TypeError, "'NonCallableMock' object is not callable"
+    ):
+      _ = mix.get_dataset(shuffle=False, num_epochs=2)
+
+  def test_multi_epoch(self):
+    mix = dataset_providers.Mixture(
+        name="test_mix",
+        tasks=[self._simple_task_1, self._simple_task_2],
+        proportions=[2.0, 1.0],
+    )
+    ds = mix.get_dataset(
+        shuffle=True,
+        seed=42,
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
+        num_epochs=2,
+    )
+    self.assertListEqual(
+        list(ds),
+        [
+            {"idx": 1, "val": 2},
+            {"idx": 1, "val": 1},
+            {"idx": 2, "val": 2},
+            {"idx": 1, "val": 0},
+            # epoch 1 end, no overlapping examples
             {"idx": 1, "val": 1},
             {"idx": 2, "val": 1},
+            {"idx": 1, "val": 0},
             {"idx": 1, "val": 2},
-            {"idx": 2, "val": 2},
-            {"idx": 1, "val": 3},
-            {"idx": 2, "val": 3},
-            {"idx": 1, "val": 4},
-            {"idx": 2, "val": 4},
+            {"idx": 2, "val": 0},
+            # task 1 dataset now empty
         ],
+        # Note: We get an odd number of examples with num_epochs = 2. This is
+        # because we mix after repeating - mixing datasets of length 10 (2
+        # epochs). If we repeated after mixing, we'd mix datasets of length 5
+        # and get 4 examples, and then repeat to get 8 examples. Repeating
+        # earlier enables passing different seeds to epochs for preprocessing.
     )
 
-  def test_simple_mixture_oversampling(self):
-    def test_map_fn(ex, idx):
-      return {"idx": idx, "val": ex}
+  def test_multi_epoch_with_stochastic_preprocessor(self):
+    def test_random_map_fn(ex, rng):
+      ex["var"] = rng.integers(0, 5)
+      return ex
 
-    task1 = _create_task(
-        task_name="test_task1",
-        source=self._get_test_src(),
-        preprocessors=[
-            airio_preps.MapFnTransform(functools.partial(test_map_fn, idx=1))
-        ],
+    task1 = (
+        dataset_providers.TaskBuilder.from_task(self._simple_task_1)
+        .set_preprocessors([
+            self._map_transform_idx_1,
+            airio_preps.RandomMapFnTransform(test_random_map_fn),
+        ])
+        .build()
     )
-    task2 = _create_task(
-        task_name="test_task2",
-        source=self._get_test_src(),
-        preprocessors=[
-            airio_preps.MapFnTransform(functools.partial(test_map_fn, idx=2))
-        ],
+    task2 = (
+        dataset_providers.TaskBuilder.from_task(self._simple_task_2)
+        .set_preprocessors([
+            self._map_transform_idx_2,
+            airio_preps.RandomMapFnTransform(test_random_map_fn),
+        ])
+        .build()
     )
     mix = dataset_providers.Mixture(
         name="test_mix", tasks=[task1, task2], proportions=[2.0, 1.0]
     )
-    ds = mix.get_dataset(None, "train", shuffle=False)
+    # TODO(b/300938204): grain LazyMapDataset -> LazyIterDataset isn't
+    # reproducible at the moment, hence use get_lazy_dataset for tests.
+    ds = mix.get_lazy_dataset(
+        None,
+        "train",
+        shuffle=True,
+        seed=42,
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
+        num_epochs=2,
+    )
     self.assertListEqual(
-        list(ds),
+        [ds[i] for i in range(len(ds))],
+        [
+            {"idx": 1, "val": 2, "var": 3},  # task 1 ex 2
+            {"idx": 1, "val": 1, "var": 0},  # task 1 ex 1
+            {"idx": 2, "val": 2, "var": 3},  # task 2 ex 2
+            {"idx": 1, "val": 0, "var": 1},  # task 1 ex 0
+            # epoch 1 end, no overlapping examples
+            {"idx": 1, "val": 1, "var": 4},  # task 1 ex 1
+            {"idx": 2, "val": 1, "var": 0},  # task 2 ex 1
+            {"idx": 1, "val": 0, "var": 4},  # task 1 ex 0
+            {"idx": 1, "val": 2, "var": 1},  # task 1 ex 2
+            {"idx": 2, "val": 0, "var": 1},  # task 2 ex 0
+            # task 1 dataset now empty
+        ],
+    )
+
+  def test_indefinite_repeat(self):
+    mix = dataset_providers.Mixture(
+        name="test_mix",
+        tasks=[self._simple_task_1, self._simple_task_2],
+        proportions=[2.0, 1.0],
+    )
+    ds = mix.get_dataset(
+        shuffle=False,
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
+        num_epochs=None,
+    )
+    self.assertListEqual(
+        [next(ds) for _ in range(13)],
         [
             {"idx": 1, "val": 0},
             {"idx": 1, "val": 1},
             {"idx": 2, "val": 0},
             {"idx": 1, "val": 2},
-            {"idx": 1, "val": 3},
+            {"idx": 1, "val": 0},  # task 1 starts repeating
             {"idx": 2, "val": 1},
-            {"idx": 1, "val": 4},
-            {"idx": 1, "val": 0},
-            {"idx": 2, "val": 2},
             {"idx": 1, "val": 1},
+            {"idx": 1, "val": 2},
+            {"idx": 2, "val": 2},
+            {"idx": 1, "val": 0},
+            {"idx": 1, "val": 1},
+            {"idx": 2, "val": 0},  # task 2 starts repeating
+            {"idx": 1, "val": 2},
         ],
+    )
+
+  def test_mixture_with_different_sources_and_preprocessors(self):
+    mix = dataset_providers.Mixture(
+        name="test_mix",
+        tasks=[self._imdb_task, self._simple_to_imdb_task],
+        proportions=[1.0, 1.0],
+    )
+    ds = mix.get_dataset(
+        shuffle=False,
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
+        num_epochs=1,
+    )
+    expected = [
+        {  # imdb task
+            "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
+            "inputs": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                4,
+                2,
+                13,
+                3,
+                5,
+                20,
+                2,
+                4,
+                2,
+                20,
+                2,
+                4,
+            ],
+            "targets_pretokenized": "positive",
+            "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+        },
+        {  # simple task
+            "inputs_pretokenized": "0",
+            "inputs": [0] * 20,
+            "targets_pretokenized": "1",
+            "targets": [1] * 10,
+        },
+        {  # imdb task
+            "inputs_pretokenized": "imdb hj aijbcidcibdg",
+            "inputs": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                20,
+                2,
+                3,
+                5,
+                8,
+                2,
+                13,
+                8,
+                21,
+                13,
+                8,
+                2,
+                21,
+                2,
+            ],
+            "targets_pretokenized": "negative",
+            "targets": [3, 22, 4, 2, 18, 8, 25, 4],
+        },
+        {  # simple task
+            "inputs_pretokenized": "1",
+            "inputs": [1] * 20,
+            "targets_pretokenized": "2",
+            "targets": [2] * 10,
+        },
+        # imdb task now empty.
+    ]
+    test_utils.assert_datasets_equal(ds, expected)
+
+  def test_mixture_with_different_output_features_fail_batching(self):
+    mix = dataset_providers.Mixture(
+        name="test_mix",
+        tasks=[self._imdb_task, self._simple_task_1],
+        proportions=[1.0, 1.0],
+    )
+    ds = mix.get_dataset(
+        shuffle=False,
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
+        num_epochs=1,
+        batch_size=2
+    )
+    with self.assertRaisesRegex(
+        ValueError,
+        "The two structures don't have the same nested structure.*",
+    ):
+      _ = next(ds)
+
+  def test_mixture_with_feature_converter(self):
+    mix = dataset_providers.Mixture(
+        name="test_mix",
+        tasks=[self._imdb_task, self._simple_to_imdb_task],
+        proportions=[1.0, 1.0],
+    )
+    ds = mix.get_dataset(
+        shuffle=False,
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
+        num_epochs=1,
+        feature_converter=_create_feature_converter(),
+    )
+    expected = [
+        {  # imdb task
+            "encoder_input_tokens": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                4,
+                2,
+                13,
+                3,
+                5,
+                20,
+                2,
+                4,
+                2,
+                20,
+                2,
+                4,
+            ],
+            "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+            "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1],
+        },
+        {  # simple task
+            "encoder_input_tokens": [0] * 20,
+            "decoder_target_tokens": [1] * 10,
+            "decoder_input_tokens": [1] * 10,
+            "decoder_loss_weights": [1] * 10,
+        },
+        {  # imdb task
+            "encoder_input_tokens": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                20,
+                2,
+                3,
+                5,
+                8,
+                2,
+                13,
+                8,
+                21,
+                13,
+                8,
+                2,
+                21,
+                2,
+            ],
+            "decoder_target_tokens": [3, 22, 4, 2, 18, 8, 25, 4],
+            "decoder_input_tokens": [3, 22, 4, 2, 18, 8, 25, 4],
+            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1],
+        },
+        {  # simple task
+            "encoder_input_tokens": [1] * 20,
+            "decoder_target_tokens": [2] * 10,
+            "decoder_input_tokens": [2] * 10,
+            "decoder_loss_weights": [1] * 10,
+        },
+        # imdb task now empty
+    ]
+    test_utils.assert_datasets_equal(ds, expected)
+
+  def test_mixture_with_feature_converter_and_batching(self):
+    mix = dataset_providers.Mixture(
+        name="test_mix",
+        tasks=[self._imdb_task, self._simple_to_imdb_task],
+        proportions=[1.0, 1.0],
+    )
+    ds = mix.get_dataset(
+        sequence_lengths={"inputs": 20, "targets": 10},
+        shuffle=False,
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
+        num_epochs=1,
+        feature_converter=_create_feature_converter(),
+        batch_size=2,
+    )
+    expected_first_batch = {
+        "decoder_input_tokens": [
+            [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],  # imdb task
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],  # simple task
+        ],
+        "decoder_loss_weights": [
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 0],  # imdb task
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],  # simple task
+        ],
+        "decoder_target_tokens": [
+            [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],  # imdb task
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],  # imdb task
+        ],
+        "encoder_input_tokens": [
+            [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                4,
+                2,
+                13,
+                3,
+                5,
+                20,
+                2,
+                4,
+                2,
+                20,
+                2,
+                4,
+                0,
+                0,
+            ],  # imdb task
+            # simple task
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        ],
+    }
+    self.assertDictEqual(
+        {k: v.tolist() for k, v in next(ds).items()}, expected_first_batch
+    )
+
+  def test_mixture_with_batching_only(self):
+    mix = dataset_providers.Mixture(
+        name="test_mix",
+        tasks=[self._simple_task_1, self._simple_task_2],
+        proportions=[1.0, 1.0],
+    )
+    ds = mix.get_dataset(
+        sequence_lengths={"inputs": 20, "targets": 10},
+        shuffle=False,
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
+        num_epochs=1,
+        feature_converter=None,
+        batch_size=2,
+    )
+    self.assertDictEqual(
+        {k: v.tolist() for k, v in next(ds).items()},
+        {"idx": [1, 2], "val": [0, 0]},
     )
 
 
