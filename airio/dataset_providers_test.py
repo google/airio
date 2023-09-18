@@ -20,6 +20,7 @@ from typing import Dict, Sequence
 from unittest import mock
 
 from absl.testing import absltest
+# from absl.testing import parameterized
 from airio import data_sources
 from airio import dataset_providers
 from airio import feature_converters
@@ -88,6 +89,16 @@ def _create_source(
     splits = _SOURCE_SPLITS
   with tfds.testing.mock_data(num_examples):
     return data_sources.TfdsDataSource(tfds_name=source_name, splits=splits)
+
+
+def _create_fn_src(num_elements=5):
+  def _dataset_fn(split: str):
+    del split
+    return np.arange(num_elements)
+
+  return data_sources.FunctionDataSource(
+      dataset_fn=_dataset_fn, splits=["train"]
+  )
 
 
 def _create_task(
@@ -917,12 +928,12 @@ class MixtureTest(absltest.TestCase):
     )
     self._simple_task_1 = _create_task(
         task_name="test_task1",
-        source=self._get_test_src(),
+        source=_create_fn_src(),
         preprocessors=[self._map_transform_idx_1],
     )
     self._simple_task_2 = _create_task(
         task_name="test_task2",
-        source=self._get_test_src(),
+        source=_create_fn_src(),
         preprocessors=[self._map_transform_idx_2],
     )
     self._imdb_task = _create_task(
@@ -934,15 +945,6 @@ class MixtureTest(absltest.TestCase):
             airio_preps.MapFnTransform(simple_to_imdb_map_fn),
         ])
         .build()
-    )
-
-  def _get_test_src(self, num_elements=5):
-    def _dataset_fn(split: str):
-      del split
-      return np.arange(num_elements)
-
-    return data_sources.FunctionDataSource(
-        dataset_fn=_dataset_fn, splits=["train"]
     )
 
   def test_simple_mixture(self):
@@ -1433,6 +1435,125 @@ class MixtureTest(absltest.TestCase):
         {k: v.tolist() for k, v in next(ds).items()},
         {"idx": [1, 2], "val": [0, 0]},
     )
+
+
+class MixturePropertiesTest(absltest.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.tasks = []
+    for i in range(5):
+      self.tasks.append(
+          _create_task(
+              source=_create_fn_src(),
+              preprocessors=[],
+              task_name=f"test_task_{i}",
+          )
+      )
+    self.simple_mix = dataset_providers.Mixture(
+        name="test_mix_1",
+        tasks=self.tasks[:3],
+        proportions=[1.0, 0.5, 2.0],
+    )
+    self.mix_of_mix = dataset_providers.Mixture(
+        name="test_mix_2",
+        tasks=[self.simple_mix, self.tasks[3]],
+        proportions=[0.5, 0.7],
+    )
+    self.mix_of_mix_of_mix = dataset_providers.Mixture(
+        name="test_mix_3",
+        tasks=[self.simple_mix, self.mix_of_mix, self.tasks[4]],
+        proportions=[0.5, 0.7, 0.8],
+    )
+
+  def test_tasks_or_mixtures(self):
+    self.assertListEqual(self.simple_mix.tasks_or_mixtures, self.tasks[:3])
+    self.assertListEqual(
+        self.mix_of_mix.tasks_or_mixtures, [self.simple_mix, self.tasks[3]]
+    )
+    self.assertListEqual(
+        self.mix_of_mix_of_mix.tasks_or_mixtures,
+        [self.simple_mix, self.mix_of_mix, self.tasks[4]],
+    )
+
+  def test_total_proportions(self):
+    self.assertAlmostEqual(self.simple_mix.total_proportion, 3.5)
+    self.assertAlmostEqual(self.mix_of_mix.total_proportion, 1.2)
+    self.assertAlmostEqual(self.mix_of_mix_of_mix.total_proportion, 2.0)
+
+  def test_get_proportion(self):
+    self.assertAlmostEqual(self.simple_mix.get_proportion(self.tasks[0]), 1.0)
+    self.assertAlmostEqual(self.simple_mix.get_proportion(self.tasks[1]), 0.5)
+    self.assertAlmostEqual(self.simple_mix.get_proportion(self.tasks[2]), 2.0)
+    self.assertAlmostEqual(self.simple_mix.get_proportion(self.tasks[3]), 0.0)
+    self.assertAlmostEqual(self.simple_mix.get_proportion(self.tasks[4]), 0.0)
+
+    self.assertAlmostEqual(
+        self.mix_of_mix.get_proportion(self.tasks[0]), 0.5 * (1.0 / 3.5)
+    )
+    self.assertAlmostEqual(
+        self.mix_of_mix.get_proportion(self.tasks[1]), 0.5 * (0.5 / 3.5)
+    )
+    self.assertAlmostEqual(
+        self.mix_of_mix.get_proportion(self.tasks[2]), 0.5 * (2.0 / 3.5)
+    )
+    self.assertAlmostEqual(self.mix_of_mix.get_proportion(self.tasks[3]), 0.7)
+    self.assertAlmostEqual(self.mix_of_mix.get_proportion(self.tasks[4]), 0.0)
+
+    self.assertAlmostEqual(
+        self.mix_of_mix_of_mix.get_proportion(self.tasks[0]),
+        0.5 * (1.0 / 3.5) + 0.7 * (0.5 / 1.2) * (1.0 / 3.5),
+    )
+    self.assertAlmostEqual(
+        self.mix_of_mix_of_mix.get_proportion(self.tasks[1]),
+        0.5 * (0.5 / 3.5) + 0.7 * (0.5 / 1.2) * (0.5 / 3.5),
+    )
+    self.assertAlmostEqual(
+        self.mix_of_mix_of_mix.get_proportion(self.tasks[2]),
+        0.5 * (2.0 / 3.5) + 0.7 * (0.5 / 1.2) * (2.0 / 3.5),
+    )
+    self.assertAlmostEqual(
+        self.mix_of_mix_of_mix.get_proportion(self.tasks[3]), 0.7 * (0.7 / 1.2)
+    )
+    self.assertAlmostEqual(
+        self.mix_of_mix_of_mix.get_proportion(self.tasks[4]), 0.8
+    )
+
+  def test_leaf_tasks(self):
+    self.assertListEqual(self.simple_mix.leaf_tasks, self.tasks[:3])
+    self.assertListEqual(self.mix_of_mix.leaf_tasks, self.tasks[:4])
+    self.assertListEqual(self.mix_of_mix_of_mix.leaf_tasks, self.tasks)
+
+  def test_splits(self):
+    self.assertSequenceEqual(self.simple_mix.splits, ["train"])
+    self.assertSequenceEqual(self.mix_of_mix.splits, ["train"])
+    self.assertSequenceEqual(self.mix_of_mix_of_mix.splits, ["train"])
+
+  def test_num_input_examples(self):
+    self.assertEqual(self.simple_mix.num_input_examples("train"), 3 * 5)
+    self.assertEqual(self.mix_of_mix.num_input_examples("train"), 3 * 5 + 5)
+    self.assertEqual(
+        self.mix_of_mix_of_mix.num_input_examples("train"),
+        3 * 5 + (3 * 5 + 5) + 5,
+    )
+
+  def test_tasks_and_proportions_mismatch(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        "Mixture invalid_mix must have same number of tasks and proportions.*",
+    ):
+      _ = dataset_providers.Mixture(
+          "invalid_mix", [self.tasks[0], self.tasks[1]], [1.0]
+      )
+
+  def test_duplicate_tasks(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        "Mixture invalid_mix has duplicate tasks.*",
+    ):
+      _ = dataset_providers.Mixture(
+          "invalid_mix", [self.tasks[0], self.tasks[0]], [1.0, 1.0]
+      )
 
 
 if __name__ == "__main__":

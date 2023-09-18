@@ -15,6 +15,7 @@
 """Classes for AirIO data loading."""
 
 import dataclasses
+import functools
 import typing
 from typing import Any, Iterable, List, Mapping, Protocol, Sequence, Tuple, Union
 
@@ -265,18 +266,21 @@ class Mixture(DatasetProviderBase):
   def __init__(
       self,
       name: str,
-      tasks: Sequence[Task],
+      tasks: Sequence[Union[Task, "Mixture"]],
       proportions: Sequence[float],
   ):
-    # TODO(b/294122943): Add support for mixture of mixtures.
     if len(tasks) != len(proportions):
       raise ValueError(
-          f"Number of tasks and proportions must be the same. tasks: {tasks}, "
-          f"proportions: {proportions}."
+          f"Mixture {name} must have same number of tasks and proportions."
+          f"tasks: {tasks}, proportions: {proportions}."
       )
+    hashes = [hash(task) for task in tasks]
+    if len(set(hashes)) != len(tasks):
+      raise ValueError(f"Mixture {name} has duplicate tasks. tasks: {tasks}.")
+
     self.name = name
-    self._tasks = tasks
-    self.proportions = dict(zip([t.name for t in tasks], proportions))
+    self._tasks_or_mixtures = dict(zip(hashes, tasks))
+    self._proportions = dict(zip(hashes, proportions))
 
   def get_task_lazy_dataset(
       self,
@@ -358,7 +362,8 @@ class Mixture(DatasetProviderBase):
           "Repeating indefinitely with shuffling turned on isn't supported."
       )
     datasets = []
-    for task in self.tasks:
+    proportions = []
+    for task in self.leaf_tasks:
       datasets.append(
           self.get_task_lazy_dataset(
               task=task,
@@ -372,6 +377,7 @@ class Mixture(DatasetProviderBase):
               num_epochs=num_epochs,
           )
       )
+      proportions.append(self.get_proportion(task))
       # Note: We will run feature converter on and batch the mixed dataset, but
       # these can be done before mixing by setting feature_converter and
       # batch_size above and disabling them below if needed in the future.
@@ -379,7 +385,7 @@ class Mixture(DatasetProviderBase):
       # Mixture, but since these are lazily populated, we can skip calculating
       # the exact number of epochs required.
     ds = lazy_dataset_transforms.MixedLazyMapDataset(
-        datasets, list(self.proportions.values()), stop_on_empty_dataset=True
+        datasets, proportions, stop_on_empty_dataset=True
     )
     post_mix_preps = []
     if feature_converter:
@@ -440,24 +446,52 @@ class Mixture(DatasetProviderBase):
 
   def num_input_examples(self, split: str) -> int | None:
     return sum(
-        t.num_input_examples(split) for t in self.tasks if split in t.splits
+        t.num_input_examples(split)
+        for t in self.tasks_or_mixtures
+        if split in t.splits
     )
 
-  @property
-  def tasks(self) -> Sequence[Task]:
-    return self._tasks
+  def get_proportion(self, task: Task) -> float:
+    """Computes the mixing proportion for the given task."""
+    prop = 0.0
+    task_hash = hash(task)
+    if task_hash in self._proportions:
+      prop += self._proportions[task_hash]
+
+    if task not in self.leaf_tasks:
+      return prop
+
+    for sub_task in self.tasks_or_mixtures:
+      if isinstance(sub_task, Mixture) and task in sub_task.leaf_tasks:
+        prop += (
+            self._proportions[hash(sub_task)]
+            * sub_task.get_proportion(task)
+            / sub_task.total_proportion
+        )
+    return prop
 
   @property
-  def total_rate(self) -> float:
-    return sum(self.proportions.values())
+  def tasks_or_mixtures(self) -> Sequence[Union[Task, "Mixture"]]:
+    """Tasks or Mixtures confiugured during Mixture init."""
+    return list(self._tasks_or_mixtures.values())
 
-  def get_rate(self, task: Task) -> float:
-    return self.proportions[task.name]
+  @functools.cached_property
+  def leaf_tasks(self) -> Sequence[Task]:
+    """Tasks contained in this Mixture."""
+    all_ = self.tasks_or_mixtures
+    tasks = [t for t in all_ if isinstance(t, Task)]
+    mixtures = [m for m in all_ if isinstance(m, Mixture)]
+    sub_tasks = [mix.leaf_tasks for mix in mixtures]  # pytype: disable=attribute-error
+    return list(sorted(set(sum(sub_tasks, tasks)), key=lambda t: t.name))
+
+  @property
+  def total_proportion(self) -> float:
+    return sum(self._proportions.values())
 
   @property
   def splits(self) -> Sequence[str]:
     splits = set()
-    for task in self.tasks:
+    for task in self.tasks_or_mixtures:
       splits.update(task.splits)
     return tuple(splits)
 
