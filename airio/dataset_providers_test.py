@@ -899,6 +899,95 @@ class DatasetProvidersTest(absltest.TestCase):
         " source=<airio.data_sources.TfdsDataSource",
     )
 
+  def test_task_get_dataset_with_runtime_args(self):
+    def simple_to_imdb_map_fn(ex, rargs: airio_preps.AirIOInjectedRuntimeArgs):
+      return {
+          "inputs_pretokenized": f"{ex}",
+          "inputs": np.array([ex] * rargs.sequence_lengths["inputs"]),
+          "targets_pretokenized": f"{ex + 1}",
+          "targets": np.array([ex + 1] * rargs.sequence_lengths["targets"]),
+      }
+
+    simple_task = _create_task(
+        task_name="test_task1",
+        source=_create_fn_src(),
+        preprocessors=[airio_preps.MapFnTransform(simple_to_imdb_map_fn)],
+    )
+    ds = simple_task.get_dataset(
+        sequence_lengths={"inputs": 20, "targets": 10}, shuffle=False
+    )
+    expected = [
+        {
+            "inputs_pretokenized": "0",
+            "inputs": [0] * 20,
+            "targets_pretokenized": "1",
+            "targets": [1] * 10,
+        },
+        {
+            "inputs_pretokenized": "1",
+            "inputs": [1] * 20,
+            "targets_pretokenized": "2",
+            "targets": [2] * 10,
+        },
+        {
+            "inputs_pretokenized": "2",
+            "inputs": [2] * 20,
+            "targets_pretokenized": "3",
+            "targets": [3] * 10,
+        },
+        {
+            "inputs_pretokenized": "3",
+            "inputs": [3] * 20,
+            "targets_pretokenized": "4",
+            "targets": [4] * 10,
+        },
+        {
+            "inputs_pretokenized": "4",
+            "inputs": [4] * 20,
+            "targets_pretokenized": "5",
+            "targets": [5] * 10,
+        },
+    ]
+    test_utils.assert_datasets_equal(list(ds), expected)
+
+  def test_task_get_dataset_by_step_with_runtime_args(self):
+    def simple_to_imdb_map_fn(ex, rargs: airio_preps.AirIOInjectedRuntimeArgs):
+      return {
+          "inputs_pretokenized": f"{ex}",
+          "inputs": np.array([ex] * rargs.sequence_lengths["inputs"]),
+          "targets_pretokenized": f"{ex + 1}",
+          "targets": np.array([ex + 1] * rargs.sequence_lengths["targets"]),
+      }
+    simple_task = _create_task(
+        task_name="test_task1",
+        source=_create_fn_src(),
+        preprocessors=[airio_preps.MapFnTransform(simple_to_imdb_map_fn)],
+    )
+    ds = simple_task.get_dataset_by_step(
+        sequence_lengths={"inputs": 20, "targets": 10}, shuffle=False
+    )
+    expected = [
+        [0, 1],
+        [
+            {
+                "inputs_pretokenized": "0",
+                "inputs": [0] * 20,
+                "targets_pretokenized": "1",
+                "targets": [1] * 10,
+            },
+            {
+                "inputs_pretokenized": "1",
+                "inputs": [1] * 20,
+                "targets_pretokenized": "2",
+                "targets": [2] * 10,
+            },
+        ],
+    ]
+    # src
+    self.assertListEqual(list(ds[0]), expected[0])
+    # preprocessed
+    test_utils.assert_datasets_equal(ds[1], expected[1])
+
 
 class MixtureTest(absltest.TestCase):
   def setUp(self):
@@ -907,13 +996,12 @@ class MixtureTest(absltest.TestCase):
     def test_map_fn(ex, idx):
       return {"idx": idx, "val": ex}
 
-    # TODO(b/294122943): Pass runtime args to this preprocessor.
-    def simple_to_imdb_map_fn(ex):
+    def simple_to_imdb_map_fn(ex, rargs: airio_preps.AirIOInjectedRuntimeArgs):
       return {
           "inputs_pretokenized": f"{ex}",
-          "inputs": np.array([ex] * 20),
+          "inputs": np.array([ex] * rargs.sequence_lengths["inputs"]),
           "targets_pretokenized": f"{ex + 1}",
-          "targets": np.array([ex + 1] * 10),
+          "targets": np.array([ex + 1] * rargs.sequence_lengths["targets"]),
       }
 
     imdb_source = _create_source(
@@ -1186,6 +1274,7 @@ class MixtureTest(absltest.TestCase):
         proportions=[1.0, 1.0],
     )
     ds = mix.get_dataset(
+        sequence_lengths={"inputs": 20, "targets": 10},
         shuffle=False,
         shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
@@ -1284,13 +1373,14 @@ class MixtureTest(absltest.TestCase):
         proportions=[1.0, 1.0],
     )
     ds = mix.get_dataset(
+        sequence_lengths={"inputs": 20, "targets": 10},
         shuffle=False,
         shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
         feature_converter=_create_feature_converter(),
     )
     expected = [
-        {  # imdb task
+        {   # imdb task
             "encoder_input_tokens": [
                 3,
                 8,
@@ -1310,18 +1400,20 @@ class MixtureTest(absltest.TestCase):
                 20,
                 2,
                 4,
+                0,
+                0,
             ],
-            "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
-            "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
-            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
+            "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
+            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
         },
-        {  # simple task
+        {   # simple task
             "encoder_input_tokens": [0] * 20,
             "decoder_target_tokens": [1] * 10,
             "decoder_input_tokens": [1] * 10,
             "decoder_loss_weights": [1] * 10,
         },
-        {  # imdb task
+        {   # imdb task
             "encoder_input_tokens": [
                 3,
                 8,
@@ -1344,9 +1436,9 @@ class MixtureTest(absltest.TestCase):
                 21,
                 2,
             ],
-            "decoder_target_tokens": [3, 22, 4, 2, 18, 8, 25, 4],
-            "decoder_input_tokens": [3, 22, 4, 2, 18, 8, 25, 4],
-            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1],
+            "decoder_target_tokens": [3, 22, 4, 2, 18, 8, 25, 4, 0, 0],
+            "decoder_input_tokens": [3, 22, 4, 2, 18, 8, 25, 4, 0, 0],
+            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
         },
         {  # simple task
             "encoder_input_tokens": [1] * 20,

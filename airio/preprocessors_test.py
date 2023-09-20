@@ -186,5 +186,128 @@ class PreprocessorsTest(absltest.TestCase):
       _ = preprocessors.LazyDatasetTransform(grain.BatchOperation(5))
 
 
+class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
+  def setUp(self):
+    super().setUp()
+    self._runtime_args = preprocessors.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"val": 3},
+        split="train",
+    )
+
+  def _get_test_src(self, num_elements=5):
+    def _dataset_fn(split: str):
+      del split
+      return np.array(range(num_elements))
+
+    return data_sources.FunctionDataSource(
+        dataset_fn=_dataset_fn, splits=["train"]
+    )
+
+  def test_map_fn_preprocessor(self):
+    def test_map_fn(ex, run_args: preprocessors.AirIOInjectedRuntimeArgs):
+      return ex + run_args.sequence_lengths["val"]
+
+    task = dataset_providers.Task(
+        name="test_task",
+        source=self._get_test_src(),
+        preprocessors=[
+            preprocessors.MapFnTransform(test_map_fn, self._runtime_args)
+        ],
+    )
+    ds = task.get_dataset({"val": 3}, "train", shuffle=False)
+    self.assertListEqual(list(ds), list(range(3, 8)))
+
+  def test_random_map_fn_preprocessor(self):
+
+    def test_random_map_fn(
+        ex, rng, r_args: preprocessors.AirIOInjectedRuntimeArgs
+    ):
+      return (
+          ex
+          + r_args.sequence_lengths["val"]
+          + int(jax.random.randint(rng, [], 0, 10))
+      )
+
+    task = dataset_providers.Task(
+        name="test_task",
+        source=self._get_test_src(),
+        preprocessors=[
+            preprocessors.RandomMapFnTransform(
+                test_random_map_fn, self._runtime_args
+            )
+        ],
+    )
+    ds = task.get_dataset({"val": 3}, "train", shuffle=False, seed=42)
+    self.assertListEqual(list(ds), [8, 12, 10, 6, 15])
+
+  def test_filter_fn_preprocessor(self):
+    def test_filter_fn(ex, rargs: preprocessors.AirIOInjectedRuntimeArgs):
+      return ex > rargs.sequence_lengths["val"]
+
+    task = dataset_providers.Task(
+        name="test_task",
+        source=self._get_test_src(),
+        preprocessors=[
+            preprocessors.FilterFnTransform(test_filter_fn, self._runtime_args)
+        ],
+    )
+    ds = task.get_dataset({"val": 3}, "train", shuffle=False, seed=42)
+    self.assertListEqual(list(ds), [4])
+
+  def test_unannotated_runtime_args(self):
+    def test_map_fn(ex, run_args):
+      return ex + run_args.sequence_lengths["val"]
+
+    task = dataset_providers.Task(
+        name="test_task",
+        source=self._get_test_src(),
+        preprocessors=[
+            preprocessors.MapFnTransform(test_map_fn, self._runtime_args)
+        ],
+    )
+    with self.assertRaisesRegex(ValueError, "PyGrain encountered an error.*"):
+      ds = task.get_dataset(None, "train", shuffle=False)
+      _ = list(ds)
+
+  def test_map_lazydataset_transform(self):
+    def test_map_fn(ex, run_args: preprocessors.AirIOInjectedRuntimeArgs):
+      return ex + run_args.sequence_lengths["val"]
+
+    transform = preprocessors.MapFnTransform(test_map_fn)
+    lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
+    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    ds = lazy_dataset_transform(ds, runtime_args=self._runtime_args)
+    self.assertListEqual(list(ds), list(range(3, 8)))
+
+  def test_random_map_fn_lazydataset_transform(self):
+
+    def test_random_map_fn(
+        ex, rng, r_args: preprocessors.AirIOInjectedRuntimeArgs
+    ):
+      return (
+          ex
+          + r_args.sequence_lengths["val"]
+          + int(jax.random.randint(rng, [], 0, 10))
+      )
+
+    transform = preprocessors.RandomMapFnTransform(test_random_map_fn)
+    lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
+    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    ds = lazy_dataset_transform(
+        ds, rng=jax.random.PRNGKey(42), runtime_args=self._runtime_args
+    )
+    self.assertListEqual(list(ds), [8, 7, 8, 15, 16])
+
+  def test_filter_lazydataset_transform(self):
+    def test_filter_fn(ex, rargs: preprocessors.AirIOInjectedRuntimeArgs):
+      return ex > rargs.sequence_lengths["val"]
+
+    transform = preprocessors.FilterFnTransform(test_filter_fn)
+    lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
+    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    ds = lazy_dataset_transform(ds, runtime_args=self._runtime_args)
+    self.assertListEqual(list(ds), [4])
+
+
 if __name__ == "__main__":
   absltest.main()

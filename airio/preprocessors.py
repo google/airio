@@ -15,15 +15,16 @@
 """AirIO preprocessor classes."""
 
 import dataclasses
+import functools
+import inspect
 import time
-from typing import Any, Callable, Union
+from typing import Any, Callable, Mapping, Union
 
 from airio import lazy_dataset_transforms
 import grain.python as grain
 import jax
 import numpy as np
 
-# TODO(b/294122943): Add support for injecting runtime args, e.g. seq lens.
 # TODO(b/294122943): Implement flat_map.
 
 lazy_dataset = grain.experimental.lazy_dataset
@@ -31,37 +32,64 @@ JaxRng = Union[jax.random.PRNGKeyArray, jax.Array]
 
 
 @dataclasses.dataclass
+class AirIOInjectedRuntimeArgs:
+  """A set of attributes that can be injected into preprocessors at runtime."""
+  sequence_lengths: Mapping[str, int]
+  split: str
+
+
+MapFnCallable = Union[
+    Callable[[Any], Any], Callable[[Any, AirIOInjectedRuntimeArgs], Any]
+]
+RandomMapFnCallable = Union[
+    Callable[[Any, JaxRng], Any],
+    Callable[[Any, JaxRng, AirIOInjectedRuntimeArgs], Any],
+]
+FilterFnCallable = Union[
+    Callable[[Any], bool], Callable[[Any, AirIOInjectedRuntimeArgs], bool]
+]
+
+
+@dataclasses.dataclass
 class MapFnTransform(grain.MapTransform):
   """Grain Transform to represent AirIO map preprocessors."""
 
-  map_fn: Callable[[Any], Any]
+  map_fn: MapFnCallable
+  runtime_args: AirIOInjectedRuntimeArgs | None = None
 
   def map(self, element):
     """Maps a single element."""
-    return self.map_fn(element)
+    return inject_runtime_args_to_fn(self.map_fn, self.runtime_args)(element)
 
 
 @dataclasses.dataclass
 class RandomMapFnTransform(grain.RandomMapTransform):
   """Grain Transform to represent AirIO random map preprocessors."""
 
-  map_fn: Callable[[Any, JaxRng], Any]
+  map_fn: RandomMapFnCallable
+  runtime_args: AirIOInjectedRuntimeArgs | None = None
 
   def random_map(self, element, rng: np.random.Generator):
     """Maps a single element."""
     jax_rng = jax.random.PRNGKey(rng.integers(0, 2**16 - 1))
-    return self.map_fn(element, jax_rng)
+    return inject_runtime_args_to_fn(self.map_fn, self.runtime_args)(
+        element, jax_rng
+    )
 
 
 @dataclasses.dataclass
 class FilterFnTransform(grain.FilterTransform):
   """Grain Transform to represent AirIO filter preprocessors."""
 
-  filter_fn: Callable[..., Any]
+  filter_fn: FilterFnCallable
+  runtime_args: AirIOInjectedRuntimeArgs | None = None
 
   def filter(self, element) -> bool:
     """Filters a single element."""
-    return self.filter_fn(element)
+    return inject_runtime_args_to_fn(self.filter_fn, self.runtime_args)(element)
+
+
+FnTransforms = Union[MapFnTransform, RandomMapFnTransform, FilterFnTransform]
 
 
 @dataclasses.dataclass
@@ -84,9 +112,16 @@ class LazyDatasetTransform:
       )
 
   def __call__(
-      self, ds: lazy_dataset.LazyMapDataset, rng: JaxRng | None = None
+      self,
+      ds: lazy_dataset.LazyMapDataset,
+      rng: JaxRng | None = None,
+      runtime_args: AirIOInjectedRuntimeArgs | None = None,
   ):
     # pytype: disable=attribute-error
+    if isinstance(self.transform, FnTransforms):
+      self.transform.runtime_args = runtime_args
+      # Note: Runtime args support can be extended to general grain transforms
+      # by finding and setting attrs annotated with `AirIOInjectedRuntimeArgs`.
     match self.transform:
       case grain.MapTransform():
         return lazy_dataset.MapLazyMapDataset(ds, self.transform)
@@ -95,8 +130,11 @@ class LazyDatasetTransform:
         # jax PRNGKeys.
         if rng is None:
           rng = jax.random.PRNGKey(np.int32(time.time()))
+        map_fn = inject_runtime_args_to_fn(self.transform.map_fn, runtime_args)
         return lazy_dataset_transforms.RandomMapFnLazyMapDataset(
-            ds, map_fn=self.transform.map_fn, base_rng=rng
+            ds,
+            map_fn=map_fn,
+            base_rng=rng,
         )
       case grain.FilterTransform():
         return lazy_dataset.FilterLazyMapDataset(ds, self.transform)
@@ -110,3 +148,44 @@ class LazyDatasetTransform:
         # Should be taken care of by post init validation.
         raise ValueError("%s is not supported" % str(self.transform))
     # pytype: enable=attribute-error
+
+
+def inject_runtime_args_to_fn(
+    fn: Callable[..., Any], runtime_args: AirIOInjectedRuntimeArgs
+):
+  """Inject a partial function with runtime_args.
+
+  For example, for the following fn, `runtime_args` will be passed to `arg`
+  using `functools.partial`. The name of the arg doesn't matter, the typing
+  annotation is used to find and pass runtime args.
+
+  def my_fn(ex, ..other_args.., arg: AirIOInjectedRuntimeArgs, ..other_args..):
+    ...
+
+  Args:
+    fn: A function.
+    runtime_args: A `AirIOInjectedRuntimeArgs` obj to be passed to the fn.
+
+  Returns:
+    The provided fn with `runtime_args` passed to any arg annotated with
+    `AirIOInjectedRuntimeArgs` using `functools.partial`.
+
+  Raises:
+    ValueError: if there are multiple args annotated as
+    `AirIOInjectedRuntimeArgs`.
+  """
+  all_params = inspect.signature(fn).parameters
+  all_annotations = [
+      (arg_name, param.annotation) for arg_name, param in all_params.items()
+  ]
+  runtime_args_annotations = [
+      ann for ann in all_annotations if ann[1] is AirIOInjectedRuntimeArgs
+  ]
+  if not runtime_args_annotations:
+    return fn
+  if len(runtime_args_annotations) > 1:
+    raise ValueError(
+        "Fn has multiple args annotated with AirIOInjectedRuntimeArgs, must"
+        f" have only one: {fn}, {runtime_args_annotations}"
+    )
+  return functools.partial(fn, **{runtime_args_annotations[0][0]: runtime_args})

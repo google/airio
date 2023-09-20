@@ -151,6 +151,14 @@ class Task(DatasetProviderBase):
           grain.BatchOperation(batch_size=batch_size, drop_remainder=False)
       )
 
+    # Add runtime args
+    runtime_args = airio_preps.AirIOInjectedRuntimeArgs(
+        sequence_lengths=sequence_lengths, split=split
+    )
+    for op in ops:
+      if isinstance(op, airio_preps.FnTransforms):
+        op.runtime_args = runtime_args
+
     return self._load_data(source=source, sampler=sampler, ops=ops)
 
   def _load_data(
@@ -249,8 +257,13 @@ class Task(DatasetProviderBase):
       return accumulated_result
 
     # Apply all transformations, one by one.
+    runtime_args = airio_preps.AirIOInjectedRuntimeArgs(
+        sequence_lengths=sequence_lengths, split=split
+    )
     accumulated_ops = []
     for op in all_ops:
+      if isinstance(op, airio_preps.FnTransforms):
+        op.runtime_args = runtime_args
       accumulated_ops.append(op)
       records_next_step = self._load_data(
           source=source, sampler=sampler, ops=accumulated_ops
@@ -326,13 +339,16 @@ class Mixture(DatasetProviderBase):
       preps.append(
           grain.Batch(batch_size=batch_size)
       )
+    runtime_args = airio_preps.AirIOInjectedRuntimeArgs(
+        sequence_lengths=sequence_lengths, split=split
+    )
     preprocessed_dss = []
     next_epoch_rng = jax.random.PRNGKey(seed)
     for ds in dss:
       next_epoch_rng, prep_rng = jax.random.split(next_epoch_rng)
       prep_rng, shuffle_rng = jax.random.split(prep_rng)
       for prep in preps:
-        ds = airio_preps.LazyDatasetTransform(prep)(ds, prep_rng)
+        ds = airio_preps.LazyDatasetTransform(prep)(ds, prep_rng, runtime_args)
         prep_rng, _ = jax.random.split(prep_rng)
       if shuffle:
         shuffle_seed = int(jax.random.randint(shuffle_rng, [], 0, 2**16 - 1))
@@ -396,11 +412,14 @@ class Mixture(DatasetProviderBase):
           grain.Batch(batch_size=batch_size, drop_remainder=False)
       )
     if post_mix_preps:
+      runtime_args = airio_preps.AirIOInjectedRuntimeArgs(
+          sequence_lengths=sequence_lengths, split=split
+      )
       post_mix_transforms = [
           airio_preps.LazyDatasetTransform(p) for p in post_mix_preps
       ]
       for t in post_mix_transforms:
-        ds = t(ds)
+        ds = t(ds, runtime_args=runtime_args)
     if num_epochs is None:
       ds = lazy_dataset.RepeatLazyMapDataset(ds, num_epochs=None)
     return ds
