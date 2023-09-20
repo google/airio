@@ -87,7 +87,9 @@ class ShardLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
   def __len__(self) -> int:
     return self._end - self._start  # pytype: disable=unsupported-operands
 
-  def __getitem__(self, index: int) -> T | None:
+  def __getitem__(self, index):
+    if isinstance(index, slice):
+      return self.slice(index)
     epoch = index // len(self)
     index_in_epoch = index % len(self)
     index = epoch * len(self.parent) + index_in_epoch + self._start  # pytype: disable=unsupported-operands
@@ -112,7 +114,9 @@ class ConcatLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
   def __len__(self) -> int:
     return sum(len(p) for p in self.parents)
 
-  def __getitem__(self, index: int) -> T | None:
+  def __getitem__(self, index):
+    if isinstance(index, slice):
+      return self.slice(index)
     parent_index = bisect.bisect_right(self._accumulated_lens, index) - 1  # pytype: disable=wrong-arg-types
     local_index = index - self._accumulated_lens[parent_index]  # pytype: disable=unsupported-operands
     return self.parents[parent_index][local_index]
