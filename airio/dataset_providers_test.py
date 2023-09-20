@@ -27,6 +27,7 @@ from airio import feature_converters
 from airio import preprocessors as airio_preps
 from airio import test_utils
 from airio import tokenizer
+import jax
 import numpy as np
 from seqio import vocabularies
 import tensorflow_datasets as tfds
@@ -1101,7 +1102,7 @@ class MixtureTest(absltest.TestCase):
 
   def test_multi_epoch_with_stochastic_preprocessor(self):
     def test_random_map_fn(ex, rng):
-      ex["var"] = rng.integers(0, 5)
+      ex["var"] = int(jax.random.randint(rng, [], 0, 20))
       return ex
 
     task1 = (
@@ -1123,8 +1124,6 @@ class MixtureTest(absltest.TestCase):
     mix = dataset_providers.Mixture(
         name="test_mix", tasks=[task1, task2], proportions=[2.0, 1.0]
     )
-    # TODO(b/300938204): grain LazyMapDataset -> LazyIterDataset isn't
-    # reproducible at the moment, hence use get_lazy_dataset for tests.
     ds = mix.get_lazy_dataset(
         None,
         "train",
@@ -1134,18 +1133,18 @@ class MixtureTest(absltest.TestCase):
         num_epochs=2,
     )
     self.assertListEqual(
-        [ds[i] for i in range(len(ds))],
+        list(ds),
         [
-            {"idx": 1, "val": 2, "var": 3},  # task 1 ex 2
-            {"idx": 1, "val": 1, "var": 0},  # task 1 ex 1
-            {"idx": 2, "val": 2, "var": 3},  # task 2 ex 2
-            {"idx": 1, "val": 0, "var": 1},  # task 1 ex 0
+            {"idx": 1, "val": 2, "var": 5},  # task 1 ex 2
+            {"idx": 1, "val": 1, "var": 9},  # task 1 ex 1
+            {"idx": 2, "val": 2, "var": 5},  # task 2 ex 2
+            {"idx": 1, "val": 0, "var": 13},  # task 1 ex 0
             # epoch 1 end, no overlapping examples
-            {"idx": 1, "val": 1, "var": 4},  # task 1 ex 1
-            {"idx": 2, "val": 1, "var": 0},  # task 2 ex 1
-            {"idx": 1, "val": 0, "var": 4},  # task 1 ex 0
-            {"idx": 1, "val": 2, "var": 1},  # task 1 ex 2
-            {"idx": 2, "val": 0, "var": 1},  # task 2 ex 0
+            {"idx": 1, "val": 1, "var": 19},  # task 1 ex 1
+            {"idx": 2, "val": 1, "var": 9},  # task 2 ex 1
+            {"idx": 1, "val": 0, "var": 5},  # task 1 ex 0
+            {"idx": 1, "val": 2, "var": 17},  # task 1 ex 2
+            {"idx": 2, "val": 0, "var": 13},  # task 2 ex 0
             # task 1 dataset now empty
         ],
     )

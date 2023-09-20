@@ -19,6 +19,7 @@ from airio import data_sources
 from airio import dataset_providers
 from airio import preprocessors
 import grain.python as grain
+import jax.random
 import numpy as np
 
 lazy_dataset = grain.experimental.lazy_dataset
@@ -49,7 +50,7 @@ class PreprocessorsTest(absltest.TestCase):
 
   def test_random_map_fn_preprocessor(self):
     def test_random_map_fn(ex, rng):
-      return ex + rng.integers(0, 10)
+      return ex + int(jax.random.randint(rng, [], 0, 10))
 
     task = dataset_providers.Task(
         name="test_task",
@@ -57,7 +58,7 @@ class PreprocessorsTest(absltest.TestCase):
         preprocessors=[preprocessors.RandomMapFnTransform(test_random_map_fn)],
     )
     ds = task.get_dataset(None, "train", shuffle=False, seed=42)
-    self.assertListEqual(list(ds), [3, 4, 9, 11, 11])
+    self.assertListEqual(list(ds), [5, 9, 7, 3, 12])
 
   def test_filter_fn_preprocessor(self):
     def test_filter_fn(ex):
@@ -79,7 +80,7 @@ class PreprocessorsTest(absltest.TestCase):
       return ex + 1
 
     def test_random_map_fn(ex, rng):
-      return ex + rng.integers(0, 10)
+      return ex + int(jax.random.randint(rng, [], 0, 10))
 
     task = dataset_providers.Task(
         name="test_task",
@@ -133,15 +134,25 @@ class PreprocessorsTest(absltest.TestCase):
     ds = lazy_dataset_transform(ds)
     self.assertListEqual(list(ds), list(range(1, 6)))
 
-  def test_random_map_lazydataset_transform(self):
+  def test_random_map_fn_lazydataset_transform(self):
     def test_random_map_fn(ex, rng):
-      return ex + rng.integers(0, 10)
+      return ex + int(jax.random.randint(rng, [], 0, 10))
 
     transform = preprocessors.RandomMapFnTransform(test_random_map_fn)
     lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
     ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
-    ds = lazy_dataset_transform(ds, seed=42)
-    self.assertListEqual([ds[i] for i in range(len(ds))], [9, 1, 6, 7, 4])
+    ds = lazy_dataset_transform(ds, rng=jax.random.PRNGKey(42))
+    self.assertListEqual(list(ds), [5, 4, 5, 12, 13])
+
+  def test_random_map_lazydataset_transform_disallowed(self):
+
+    class TestRandomMap(grain.RandomMapTransform):
+      def random_map(self, element, rng: np.random.Generator):
+        return element + rng.integers(0, 10)
+
+    transform = TestRandomMap()
+    with self.assertRaisesRegex(ValueError, ".*is not safe"):
+      _ = preprocessors.LazyDatasetTransform(transform)
 
   def test_filter_lazydataset_transform(self):
     def test_filter_fn(ex):

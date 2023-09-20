@@ -21,6 +21,7 @@ from absl.testing import absltest
 from absl.testing import parameterized
 from airio import lazy_dataset_transforms
 import grain.python as grain
+import jax.random
 
 lazy_dataset = grain.experimental.lazy_dataset
 
@@ -134,6 +135,52 @@ class MixLazyMapDatasetTest(absltest.TestCase):
     expected_values = [0, 1, 5, 2, 3, 6, 4]
     self.assertListEqual(expected_values, actual_values)
 
+
+class RandomMapFnLazyMapDatasetTest(absltest.TestCase):
+
+  def test_iter_reproducible(self):
+    def random_map_fn(ex, rng):
+      return ex + int(jax.random.randint(rng, [], 0, 10))
+
+    ds = lazy_dataset.RangeLazyMapDataset(5)
+
+    for _ in range(5):
+      ds1 = lazy_dataset_transforms.RandomMapFnLazyMapDataset(
+          ds, random_map_fn, jax.random.PRNGKey(42)
+      )
+      self.assertListEqual(list(ds1), [5, 4, 5, 12, 13])
+
+  def test_get_item_reproducible(self):
+    def random_map_fn(ex, rng):
+      return ex + int(jax.random.randint(rng, [], 0, 10))
+
+    ds = lazy_dataset.RangeLazyMapDataset(5)
+
+    for _ in range(5):
+      ds1 = lazy_dataset_transforms.RandomMapFnLazyMapDataset(
+          ds, random_map_fn, jax.random.PRNGKey(42)
+      )
+      self.assertListEqual([ds1[i] for i in range(len(ds))], [5, 4, 5, 12, 13])
+
+  def test_len(self):
+    def random_map_fn(ex, rng):
+      return ex + int(jax.random.randint(rng, [], 0, 10))
+
+    ds = lazy_dataset.RangeLazyMapDataset(5)
+    ds = lazy_dataset_transforms.RandomMapFnLazyMapDataset(
+        ds, random_map_fn, jax.random.PRNGKey(42)
+    )
+    self.assertLen(ds, 5)
+
+  def test_sparse(self):
+    def random_map_fn(ex, rng):
+      return ex + int(jax.random.randint(rng, [], 0, 10))
+
+    ds = lazy_dataset.RangeLazyMapDataset(5)
+    ds1 = lazy_dataset_transforms.RandomMapFnLazyMapDataset(
+        ds, random_map_fn, jax.random.PRNGKey(42)
+    )
+    self.assertEqual(ds1.sparse, ds.sparse)
 
 if __name__ == "__main__":
   absltest.main()

@@ -17,7 +17,7 @@
 import dataclasses
 import functools
 import typing
-from typing import Any, Iterable, List, Mapping, Protocol, Sequence, Tuple, Union
+from typing import Any, Iterable, List, Mapping, Protocol, Sequence, Union
 
 from airio import data_sources
 from airio import dataset_iterators
@@ -26,7 +26,7 @@ from airio import lazy_dataset_transforms
 from airio import preprocessors as airio_preps
 from clu.data import dataset_iterator as clu_dataset_iterator
 import grain.python as grain
-import numpy as np
+import jax.random
 import tensorflow_datasets as tfds
 
 lazy_dataset = grain.experimental.lazy_dataset
@@ -327,14 +327,15 @@ class Mixture(DatasetProviderBase):
           grain.Batch(batch_size=batch_size)
       )
     preprocessed_dss = []
-    next_epoch_seed = seed
+    next_epoch_rng = jax.random.PRNGKey(seed)
     for ds in dss:
-      next_epoch_seed, prep_seed = _split_seed(next_epoch_seed)
-      prep_seed, shuffle_seed = _split_seed(prep_seed)
+      next_epoch_rng, prep_rng = jax.random.split(next_epoch_rng)
+      prep_rng, shuffle_rng = jax.random.split(prep_rng)
       for prep in preps:
-        ds = airio_preps.LazyDatasetTransform(prep)(ds, prep_seed)
-        prep_seed, _ = _split_seed(prep_seed)
+        ds = airio_preps.LazyDatasetTransform(prep)(ds, prep_rng)
+        prep_rng, _ = jax.random.split(prep_rng)
       if shuffle:
+        shuffle_seed = int(jax.random.randint(shuffle_rng, [], 0, 2**16 - 1))
         ds = lazy_dataset.ShuffleLazyMapDataset(ds, seed=shuffle_seed)
       preprocessed_dss.append(ds)
     # pylint:enable=protected-access
@@ -399,7 +400,7 @@ class Mixture(DatasetProviderBase):
           airio_preps.LazyDatasetTransform(p) for p in post_mix_preps
       ]
       for t in post_mix_transforms:
-        ds = t(ds, seed=None)
+        ds = t(ds)
     if num_epochs is None:
       ds = lazy_dataset.RepeatLazyMapDataset(ds, num_epochs=None)
     return ds
@@ -598,8 +599,3 @@ def get_dataset(
       num_epochs=num_epochs,
       seed=seed,
   )
-
-
-def _split_seed(seed: int) -> Tuple[int, int]:
-  rst = np.random.RandomState(seed)
-  return rst.randint(0, 2**16 - 1), rst.randint(0, 2**16 - 1)

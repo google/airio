@@ -19,13 +19,14 @@ Most, if not all, of these should be upstreamed into the grain codebase.
 import bisect
 import dataclasses
 import itertools
-from typing import Sequence, TypeVar
+from typing import Any, Callable, Sequence, TypeVar, Union
 from absl import logging
 import grain.python as grain
+import jax
 import numpy as np
 
-
 lazy_dataset = grain.experimental.lazy_dataset
+JaxRng = Union[jax.random.PRNGKeyArray, jax.Array]
 T = TypeVar("T")
 
 
@@ -137,3 +138,28 @@ class MixedLazyMapDataset(lazy_dataset.MixedLazyMapDataset[T]):
       float_proportions = np.asarray(proportions) / sum(proportions)
       # Stop sampling once any constituent is exhausted.
       self._length = int((lengths / float_proportions).min())
+
+
+@dataclasses.dataclass(frozen=False)
+class RandomMapFnLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
+  """LazyMapDataset for random map fns with jax PRNGKey support."""
+
+  parent: lazy_dataset.LazyMapDataset
+  map_fn: Callable[[Any, JaxRng], Any]
+  base_rng: JaxRng
+
+  @property
+  def sparse(self) -> bool:
+    return self.parent.sparse
+
+  def __len__(self) -> int:
+    return len(self.parent)
+
+  def __getitem__(self, index):
+    if isinstance(index, slice):
+      return self.slice(index)
+    element = self.parent[index]
+    if element is None:
+      return None
+    rng = jax.random.fold_in(self.base_rng, index)
+    return self.map_fn(element, rng)
