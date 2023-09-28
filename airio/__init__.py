@@ -19,3 +19,4 @@ from airio.dataset_providers import *
 from airio.data_sources import *
 from airio.tokenizer import *
 from airio.feature_converters import *
+from airio.dataset_iterators import *
