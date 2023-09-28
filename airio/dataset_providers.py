@@ -146,9 +146,8 @@ class Task(DatasetProviderBase):
           )
       )
     if batch_size:
-      # TODO(b/300282178): Use grain.Batch when ready.
       ops.append(
-          grain.BatchOperation(batch_size=batch_size, drop_remainder=False)
+          grain.Batch(batch_size=batch_size, drop_remainder=False)
       )
 
     # Add runtime args
@@ -244,9 +243,8 @@ class Task(DatasetProviderBase):
           )
       )
     if batch_size:
-      # TODO(b/300282178): Use grain.Batch when ready.
       all_ops.append(
-          grain.BatchOperation(batch_size=batch_size, drop_remainder=False)
+          grain.Batch(batch_size=batch_size, drop_remainder=False)
       )
 
     # Raw data
