@@ -35,7 +35,7 @@ DEFAULT_NUM_RECORDS_TO_INSPECT = 2
 MAX_NUM_RECORDS_TO_INSPECT = 1000
 
 # TODO(sahildua): Expose these data sources as AirIO data sources?
-GrainDataSource = grain.TfdsDataSource
+GrainDataSource = grain.RandomAccessDataSource
 GrainPreprocessor = grain.Transformation | grain.Operation
 
 

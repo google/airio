@@ -63,7 +63,7 @@ class TfdsDataSource(DataSource):
           decoders=self._decoders,
       )
 
-  def get_data_source(self, split: str) -> grain.TfdsDataSource:
+  def get_data_source(self, split: str):
     if split not in self._sources:
       raise ValueError(
           f'Split {split} not found in {self.splits} for {self._tfds_name}.'
