@@ -14,6 +14,9 @@
 
 """AirIO-specific dataset iterators."""
 
+import concurrent.futures
+
+from clu import asynclib
 from clu.data import dataset_iterator
 from etils import epath
 import grain.python as grain
@@ -26,6 +29,11 @@ class PyGrainDatasetIteratorWrapper(dataset_iterator.DatasetIterator):
   def __init__(self, data_loader: grain.DataLoader):
     self._data_loader = data_loader
     self._iterator = data_loader.__iter__()
+
+    # Necessary to support peek_async().
+    self._peek = None
+    self._peek_future = None
+    self._pool = None
 
   def __next__(self) -> dataset_iterator.Element:
     return next(self._iterator)
@@ -41,6 +49,35 @@ class PyGrainDatasetIteratorWrapper(dataset_iterator.DatasetIterator):
             dtype=v.dtype, shape=tuple(v.shape)
         )
     return element_spec
+
+  def peek(self) -> dataset_iterator.Element:
+    """Returns the next element without consuming it.
+
+    This will get the next element from the underlying iterator. The element
+    is stored and return on the next call of __next__().
+
+    Returns:
+      The next element.
+    """
+    if self._peek is None:
+      local_iter = iter(self._data_loader)
+      self._peek = next(local_iter)
+    return self._peek
+
+  def peek_async(self) -> concurrent.futures.Future[dataset_iterator.Element]:
+    """Same as peek() but returns the Future of the element.
+
+    Users can call this to warm up the iterator.
+
+    Returns:
+      Future with the next element. The element is also kept and returned on the
+      next call of __next__().
+    """
+    if self._peek_future is None:
+      if self._pool is None:
+        self._pool = asynclib.Pool(max_workers=1)
+      self._peek_future = self._pool(self.peek)()
+    return self._peek_future
 
   def get_state(self) -> bytes:
     return self._iterator.get_state()

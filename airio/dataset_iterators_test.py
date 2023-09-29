@@ -177,6 +177,33 @@ class DatasetIteratorsTest(absltest.TestCase):
     ):
       iterator_wrapper.restore("non_existent_file")
 
+  def test_peek_gives_next_element(self):
+    data_loader = self._get_dummy_data_loader()
+    iterator_wrapper = dataset_iterators.PyGrainDatasetIteratorWrapper(
+        data_loader
+    )
+    peek_element = iterator_wrapper.peek()
+    self.assertEqual(peek_element["inputs_pretokenized"], "abc")
+
+    next_element = next(iterator_wrapper)
+    self.assertEqual(next_element["inputs_pretokenized"], "abc")
+
+  def test_peek_async(self):
+    data_loader = self._get_dummy_data_loader()
+    iterator_wrapper = dataset_iterators.PyGrainDatasetIteratorWrapper(
+        data_loader
+    )
+    future = iterator_wrapper.peek_async()
+    self.assertIsNone(iterator_wrapper._peek)
+    future.result()
+    self.assertIsNotNone(iterator_wrapper._peek)
+    peek_element = iterator_wrapper.peek()
+    self.assertEqual(peek_element["inputs_pretokenized"], "abc")
+    first_element = next(iterator_wrapper)
+    self.assertEqual(first_element["inputs_pretokenized"], "abc")
+    second_element = next(iterator_wrapper)
+    self.assertEqual(second_element["inputs_pretokenized"], "def")
+
 
 if __name__ == "__main__":
   absltest.main()
