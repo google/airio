@@ -26,6 +26,7 @@ from airio import preprocessors
 from airio import test_utils
 from airio import tokenizer
 import numpy as np
+import seqio
 from seqio import vocabularies
 
 _SOURCE_SPLITS = {"train", "test", "unsupervised"}
@@ -268,6 +269,32 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
             task_feature_lengths={"inputs": 24, "targets": 12},
         )
     )
+
+
+class FeatureConvertersTest(absltest.TestCase):
+
+  def test_get_pygrain_feature_converter_sets_properties_correctly(self):
+    pygrain_feature_converter = (
+        feature_converters.get_pygrain_feature_converter(
+            seqio.EncDecFeatureConverter(bos_id=123, pack=False)
+        )
+    )
+    self.assertIsInstance(
+        pygrain_feature_converter,
+        feature_converters.PyGrainEncDecFeatureConverter,
+    )
+    self.assertEqual(pygrain_feature_converter._bos_id, 123)
+    self.assertFalse(pygrain_feature_converter._pack)
+
+  def test_get_pygrain_feature_converter_raises_error_for_unimplemented(self):
+    with self.assertRaisesRegex(
+        NotImplementedError,
+        "Feature Converter .* does not have PyGrain FeatureConverter"
+        " equivalent.",
+    ):
+      feature_converters.get_pygrain_feature_converter(
+          seqio.PrefixLMFeatureConverter()
+      )
 
 
 if __name__ == "__main__":

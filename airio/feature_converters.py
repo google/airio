@@ -21,6 +21,7 @@ from typing import List, Mapping, Protocol
 from airio import preprocessors
 import grain.python as grain
 import numpy as np
+import seqio
 
 
 def _get_non_padding_positions(
@@ -144,3 +145,31 @@ class PyGrainEncDecFeatureConverter:
         "decoder_input_tokens": decoder_length,
         "decoder_loss_weights": decoder_length,
     }
+
+
+def get_pygrain_feature_converter(
+    feature_converter: seqio.FeatureConverter,
+) -> PyGrainFeatureConverter:
+  """Wrapper to convert seqio FeatureConverter into PyGrain FeatureConverter.
+
+  This method receives a SeqIO feature converter and returns a PyGrain-based
+  feature converter. This PyGrain-based feature converter has a list of PyGrain
+  operations which resemble the transformations applied in the _convert_features
+  method of SeqIO FeatureConverters.
+
+  Args:
+    feature_converter: A SeqIO feature converter.
+
+  Returns:
+    A PyGrain equivalent feature converter object.
+  """
+  if isinstance(feature_converter, seqio.EncDecFeatureConverter):
+    return PyGrainEncDecFeatureConverter(
+        bos_id=feature_converter.bos_id,
+        pack=feature_converter.pack,
+    )
+
+  raise NotImplementedError(
+      f"Feature Converter '{feature_converter}' does not have PyGrain"
+      " FeatureConverter equivalent."
+  )
