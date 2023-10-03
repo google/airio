@@ -42,9 +42,10 @@ class TokenizerTest(absltest.TestCase):
         "inputs": "imdb ebc   ahgjefjhfe",
         "targets": "positive",
     }
-    tokenized_example = tokenizer.tokenize(
-        orig_example, tokenizer_configs=self.tokenizer_configs
+    tokenizer_obj = tokenizer.Tokenizer(
+        tokenizer_configs=self.tokenizer_configs
     )
+    tokenized_example = tokenizer_obj(orig_example)
     expected_example = {
         "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
         "inputs": np.array(
@@ -63,9 +64,10 @@ class TokenizerTest(absltest.TestCase):
     orig_example = {
         "metadata": "sequence metadata",
     }
-    tokenized_example = tokenizer.tokenize(
-        orig_example, tokenizer_configs=self.tokenizer_configs
+    tokenizer_obj = tokenizer.Tokenizer(
+        tokenizer_configs=self.tokenizer_configs
     )
+    tokenized_example = tokenizer_obj(orig_example)
     for feature, value in tokenized_example.items():
       if isinstance(value, np.ndarray):
         np.testing.assert_allclose(value, orig_example[feature])
@@ -77,11 +79,11 @@ class TokenizerTest(absltest.TestCase):
         "inputs": "imdb ebc   ahgjefjhfe",
         "targets": "positive",
     }
-    tokenized_example = tokenizer.tokenize(
-        orig_example,
+    tokenizer_obj = tokenizer.Tokenizer(
         tokenizer_configs=self.tokenizer_configs,
         copy_pretokenized=False,
     )
+    tokenized_example = tokenizer_obj(orig_example)
     expected_example = {
         "inputs": np.array(
             [3, 8, 14, 21, 2, 3, 4, 2, 13, 3, 5, 20, 2, 4, 2, 20, 2, 4]
@@ -95,9 +97,10 @@ class TokenizerTest(absltest.TestCase):
         self.assertEqual(value, expected_example[feature])
 
   def test_tokenize_empty(self):
-    tokenized_example = tokenizer.tokenize(
-        {}, tokenizer_configs=self.tokenizer_configs
+    tokenizer_obj = tokenizer.Tokenizer(
+        tokenizer_configs=self.tokenizer_configs
     )
+    tokenized_example = tokenizer_obj({})
     self.assertEmpty(tokenized_example)
 
 

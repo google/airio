@@ -14,7 +14,6 @@
 
 """Tests for airio.feature_converters."""
 
-import functools
 import os
 from typing import Dict, Sequence
 from unittest import mock
@@ -85,8 +84,7 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
         preprocessors=[
             preprocessors.MapFnTransform(_imdb_preprocessor),
             preprocessors.MapFnTransform(
-                functools.partial(
-                    tokenizer.tokenize,
+                tokenizer.Tokenizer(
                     tokenizer_configs={
                         "inputs": tokenizer_config,
                         "targets": tokenizer_config,

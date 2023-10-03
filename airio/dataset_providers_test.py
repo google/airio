@@ -50,14 +50,18 @@ def _imdb_preprocessor(raw_example: Dict[str, str]) -> Dict[str, str]:
   return final_example
 
 
-def _create_tokenizer_config() -> Dict[str, str]:
+def _create_sentencepiece_vocab() -> vocabularies.SentencePieceVocabulary:
   test_data_dir = os.path.join(
       os.path.dirname(os.path.abspath(__file__)), "test_data"
   )
   sentencepiece_vocab = vocabularies.SentencePieceVocabulary(
       os.path.join(test_data_dir, "sentencepiece", "sentencepiece.model")
   )
-  return tokenizer.TokenizerConfig(vocab=sentencepiece_vocab)
+  return sentencepiece_vocab
+
+
+def _create_tokenizer_config() -> tokenizer.TokenizerConfig:
+  return tokenizer.TokenizerConfig(vocab=_create_sentencepiece_vocab())
 
 
 def _create_preprocessors() -> Sequence[dataset_providers.GrainPreprocessor]:
@@ -65,8 +69,7 @@ def _create_preprocessors() -> Sequence[dataset_providers.GrainPreprocessor]:
   return [
       airio_preps.MapFnTransform(_imdb_preprocessor),
       airio_preps.MapFnTransform(
-          functools.partial(
-              tokenizer.tokenize,
+          tokenizer.Tokenizer(
               tokenizer_configs={
                   "inputs": tokenizer_config,
                   "targets": tokenizer_config,
@@ -797,6 +800,31 @@ class DatasetProvidersTest(absltest.TestCase):
     ]
     test_utils.assert_datasets_equal(ds, expected)
 
+  def test_get_vocabularies_returns_correct_vocabularies(self):
+    source = _create_source(
+        source_name=_SOURCE_NAME,
+        num_examples=_SOURCE_NUM_EXAMPLES,
+    )
+    task = _create_task(source=source, preprocessors=_create_preprocessors())
+    vocabs_map = dataset_providers.get_vocabularies(task)
+    expected = {
+        "inputs": _create_sentencepiece_vocab(),
+        "targets": _create_sentencepiece_vocab(),
+    }
+    self.assertEqual(vocabs_map, expected)
+
+  def test_get_vocabularies_returns_empty_map_when_no_tokenizer(self):
+    source = _create_source(
+        source_name=_SOURCE_NAME,
+        num_examples=_SOURCE_NUM_EXAMPLES,
+    )
+    task = _create_task(
+        source=source,
+        preprocessors=[airio_preps.MapFnTransform(_imdb_preprocessor)],
+    )
+    vocabs_map = dataset_providers.get_vocabularies(task)
+    self.assertEmpty(vocabs_map)
+
   def test_task_builder_from_task_copies_params_correctly(self):
     """Verify that the TaskBuilder object is created with correct params."""
     task = _create_task(
@@ -958,6 +986,7 @@ class DatasetProvidersTest(absltest.TestCase):
           "targets_pretokenized": f"{ex + 1}",
           "targets": np.array([ex + 1] * rargs.sequence_lengths["targets"]),
       }
+
     simple_task = _create_task(
         task_name="test_task1",
         source=_create_fn_src(),
@@ -990,6 +1019,7 @@ class DatasetProvidersTest(absltest.TestCase):
 
 
 class MixtureTest(absltest.TestCase):
+
   def setUp(self):
     super().setUp()
 
@@ -1358,7 +1388,7 @@ class MixtureTest(absltest.TestCase):
         shuffle=False,
         shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
-        batch_size=2
+        batch_size=2,
     )
     with self.assertRaisesRegex(
         ValueError,
@@ -1380,7 +1410,7 @@ class MixtureTest(absltest.TestCase):
         feature_converter=_create_feature_converter(),
     )
     expected = [
-        {   # imdb task
+        {  # imdb task
             "encoder_input_tokens": [
                 3,
                 8,
@@ -1407,13 +1437,13 @@ class MixtureTest(absltest.TestCase):
             "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
             "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
         },
-        {   # simple task
+        {  # simple task
             "encoder_input_tokens": [0] * 20,
             "decoder_target_tokens": [1] * 10,
             "decoder_input_tokens": [1] * 10,
             "decoder_loss_weights": [1] * 10,
         },
-        {   # imdb task
+        {  # imdb task
             "encoder_input_tokens": [
                 3,
                 8,

@@ -24,9 +24,11 @@ from airio import dataset_iterators
 from airio import feature_converters
 from airio import lazy_dataset_transforms
 from airio import preprocessors as airio_preps
+from airio import tokenizer
 from clu.data import dataset_iterator as clu_dataset_iterator
 import grain.python as grain
 import jax.random
+from seqio import vocabularies
 import tensorflow_datasets as tfds
 
 lazy_dataset = grain.experimental.lazy_dataset
@@ -146,9 +148,7 @@ class Task(DatasetProviderBase):
           )
       )
     if batch_size:
-      ops.append(
-          grain.Batch(batch_size=batch_size, drop_remainder=False)
-      )
+      ops.append(grain.Batch(batch_size=batch_size, drop_remainder=False))
 
     # Add runtime args
     runtime_args = airio_preps.AirIOInjectedRuntimeArgs(
@@ -243,9 +243,7 @@ class Task(DatasetProviderBase):
           )
       )
     if batch_size:
-      all_ops.append(
-          grain.Batch(batch_size=batch_size, drop_remainder=False)
-      )
+      all_ops.append(grain.Batch(batch_size=batch_size, drop_remainder=False))
 
     # Raw data
     records_step0 = self._load_data(source=source, sampler=sampler, ops=[])
@@ -329,14 +327,10 @@ class Mixture(DatasetProviderBase):
     # Step 3: Run preprocessors and shuffle each epoch (if needed)
     preps = task._preprocessors
     if feature_converter is not None:
-      preps.extend(
-          feature_converter.get_transforms(sequence_lengths)
-      )
+      preps.extend(feature_converter.get_transforms(sequence_lengths))
     if batch_size:
       # TODO(b/300282178): This doesn't support drop_remainder=False yet.
-      preps.append(
-          grain.Batch(batch_size=batch_size)
-      )
+      preps.append(grain.Batch(batch_size=batch_size))
     runtime_args = airio_preps.AirIOInjectedRuntimeArgs(
         sequence_lengths=sequence_lengths, split=split
     )
@@ -616,3 +610,27 @@ def get_dataset(
       num_epochs=num_epochs,
       seed=seed,
   )
+
+
+def get_vocabularies(
+    mixture_or_task: Union[Task, Mixture]
+) -> Mapping[str, vocabularies.Vocabulary]:
+  """Returns vocabularies for all features as configured in tokenizer."""
+  if isinstance(mixture_or_task, Mixture):
+    tasks = mixture_or_task.leaf_tasks
+    if not tasks:
+      return {}
+    task = tasks[0]
+  else:
+    task = mixture_or_task
+
+  vocabulary_map = {}
+  for preproc in task.get_preprocessors():
+    if isinstance(preproc, airio_preps.MapFnTransform) and isinstance(
+        preproc.map_fn, tokenizer.Tokenizer
+    ):
+      tokenizer_configs = preproc.map_fn.tokenizer_configs
+      for feature_name, tokenizer_config in tokenizer_configs.items():
+        vocabulary_map[feature_name] = tokenizer_config.vocab
+
+  return vocabulary_map

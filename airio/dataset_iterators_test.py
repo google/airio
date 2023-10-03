@@ -15,7 +15,6 @@
 """Tests for airio.dataset_iterators."""
 
 import ast
-import functools
 import json
 import os
 from typing import Dict
@@ -68,8 +67,7 @@ class DatasetIteratorsTest(absltest.TestCase):
         operations=[
             preprocessors.MapFnTransform(_parse_and_preprocess),
             preprocessors.MapFnTransform(
-                functools.partial(
-                    tokenizer.tokenize,
+                tokenizer.Tokenizer(
                     tokenizer_configs={
                         "inputs": self.tokenizer_config,
                         "targets": self.tokenizer_config,

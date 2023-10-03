@@ -14,7 +14,6 @@
 
 """Tester file to debug task/mixture interfaces."""
 
-import functools
 from typing import Dict
 
 from absl import app
@@ -52,8 +51,7 @@ def create_task() -> dataset_providers.Task:
       preprocessors=[
           preprocessors.MapFnTransform(_imdb_preprocessor),
           preprocessors.MapFnTransform(
-              functools.partial(
-                  tokenizer.tokenize,
+              tokenizer.Tokenizer(
                   tokenizer_configs={
                       "inputs": tokenizer.TokenizerConfig(vocab=DEFAULT_VOCAB),
                       "targets": tokenizer.TokenizerConfig(vocab=DEFAULT_VOCAB),
