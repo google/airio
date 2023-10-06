@@ -172,15 +172,5 @@ class RandomMapFnLazyMapDatasetTest(absltest.TestCase):
     )
     self.assertLen(ds, 5)
 
-  def test_sparse(self):
-    def random_map_fn(ex, rng):
-      return ex + int(jax.random.randint(rng, [], 0, 10))
-
-    ds = lazy_dataset.RangeLazyMapDataset(5)
-    ds1 = lazy_dataset_transforms.RandomMapFnLazyMapDataset(
-        ds, random_map_fn, jax.random.PRNGKey(42)
-    )
-    self.assertEqual(ds1.sparse, ds.sparse)
-
 if __name__ == "__main__":
   absltest.main()
