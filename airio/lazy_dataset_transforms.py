@@ -81,10 +81,6 @@ class ShardLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
   def __post_init__(self):
     self._start, self._end = even_split(len(self.parent), self.shard_options)
 
-  @property
-  def sparse(self) -> bool:
-    return self.parent.sparse
-
   def __len__(self) -> int:
     return self._end - self._start  # pytype: disable=unsupported-operands
 
@@ -102,10 +98,6 @@ class ConcatLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
   """Concats LazyMapDatasets."""
 
   parents: Sequence[lazy_dataset.LazyMapDataset[T]]
-
-  @property
-  def sparse(self) -> bool:
-    return any(p.sparse for p in self.parents)
 
   def __post_init__(self):
     self._accumulated_lens = [0] + list(
@@ -147,10 +139,6 @@ class RandomMapFnLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
   parent: lazy_dataset.LazyMapDataset
   map_fn: Callable[[Any, JaxRng], Any]
   base_rng: JaxRng
-
-  @property
-  def sparse(self) -> bool:
-    return self.parent.sparse
 
   def __len__(self) -> int:
     return len(self.parent)
