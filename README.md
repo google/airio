@@ -25,3 +25,13 @@ The following are guiding principles for AirIO development:
     *   Composition over inheritance
     *   Loose coupling with data, eval, and other API layers
 
+## Installation
+
+### From source
+
+```
+git clone https://github.com/google/airio.git
+cd airio
+pip install -e .
+```
+
