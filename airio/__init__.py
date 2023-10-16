@@ -21,3 +21,6 @@ from airio.tokenizer import *
 from airio.feature_converters import *
 from airio.dataset_iterators import *
 from airio.preprocessors import *
+
+# Version number.
+from airio.version import __version__
