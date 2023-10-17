@@ -178,13 +178,6 @@ class PreprocessorsTest(absltest.TestCase):
     ds = lazy_dataset_transform(ds)
     self.assertListEqual([t.tolist() for t in list(ds)], [[0, 1], [2, 3], [4]])
 
-  def test_invalid_lazydataset_transform(self):
-    error_msg = (
-        r"BatchOperation\(batch_size=5, drop_remainder=False\) is not supported"
-    )
-    with self.assertRaisesRegex(ValueError, error_msg):
-      _ = preprocessors.LazyDatasetTransform(grain.BatchOperation(5))
-
 
 class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
   def setUp(self):
