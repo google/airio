@@ -19,14 +19,14 @@ Most, if not all, of these should be upstreamed into the grain codebase.
 import bisect
 import dataclasses
 import itertools
-from typing import Any, Callable, Sequence, TypeVar, Union
+from typing import Any, Callable, Sequence, TypeVar
 from absl import logging
 import grain.python as grain
 import jax
 import numpy as np
 
 lazy_dataset = grain.experimental.lazy_dataset
-JaxRng = Union[jax.random.PRNGKeyArray, jax.Array]
+JaxRng = jax.Array
 T = TypeVar("T")
 
 

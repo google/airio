@@ -28,7 +28,7 @@ import numpy as np
 # TODO(b/294122943): Implement flat_map.
 
 lazy_dataset = grain.experimental.lazy_dataset
-JaxRng = Union[jax.random.PRNGKeyArray, jax.Array]
+JaxRng = jax.Array
 
 
 @dataclasses.dataclass
