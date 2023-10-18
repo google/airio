@@ -27,6 +27,9 @@ from version import __version__  # pylint: disable=g-import-not-at-top
 with open('README.md') as fp:
   _LONG_DESCRIPTION = fp.read()
 
+_jax_version = '0.4.16'
+_jaxlib_version = '0.4.16'
+
 setuptools.setup(
     name='airio',
     version=__version__,
@@ -45,12 +48,16 @@ setuptools.setup(
     scripts=[],
     install_requires=[
         'absl-py',
-        'clu',
-        'grain',
-        'jax',
-        'jaxlib',
+        'clu @ git+https://github.com/google/CommonLoopUtils#egg=clu',
+        'grain @ git+https://github.com/google/grain#egg=grain',
+        f'jax >= {_jax_version}',
+        f'jaxlib >= {_jaxlib_version}',
+        (
+            'jestimator @'
+            ' git+https://github.com/google-research/jestimator#egg=jestimator'
+        ),
         'numpy',
-        'seqio',
+        'seqio @ git+https://github.com/google/seqio#egg=seqio',
         # Ping to a specific version to avoid endless backtracking during
         # pip dependency resolution.
         'tfds-nightly==4.9.2.dev202308090034',
