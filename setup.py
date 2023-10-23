@@ -49,7 +49,7 @@ setuptools.setup(
     install_requires=[
         'absl-py',
         'clu @ git+https://github.com/google/CommonLoopUtils#egg=clu',
-        'grain @ git+https://github.com/google/grain#egg=grain',
+        'grain-nightly',
         f'jax >= {_jax_version}',
         f'jaxlib >= {_jaxlib_version}',
         (
