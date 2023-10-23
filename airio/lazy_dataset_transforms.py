@@ -97,9 +97,11 @@ class ShardLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
 class ConcatLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
   """Concats LazyMapDatasets."""
 
-  parents: Sequence[lazy_dataset.LazyMapDataset[T]]
-
-  def __post_init__(self):
+  def __init__(
+      self,
+      parents: Sequence[lazy_dataset.LazyMapDataset[T]],
+  ):
+    super().__init__(parents)
     self._accumulated_lens = [0] + list(
         itertools.accumulate([len(p) for p in self.parents])
     )
