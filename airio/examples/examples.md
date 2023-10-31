@@ -45,8 +45,4 @@ steps = task.get_dataset_by_step(num_records=3)
 
 
 [imdb_reviews]: https://www.tensorflow.org/datasets/catalog/imdb_reviews
-[inspect_ipynb]: inspect.ipynb
-[inspect_py]: inspect.py
-[quickstart_ipynb]: quickstart.ipynb
-[quickstart_py]: quickstart.py
 [seqio_vocabularies]: https://github.com/google/seqio/blob/main/seqio/vocabularies.py

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tester file to debug task/mixture interfaces."""
+"""Example script that demonstrates creation of a basic task."""
 
 from typing import Dict
 
