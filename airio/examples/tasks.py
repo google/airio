@@ -107,8 +107,10 @@ def get_nqo_v001_task(
 
 # Preprocessors for WMT Task.
 def translate(
-    ex: Dict[str, str], source_language: str, target_language: str
-) -> Dict[str, str]:
+    ex: Dict[bytes | str, bytes | str],
+    source_language: str,
+    target_language: str,
+) -> Dict[bytes | str, bytes | str]:
   """Convert a translation dataset to a text2text pair.
 
   For example, say the dataset returns examples of this format:
@@ -138,11 +140,18 @@ def translate(
       source_language: babel.Locale(source_language[:2]).english_name,
       target_language: babel.Locale(target_language[:2]).english_name,
   }
-  src_str = (
-      f"translate {lang_id_to_string[source_language]} to"
-      f" {lang_id_to_string[target_language]}: "
-      + ex[source_language]
-  )
+  if isinstance(ex[source_language], bytes):
+    src_str = (
+        f"translate {lang_id_to_string[source_language]} to"
+        f" {lang_id_to_string[target_language]}: ".encode()
+        + ex[source_language]
+    )
+  else:
+    src_str = (
+        f"translate {lang_id_to_string[source_language]} to"
+        f" {lang_id_to_string[target_language]}: "
+        + ex[source_language]
+    )
   return {
       "inputs": src_str,
       "targets": ex[target_language],

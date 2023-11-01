@@ -4,6 +4,7 @@ The files in this directory illustrate basic usage of AirIO.
 
 * Quickstart: [quickstart.py](quickstart.py), [quickstart.ipynb](quickstart.ipynb)
 * Inspect: [inspect.py](inspect.py), [inspect.ipynb](inspect.ipynb)
+* Train on WMT: [train_wmt.py](train_wmt.py), [train_wmt.ipynb](train_wmt.ipynb)
 
 ## Quickstart
 
@@ -43,6 +44,11 @@ steps = task.get_dataset_by_step(num_records=3)
 ```
 
 
+## Train on WMT
+
+The training example demonstrates training with T5X on the [WMT][wmt] data set.
+
 
 [imdb_reviews]: https://www.tensorflow.org/datasets/catalog/imdb_reviews
 [seqio_vocabularies]: https://github.com/google/seqio/blob/main/seqio/vocabularies.py
+[wmt]: https://www.tensorflow.org/datasets/catalog/wmt19_translate
