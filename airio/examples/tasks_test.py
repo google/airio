@@ -17,9 +17,8 @@
 import os
 
 from absl.testing import absltest
-from airio import feature_converters
-from airio import tokenizer
-from airio.examples import tasks
+import airio
+from airio import examples
 from seqio import vocabularies
 import tensorflow_datasets as tfds
 
@@ -39,13 +38,13 @@ class TasksTest(absltest.TestCase):
         os.path.join(self.test_dir, "sentencepiece", "sentencepiece.model")
     )
     self.tokenizer_configs = {
-        "inputs": tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),
-        "targets": tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),
+        "inputs": airio.tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),
+        "targets": airio.tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),
     }
 
   def test_wmt_task(self):
     with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
-      wmt_task = tasks.get_wmt_19_ende_v003_task(
+      wmt_task = examples.tasks.get_wmt_19_ende_v003_task(
           tokenizer_configs=self.tokenizer_configs
       )
     sequence_lengths = {
@@ -56,7 +55,7 @@ class TasksTest(absltest.TestCase):
         sequence_lengths,
         "train",
         shuffle=False,
-        feature_converter=feature_converters.PyGrainEncDecFeatureConverter(),
+        feature_converter=airio.feature_converters.PyGrainEncDecFeatureConverter(),
         batch_size=2,
     )
     expected_first_batch = {
@@ -346,7 +345,7 @@ class TasksTest(absltest.TestCase):
 
   def test_nqo_task(self):
     with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
-      nqo_task = tasks.get_nqo_v001_task(
+      nqo_task = examples.tasks.get_nqo_v001_task(
           tokenizer_configs=self.tokenizer_configs
       )
     sequence_lengths = {
@@ -357,7 +356,7 @@ class TasksTest(absltest.TestCase):
         sequence_lengths,
         "train",
         shuffle=False,
-        feature_converter=feature_converters.PyGrainEncDecFeatureConverter(),
+        feature_converter=airio.feature_converters.PyGrainEncDecFeatureConverter(),
         batch_size=2,
     )
     expected_first_batch = {

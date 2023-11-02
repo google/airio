@@ -17,10 +17,7 @@
 from typing import Dict
 
 from absl import app
-from airio import data_sources
-from airio import dataset_providers
-from airio import preprocessors
-from airio import tokenizer
+import airio
 from seqio import vocabularies
 
 
@@ -28,7 +25,7 @@ DEFAULT_SPM_PATH = "gs://t5-data/vocabs/mc4.250000.100extra/sentencepiece.model"
 DEFAULT_VOCAB = vocabularies.SentencePieceVocabulary(DEFAULT_SPM_PATH)
 
 
-def create_task() -> dataset_providers.Task:
+def create_task() -> airio.dataset_providers.Task:
   """Create example AirIO task."""
 
   def _imdb_preprocessor(raw_example: Dict[str, bytes]) -> Dict[str, str]:
@@ -42,18 +39,22 @@ def create_task() -> dataset_providers.Task:
       final_example["targets"] = "invalid"
     return final_example
 
-  return dataset_providers.Task(
+  return airio.dataset_providers.Task(
       name="dummy_airio_task",
-      source=data_sources.TfdsDataSource(
+      source=airio.data_sources.TfdsDataSource(
           tfds_name="imdb_reviews/plain_text:1.0.0", splits=["train"]
       ),
       preprocessors=[
-          preprocessors.MapFnTransform(_imdb_preprocessor),
-          preprocessors.MapFnTransform(
-              tokenizer.Tokenizer(
+          airio.preprocessors.MapFnTransform(_imdb_preprocessor),
+          airio.preprocessors.MapFnTransform(
+              airio.tokenizer.Tokenizer(
                   tokenizer_configs={
-                      "inputs": tokenizer.TokenizerConfig(vocab=DEFAULT_VOCAB),
-                      "targets": tokenizer.TokenizerConfig(vocab=DEFAULT_VOCAB),
+                      "inputs": airio.tokenizer.TokenizerConfig(
+                          vocab=DEFAULT_VOCAB
+                      ),
+                      "targets": airio.tokenizer.TokenizerConfig(
+                          vocab=DEFAULT_VOCAB
+                      ),
                   },
               )
           ),
@@ -71,7 +72,7 @@ def main(_) -> None:
   for element in ds:
     print(element)
     cnt += 1
-    if cnt == 10:
+    if cnt >= airio.dataset_providers.DEFAULT_NUM_RECORDS_TO_INSPECT:
       break
 
 

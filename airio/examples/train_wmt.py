@@ -22,6 +22,7 @@ import tempfile
 
 from absl import app
 import airio
+from airio import examples
 from clu.data import dataset_iterator as clu_dataset_iterator
 from seqio import vocabularies
 from t5x import adafactor
@@ -150,7 +151,7 @@ def main(argv: Sequence[str]) -> None:
   if len(argv) > 1:
     raise app.UsageError("Too many command-line arguments.")
 
-  wmt_task = airio.examples.tasks.get_wmt_19_ende_v003_task()
+  wmt_task = examples.tasks.get_wmt_19_ende_v003_task()
 
   train_fn = create_train_fn(wmt_task)
   workdir = tempfile.mkdtemp()

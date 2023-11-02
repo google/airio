@@ -17,10 +17,7 @@
 from typing import Dict
 
 from absl import app
-from airio import data_sources
-from airio import dataset_providers
-from airio import preprocessors
-from airio import tokenizer
+import airio
 from seqio import vocabularies
 
 
@@ -29,7 +26,7 @@ DEFAULT_VOCAB = vocabularies.SentencePieceVocabulary(DEFAULT_SPM_PATH)
 RECORDS_TO_INSPECT = 2
 
 
-def create_task() -> dataset_providers.Task:
+def create_task() -> airio.dataset_providers.Task:
   """Create example AirIO task."""
 
   def _imdb_preprocessor(raw_example: Dict[str, bytes]) -> Dict[str, str]:
@@ -43,18 +40,22 @@ def create_task() -> dataset_providers.Task:
       final_example["targets"] = "invalid"
     return final_example
 
-  return dataset_providers.Task(
+  return airio.dataset_providers.Task(
       name="dummy_airio_task",
-      source=data_sources.TfdsDataSource(
+      source=airio.data_sources.TfdsDataSource(
           tfds_name="imdb_reviews/plain_text:1.0.0", splits=["train"]
       ),
       preprocessors=[
-          preprocessors.MapFnTransform(_imdb_preprocessor),
-          preprocessors.MapFnTransform(
-              tokenizer.Tokenizer(
+          airio.preprocessors.MapFnTransform(_imdb_preprocessor),
+          airio.preprocessors.MapFnTransform(
+              airio.tokenizer.Tokenizer(
                   tokenizer_configs={
-                      "inputs": tokenizer.TokenizerConfig(vocab=DEFAULT_VOCAB),
-                      "targets": tokenizer.TokenizerConfig(vocab=DEFAULT_VOCAB),
+                      "inputs": airio.tokenizer.TokenizerConfig(
+                          vocab=DEFAULT_VOCAB
+                      ),
+                      "targets": airio.tokenizer.TokenizerConfig(
+                          vocab=DEFAULT_VOCAB
+                      ),
                   },
               )
           ),

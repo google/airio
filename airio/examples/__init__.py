@@ -12,15 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Import to top-level API."""
+"""Import to airio.examples."""
+
 # pylint:disable=wildcard-import,g-bad-import-order
 
-from airio.dataset_providers import *
-from airio.data_sources import *
-from airio.tokenizer import *
-from airio.feature_converters import *
-from airio.dataset_iterators import *
-from airio.preprocessors import *
-
-# Version number.
-from airio.version import __version__
+from airio.examples.tasks import *
