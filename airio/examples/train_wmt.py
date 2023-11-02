@@ -23,7 +23,6 @@ import tempfile
 from absl import app
 import airio
 from airio import examples
-from clu.data import dataset_iterator as clu_dataset_iterator
 from seqio import vocabularies
 from t5x import adafactor
 from t5x import gin_utils
@@ -39,27 +38,14 @@ _DEFAULT_SPM_PATH = "gs://t5-data/vocabs/cc_all.32000/sentencepiece.model"
 _DEFAULT_VOCAB = vocabularies.SentencePieceVocabulary(
     _DEFAULT_SPM_PATH, _DEFAULT_EXTRA_IDS
 )
+_EVAL_STEPS = 2
 _SOURCE_SEQUENCE_LENGTH = 32
-
-
-def create_dataset(
-    task: airio.dataset_providers.Task,
-) -> clu_dataset_iterator.DatasetIterator:
-  sequence_lengths = {
-      "inputs": _SOURCE_SEQUENCE_LENGTH,
-      "targets": _SOURCE_SEQUENCE_LENGTH,
-  }
-  return task.get_dataset(
-      sequence_lengths,
-      "train",
-      shuffle=False,
-      feature_converter=airio.feature_converters.PyGrainEncDecFeatureConverter(),
-      batch_size=2,
-  )
+_TOTAL_STEPS = 3
+_WORKDIR = tempfile.mkdtemp()
 
 
 def get_t5_model(**config_overrides) -> models.EncoderDecoderModel:
-  """Returns a small T5 1.1 model to use for testing."""
+  """Returns a small T5 1.1 model."""
   tiny_config = network.T5Config(
       vocab_size=32128,
       dtype="bfloat16",
@@ -73,7 +59,6 @@ def get_t5_model(**config_overrides) -> models.EncoderDecoderModel:
       dropout_rate=0.0,
       logits_via_embedding=False,
   )
-
   tiny_config = dataclasses.replace(tiny_config, **config_overrides)
   return models.EncoderDecoderModel(
       module=network.Transformer(tiny_config),
@@ -88,10 +73,13 @@ def get_t5_model(**config_overrides) -> models.EncoderDecoderModel:
 
 
 def create_train_fn(task: airio.dataset_providers.Task):
-  """Returns a function for training."""
+  """Returns a callable function for training."""
   train_dataset_cfg = utils.DatasetConfig(
       mixture_or_task_name=task,
-      task_feature_lengths={"inputs": 32, "targets": 32},
+      task_feature_lengths={
+          "inputs": _SOURCE_SEQUENCE_LENGTH,
+          "targets": _SOURCE_SEQUENCE_LENGTH,
+      },
       split="train",
       batch_size=8,
       shuffle=False,
@@ -101,7 +89,10 @@ def create_train_fn(task: airio.dataset_providers.Task):
   )
   eval_dataset_cfg = utils.DatasetConfig(
       mixture_or_task_name=task,
-      task_feature_lengths={"inputs": 32, "targets": 32},
+      task_feature_lengths={
+          "inputs": _SOURCE_SEQUENCE_LENGTH,
+          "targets": _SOURCE_SEQUENCE_LENGTH,
+      },
       split="validation",
       batch_size=8,
       shuffle=False,
@@ -137,8 +128,8 @@ def create_train_fn(task: airio.dataset_providers.Task):
       checkpoint_cfg=ckpt_cfg,
       partitioner=partitioner,
       trainer_cls=trainer_cls,
-      total_steps=3,
-      eval_steps=2,
+      total_steps=_TOTAL_STEPS,
+      eval_steps=_EVAL_STEPS,
       eval_period=1000,
       random_seed=0,
       summarize_config_fn=gin_utils.summarize_gin_config,
@@ -154,8 +145,7 @@ def main(argv: Sequence[str]) -> None:
   wmt_task = examples.tasks.get_wmt_19_ende_v003_task()
 
   train_fn = create_train_fn(wmt_task)
-  workdir = tempfile.mkdtemp()
-  step, _ = train_fn(model_dir=workdir)
+  step, _ = train_fn(model_dir=_WORKDIR)
   logging.info("Completed %s training steps.", step)
 
 
