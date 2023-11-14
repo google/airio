@@ -14,6 +14,8 @@
 
 """Microbenchmarks for AirIO data_sources functions."""
 
+import os
+
 import airio
 import google_benchmark
 import numpy as np
