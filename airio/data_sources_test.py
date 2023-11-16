@@ -37,6 +37,66 @@ class DataSourceTest(absltest.TestCase):
     self.assertIsNone(source.num_input_examples(self, split=""))
 
 
+class ArrayRecordDataSourceTest(absltest.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.test_data_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "test_data",
+        "classification",
+    )
+
+  def _create_data_source(
+      self,
+      splits: Sequence[str] | None = None,
+  ):
+    """Creates a basic ArrayRecordDataSource."""
+
+    if splits is None:
+      splits = _SOURCE_SPLITS
+
+    split_to_filepattern = {}
+    for split in splits:
+      split_to_filepattern[split] = os.path.join(
+          self.test_data_dir, "classification.array_record@2"
+      )
+
+    return data_sources.ArrayRecordDataSource(
+        split_to_filepattern=split_to_filepattern,
+    )
+
+  def test_create(self):
+    source = data_sources.ArrayRecordDataSource([])
+    self.assertIsInstance(source, data_sources.DataSource)
+    self.assertIsInstance(source, data_sources.ArrayRecordDataSource)
+
+  def test_get_data_source(self):
+    source = self._create_data_source(splits=_SOURCE_SPLITS)
+    for split in _SOURCE_SPLITS:
+      data_source = source.get_data_source(split)
+      self.assertLen(data_source, 10)
+
+  def test_get_data_source_nonexistent_split(self):
+    source = self._create_data_source(splits=_SOURCE_SPLITS)
+    with self.assertRaisesRegex(ValueError, "Split nonexistent not found in"):
+      source.get_data_source("nonexistent")
+
+  def test_num_input_examples(self):
+    source = self._create_data_source(splits=_SOURCE_SPLITS)
+    for split in _SOURCE_SPLITS:
+      self.assertEqual(source.num_input_examples(split), 10)
+
+  def test_num_input_examples_nonexistent_split(self):
+    source = self._create_data_source(splits=_SOURCE_SPLITS)
+    with self.assertRaisesRegex(ValueError, "Split nonexistent not found in"):
+      source.num_input_examples("nonexistent")
+
+  def test_splits(self):
+    source = self._create_data_source(splits=_SOURCE_SPLITS)
+    self.assertEqual(_SOURCE_SPLITS, source.splits)
+
+
 class DatasetFnCallableTest(absltest.TestCase):
 
   @mock.patch.multiple(
