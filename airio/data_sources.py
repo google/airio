@@ -35,6 +35,33 @@ class DataSource(Protocol):
     ...
 
 
+class ArrayRecordDataSource(DataSource):
+  """Wrapper for grain.ArrayRecordDataSource with multiple splits support."""
+
+  def __init__(
+      self,
+      split_to_filepattern: Mapping[str, Union[str, Iterable[str]]],
+  ):
+    self._split_to_filepattern = split_to_filepattern
+
+    self.splits = set(self._split_to_filepattern)
+    self._sources = {}
+    for split in self.splits:
+      self._sources[split] = grain.ArrayRecordDataSource(
+          self._split_to_filepattern[split],
+      )
+
+  def get_data_source(self, split: str) -> grain.ArrayRecordDataSource:
+    if split not in self._sources:
+      raise ValueError(f'Split {split} not found in {self.splits}.')
+    return self._sources[split]
+
+  def num_input_examples(self, split: str) -> int:
+    if split not in self._sources:
+      raise ValueError(f'Split {split} not found in {self.splits}.')
+    return len(self._sources[split])
+
+
 class TfdsDataSource(DataSource):
   """Wrapper for grain.TfdsDataSource with multiple splits support."""
 
