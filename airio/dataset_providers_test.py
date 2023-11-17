@@ -24,15 +24,17 @@ from absl.testing import absltest
 from airio import data_sources
 from airio import dataset_providers
 from airio import feature_converters
-from airio import preprocessors as airio_preps
+from airio import preprocessors as preprocessors_lib
 from airio import test_utils
 from airio import tokenizer
+import grain.python as grain
 import jax
 import numpy as np
 from seqio import vocabularies
 import tensorflow_datasets as tfds
 
 
+lazy_dataset = grain.experimental.lazy_dataset
 _SOURCE_NAME = "imdb_reviews"
 _SOURCE_NUM_EXAMPLES = 3
 _SOURCE_SPLITS = {"train", "test", "unsupervised"}
@@ -64,11 +66,11 @@ def _create_tokenizer_config() -> tokenizer.TokenizerConfig:
   return tokenizer.TokenizerConfig(vocab=_create_sentencepiece_vocab())
 
 
-def _create_preprocessors() -> Sequence[dataset_providers.GrainPreprocessor]:
+def _create_preprocessors() -> Sequence[dataset_providers.AirIOPreprocessor]:
   tokenizer_config = _create_tokenizer_config()
   return [
-      airio_preps.MapFnTransform(_imdb_preprocessor),
-      airio_preps.MapFnTransform(
+      preprocessors_lib.MapFnTransform(_imdb_preprocessor),
+      preprocessors_lib.MapFnTransform(
           tokenizer.Tokenizer(
               tokenizer_configs={
                   "inputs": tokenizer_config,
@@ -107,7 +109,7 @@ def _create_fn_src(num_elements=5):
 
 def _create_task(
     source: data_sources.DataSource | None,
-    preprocessors: Sequence[dataset_providers.GrainPreprocessor] | None = None,
+    preprocessors: Sequence[dataset_providers.AirIOPreprocessor] | None = None,
     task_name: str = "dummy_airio_task",
 ) -> dataset_providers.Task:
   """Create example AirIO task."""
@@ -120,7 +122,7 @@ def _create_task(
 
 def _create_task_builder(
     source: data_sources.DataSource | None,
-    preprocessors: Sequence[dataset_providers.GrainPreprocessor] | None = None,
+    preprocessors: Sequence[dataset_providers.AirIOPreprocessor] | None = None,
     task_name: str = "dummy_airio_task",
 ) -> dataset_providers.TaskBuilder:
   return dataset_providers.TaskBuilder(
@@ -820,7 +822,7 @@ class DatasetProvidersTest(absltest.TestCase):
     )
     task = _create_task(
         source=source,
-        preprocessors=[airio_preps.MapFnTransform(_imdb_preprocessor)],
+        preprocessors=[preprocessors_lib.MapFnTransform(_imdb_preprocessor)],
     )
     vocabs_map = dataset_providers.get_vocabularies(task)
     self.assertEmpty(vocabs_map)
@@ -874,7 +876,7 @@ class DatasetProvidersTest(absltest.TestCase):
         preprocessors=_create_preprocessors(),
         task_name=task_name,
     )
-    new_preprocessors = [airio_preps.MapFnTransform(_imdb_preprocessor)]
+    new_preprocessors = [preprocessors_lib.MapFnTransform(_imdb_preprocessor)]
     task_builder.set_preprocessors(new_preprocessors)
     new_task = task_builder.build()
     self.assertEqual(new_task.get_preprocessors(), new_preprocessors)
@@ -928,7 +930,10 @@ class DatasetProvidersTest(absltest.TestCase):
     )
 
   def test_task_get_dataset_with_runtime_args(self):
-    def simple_to_imdb_map_fn(ex, rargs: airio_preps.AirIOInjectedRuntimeArgs):
+
+    def simple_to_imdb_map_fn(
+        ex, rargs: preprocessors_lib.AirIOInjectedRuntimeArgs
+    ):
       return {
           "inputs_pretokenized": f"{ex}",
           "inputs": np.array([ex] * rargs.sequence_lengths["inputs"]),
@@ -939,7 +944,7 @@ class DatasetProvidersTest(absltest.TestCase):
     simple_task = _create_task(
         task_name="test_task1",
         source=_create_fn_src(),
-        preprocessors=[airio_preps.MapFnTransform(simple_to_imdb_map_fn)],
+        preprocessors=[preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn)],
     )
     ds = simple_task.get_dataset(
         sequence_lengths={"inputs": 20, "targets": 10}, shuffle=False
@@ -979,7 +984,10 @@ class DatasetProvidersTest(absltest.TestCase):
     test_utils.assert_datasets_equal(list(ds), expected)
 
   def test_task_get_dataset_by_step_with_runtime_args(self):
-    def simple_to_imdb_map_fn(ex, rargs: airio_preps.AirIOInjectedRuntimeArgs):
+
+    def simple_to_imdb_map_fn(
+        ex, rargs: preprocessors_lib.AirIOInjectedRuntimeArgs
+    ):
       return {
           "inputs_pretokenized": f"{ex}",
           "inputs": np.array([ex] * rargs.sequence_lengths["inputs"]),
@@ -990,7 +998,7 @@ class DatasetProvidersTest(absltest.TestCase):
     simple_task = _create_task(
         task_name="test_task1",
         source=_create_fn_src(),
-        preprocessors=[airio_preps.MapFnTransform(simple_to_imdb_map_fn)],
+        preprocessors=[preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn)],
     )
     ds = simple_task.get_dataset_by_step(
         sequence_lengths={"inputs": 20, "targets": 10}, shuffle=False
@@ -1017,6 +1025,106 @@ class DatasetProvidersTest(absltest.TestCase):
     # preprocessed
     test_utils.assert_datasets_equal(ds[1], expected[1])
 
+  def test_task_switch_to_lazy_dataset(self):
+    def lazy_id_fn(
+        ds: lazy_dataset.LazyMapDataset,
+        rargs: preprocessors_lib.AirIOInjectedRuntimeArgs,
+    ):
+      return ds, rargs
+
+    preprocessors = _create_preprocessors() + [
+        preprocessors_lib.PackTransform(
+            packing_preprocessor=lazy_id_fn,
+        )
+    ]
+    source = _create_source(
+        source_name=_SOURCE_NAME,
+        splits=_SOURCE_SPLITS,
+        num_examples=_SOURCE_NUM_EXAMPLES,
+    )
+
+    task = _create_task(source=source, preprocessors=preprocessors)
+    ds = task.get_dataset(split="train", shuffle=False)
+    expected = [
+        {
+            "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
+            "inputs": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                4,
+                2,
+                13,
+                3,
+                5,
+                20,
+                2,
+                4,
+                2,
+                20,
+                2,
+                4,
+            ],
+            "targets_pretokenized": "positive",
+            "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+        },
+        {
+            "inputs_pretokenized": "imdb hj aijbcidcibdg",
+            "inputs": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                20,
+                2,
+                3,
+                5,
+                8,
+                2,
+                13,
+                8,
+                21,
+                13,
+                8,
+                2,
+                21,
+                2,
+            ],
+            "targets_pretokenized": "negative",
+            "targets": [3, 22, 4, 2, 18, 8, 25, 4],
+        },
+        {
+            "inputs_pretokenized": "imdb acdhdacfhhjb",
+            "inputs": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                5,
+                13,
+                21,
+                20,
+                21,
+                5,
+                13,
+                2,
+                20,
+                20,
+                2,
+            ],
+            "targets_pretokenized": "positive",
+            "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+        },
+    ]
+    test_utils.assert_datasets_equal(ds, expected)
+
 
 class MixtureTest(absltest.TestCase):
 
@@ -1026,7 +1134,9 @@ class MixtureTest(absltest.TestCase):
     def test_map_fn(ex, idx):
       return {"idx": idx, "val": ex}
 
-    def simple_to_imdb_map_fn(ex, rargs: airio_preps.AirIOInjectedRuntimeArgs):
+    def simple_to_imdb_map_fn(
+        ex, rargs: preprocessors_lib.AirIOInjectedRuntimeArgs
+    ):
       return {
           "inputs_pretokenized": f"{ex}",
           "inputs": np.array([ex] * rargs.sequence_lengths["inputs"]),
@@ -1039,10 +1149,10 @@ class MixtureTest(absltest.TestCase):
         splits=_SOURCE_SPLITS,
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
-    self._map_transform_idx_1 = airio_preps.MapFnTransform(
+    self._map_transform_idx_1 = preprocessors_lib.MapFnTransform(
         functools.partial(test_map_fn, idx=1)
     )
-    self._map_transform_idx_2 = airio_preps.MapFnTransform(
+    self._map_transform_idx_2 = preprocessors_lib.MapFnTransform(
         functools.partial(test_map_fn, idx=2)
     )
     self._simple_task_1 = _create_task(
@@ -1061,7 +1171,7 @@ class MixtureTest(absltest.TestCase):
     self._simple_to_imdb_task = (
         dataset_providers.TaskBuilder.from_task(self._simple_task_1)
         .set_preprocessors([
-            airio_preps.MapFnTransform(simple_to_imdb_map_fn),
+            preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn),
         ])
         .build()
     )
@@ -1227,7 +1337,7 @@ class MixtureTest(absltest.TestCase):
         dataset_providers.TaskBuilder.from_task(self._simple_task_1)
         .set_preprocessors([
             self._map_transform_idx_1,
-            airio_preps.RandomMapFnTransform(test_random_map_fn),
+            preprocessors_lib.RandomMapFnTransform(test_random_map_fn),
         ])
         .build()
     )
@@ -1235,7 +1345,7 @@ class MixtureTest(absltest.TestCase):
         dataset_providers.TaskBuilder.from_task(self._simple_task_2)
         .set_preprocessors([
             self._map_transform_idx_2,
-            airio_preps.RandomMapFnTransform(test_random_map_fn),
+            preprocessors_lib.RandomMapFnTransform(test_random_map_fn),
         ])
         .build()
     )
