@@ -18,6 +18,7 @@ import copy
 import dataclasses
 import math
 from typing import Any, Sequence, TypeVar
+import airio.common.constants
 import grain.python as grain
 import jax
 from jaxtyping import PyTree  # pylint: disable=g-importing-member
@@ -25,6 +26,7 @@ import numpy as np
 
 lazy_dataset = grain.experimental.lazy_dataset
 T = TypeVar("T")
+SKIP_FEATURE = airio.common.constants.SKIP_FEATURE
 
 
 @dataclasses.dataclass(frozen=False)
@@ -228,7 +230,7 @@ class PartiallyPackedExample:
   def add_example(self, flat_ex: Any):
     self._partially_packed_flat_example_list.append(flat_ex)
     for i in range(len(self._available_flat_lengths)):
-      if self._available_flat_lengths[i] == -1:
+      if self._available_flat_lengths[i] == SKIP_FEATURE:
         # Feature should not be packed.
         continue
       length = len(flat_ex[i])
@@ -236,7 +238,7 @@ class PartiallyPackedExample:
 
   def example_fits(self, flat_ex: Any):
     for i in range(len(self._available_flat_lengths)):
-      if self._available_flat_lengths[i] == -1:
+      if self._available_flat_lengths[i] == SKIP_FEATURE:
         # Feature should not be packed.
         continue
       if self._available_flat_lengths[i] < len(flat_ex[i]):
@@ -258,7 +260,7 @@ class PartiallyPackedExample:
     flat_elements = self._partially_packed_flat_example_list
     flat_packed_element = []
     for feature in range(len(flat_feature_lengths)):
-      if flat_feature_lengths[feature] == -1:
+      if flat_feature_lengths[feature] == SKIP_FEATURE:
         # Feature should not be packed.
         flat_packed_element.append(
             [flat_elements[i][feature] for i in range(len(flat_elements))]
@@ -295,7 +297,7 @@ class PartiallyPackedExample:
 
 def trim_flattened(flat_ex, flat_lengths):
   for i in range(len(flat_lengths)):
-    if flat_lengths[i] == -1:
+    if flat_lengths[i] == SKIP_FEATURE:
       # Feature should not be trimmed.
       continue
     flat_ex[i] = flat_ex[i][:flat_lengths[i], ...]

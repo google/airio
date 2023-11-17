@@ -16,7 +16,7 @@
 
 from absl.testing import absltest
 from absl.testing import parameterized
-from airio import packing
+from airio.common import packing
 import grain.python as grain
 import numpy as np
 

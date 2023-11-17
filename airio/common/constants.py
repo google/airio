@@ -12,15 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Import to top-level API."""
-# pylint:disable=wildcard-import,g-bad-import-order,g-importing-member
+"""Common constants."""
 
-from airio.dataset_providers import *
-from airio.data_sources import *
-from airio.tokenizer import *
-from airio.feature_converters import *
-from airio.dataset_iterators import *
-from airio.preprocessors import *
-
-# Version number.
-from airio.version import __version__
+SKIP_FEATURE = -1

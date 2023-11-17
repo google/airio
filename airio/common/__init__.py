@@ -13,14 +13,9 @@
 # limitations under the License.
 
 """Import to top-level API."""
+
 # pylint:disable=wildcard-import,g-bad-import-order,g-importing-member
 
-from airio.dataset_providers import *
-from airio.data_sources import *
-from airio.tokenizer import *
-from airio.feature_converters import *
-from airio.dataset_iterators import *
-from airio.preprocessors import *
-
-# Version number.
-from airio.version import __version__
+from airio.common.constants import *
+from airio.common.packing import *
+from airio.common.preprocessors import *
