@@ -108,6 +108,67 @@ class Task(DatasetProviderBase):
       raise ValueError("Source has not been set on this task object.")
     return self.source.get_data_source(split=split)
 
+  def _switch_to_lazy_dataset(self):
+    # TODO(b/310685401): Populate this method.
+    return False
+
+  def get_lazy_dataset(
+      self,
+      sequence_lengths: Mapping[str, int] | None,
+      split: str,
+      feature_converter: feature_converters.PyGrainFeatureConverter | None,
+      batch_size: int | None,
+      shuffle: bool,
+      seed: int | None,
+      shard_info: ShardInfo | None,
+      num_epochs: int | None,
+  ) -> lazy_dataset.LazyMapDataset:
+    """Returns a lazy dataset for Task source and preprocessors."""
+    # Step 1: Get Source.
+    ds = lazy_dataset.SourceLazyMapDataset(
+        self._get_data_source_for_split(split=split)
+    )
+    if shard_info:
+      shard_options = grain.ShardOptions(
+          shard_index=shard_info.index, shard_count=shard_info.num_shards
+      )
+      ds = lazy_dataset_transforms.ShardLazyMapDataset(ds, shard_options)
+
+    # Step 2: Make epochs.
+    if num_epochs:
+      dss = [ds] * num_epochs
+    else:
+      # Skip repeating here, repeat the mixed dataset.
+      dss = [ds]
+
+    # Step 3: Run preprocessors and shuffle each epoch (if needed)
+    preps = self._preprocessors
+    if feature_converter is not None:
+      preps.extend(feature_converter.get_transforms(sequence_lengths))
+    if batch_size:
+      preps.append(grain.Batch(batch_size=batch_size, drop_remainder=False))
+    runtime_args = airio_preps.AirIOInjectedRuntimeArgs(
+        sequence_lengths=sequence_lengths, split=split
+    )
+    preprocessed_dss = []
+    next_epoch_rng = jax.random.PRNGKey(seed)
+    for ds in dss:
+      next_epoch_rng, prep_rng = jax.random.split(next_epoch_rng)
+      prep_rng, shuffle_rng = jax.random.split(prep_rng)
+      for prep in preps:
+        ds = airio_preps.LazyDatasetTransform(prep)(ds, prep_rng, runtime_args)
+        prep_rng, _ = jax.random.split(prep_rng)
+      if shuffle:
+        shuffle_seed = int(jax.random.randint(shuffle_rng, [], 0, 2**16 - 1))
+        ds = lazy_dataset.ShuffleLazyMapDataset(ds, seed=shuffle_seed)
+      preprocessed_dss.append(ds)
+    # pylint:enable=protected-access
+
+    # Step 4: Combine epochs if needed
+    if len(preprocessed_dss) == 1:
+      return preprocessed_dss[0]
+    return lazy_dataset_transforms.ConcatLazyMapDataset(preprocessed_dss)
+
   # TODO(sahildua): Add logging.
   def get_dataset(
       self,
@@ -122,6 +183,31 @@ class Task(DatasetProviderBase):
       num_epochs: int | None = 1,
   ) -> clu_dataset_iterator.DatasetIterator:
     """Returns the dataset iterator as per the task configuration."""
+    # TODO(b/311720936): Until Task preprocessing is fully switched to
+    # lazy_dataset, check and use lazy_dataset only if any preprocessor requires
+    # lazy_dataset.
+    if self._switch_to_lazy_dataset():
+      ds = self.get_lazy_dataset(
+          sequence_lengths=sequence_lengths,
+          split=split,
+          feature_converter=feature_converter,
+          batch_size=batch_size,
+          shuffle=shuffle,
+          seed=seed,
+          shard_info=shard_info,
+          num_epochs=num_epochs,
+      )
+      # The sampler below is a no-op because sharding, shuffling and repeats are
+      # done using the lazy_dataset API. It may be removed when lazy_dataset
+      # releases.
+      sampler = grain.IndexSampler(
+          num_records=len(ds),
+          shard_options=grain.NoSharding(),
+          shuffle=False,
+          num_epochs=1,
+          seed=seed,
+      )
+      return self._load_data(source=ds, sampler=sampler, ops=[])
     if shard_info is None:
       shard_options = grain.NoSharding()
     else:
@@ -219,6 +305,7 @@ class Task(DatasetProviderBase):
     | Final transformed data      |
     |-----------------------------|
     """
+    # TODO(b/311720936): Add support for preprocessing using lazy_dataset.
     # Validate num_records.
     if num_records < 1:
       num_records = DEFAULT_NUM_RECORDS_TO_INSPECT
@@ -291,68 +378,6 @@ class Mixture(DatasetProviderBase):
     self._tasks_or_mixtures = dict(zip(hashes, tasks))
     self._proportions = dict(zip(hashes, proportions))
 
-  def get_task_lazy_dataset(
-      self,
-      task: Task,
-      sequence_lengths: Mapping[str, int] | None,
-      split: str,
-      feature_converter: feature_converters.PyGrainFeatureConverter | None,
-      batch_size: int | None,
-      shuffle: bool,
-      seed: int | None,
-      shard_info: ShardInfo | None,
-      num_epochs: int | None,
-  ) -> lazy_dataset.LazyMapDataset:
-    """Returns a lazy dataset for Task source and preprocessors."""
-    # TODO(b/300282178): Merge with Task.get_dataset when lazy dataset is
-    # released.
-    # pylint:disable=protected-access
-    # Step 1: Get Source.
-    ds = lazy_dataset.SourceLazyMapDataset(
-        task._get_data_source_for_split(split=split)
-    )
-    if shard_info:
-      shard_options = grain.ShardOptions(
-          shard_index=shard_info.index, shard_count=shard_info.num_shards
-      )
-      ds = lazy_dataset_transforms.ShardLazyMapDataset(ds, shard_options)
-
-    # Step 2: Make epochs.
-    if num_epochs:
-      dss = [ds] * num_epochs
-    else:
-      # Skip repeating here, repeat the mixed dataset.
-      dss = [ds]
-
-    # Step 3: Run preprocessors and shuffle each epoch (if needed)
-    preps = task._preprocessors
-    if feature_converter is not None:
-      preps.extend(feature_converter.get_transforms(sequence_lengths))
-    if batch_size:
-      # TODO(b/300282178): This doesn't support drop_remainder=False yet.
-      preps.append(grain.Batch(batch_size=batch_size))
-    runtime_args = airio_preps.AirIOInjectedRuntimeArgs(
-        sequence_lengths=sequence_lengths, split=split
-    )
-    preprocessed_dss = []
-    next_epoch_rng = jax.random.PRNGKey(seed)
-    for ds in dss:
-      next_epoch_rng, prep_rng = jax.random.split(next_epoch_rng)
-      prep_rng, shuffle_rng = jax.random.split(prep_rng)
-      for prep in preps:
-        ds = airio_preps.LazyDatasetTransform(prep)(ds, prep_rng, runtime_args)
-        prep_rng, _ = jax.random.split(prep_rng)
-      if shuffle:
-        shuffle_seed = int(jax.random.randint(shuffle_rng, [], 0, 2**16 - 1))
-        ds = lazy_dataset.ShuffleLazyMapDataset(ds, seed=shuffle_seed)
-      preprocessed_dss.append(ds)
-    # pylint:enable=protected-access
-
-    # Step 4: Combine epochs if needed
-    if len(preprocessed_dss) == 1:
-      return preprocessed_dss[0]
-    return lazy_dataset_transforms.ConcatLazyMapDataset(preprocessed_dss)
-
   def get_lazy_dataset(
       self,
       sequence_lengths: Mapping[str, int] | None = None,
@@ -374,8 +399,7 @@ class Mixture(DatasetProviderBase):
     proportions = []
     for task in self.leaf_tasks:
       datasets.append(
-          self.get_task_lazy_dataset(
-              task=task,
+          task.get_lazy_dataset(
               sequence_lengths=sequence_lengths,
               split=split,
               feature_converter=None,
