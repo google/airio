@@ -23,7 +23,7 @@ from airio import data_sources
 from airio import dataset_iterators
 from airio import feature_converters
 from airio import lazy_dataset_transforms
-from airio import preprocessors as airio_preps
+from airio import preprocessors as preprocessors_lib
 from airio import tokenizer
 from clu.data import dataset_iterator as clu_dataset_iterator
 import grain.python as grain
@@ -38,7 +38,7 @@ MAX_NUM_RECORDS_TO_INSPECT = 1000
 
 # TODO(sahildua): Expose these data sources as AirIO data sources?
 GrainDataSource = grain.RandomAccessDataSource
-GrainPreprocessor = grain.Transformation | grain.Operation
+AirIOPreprocessor = preprocessors_lib.AirIOPreprocessor
 
 
 @dataclasses.dataclass(frozen=True)
@@ -84,7 +84,7 @@ class Task(DatasetProviderBase):
       self,
       name: str,
       source: data_sources.DataSource,
-      preprocessors: Sequence[GrainPreprocessor] | None = None,
+      preprocessors: Sequence[AirIOPreprocessor] | None = None,
   ):
     self.name = name
     self.source = source
@@ -93,7 +93,7 @@ class Task(DatasetProviderBase):
         list(preprocessors) if preprocessors is not None else []
     )
 
-  def get_preprocessors(self) -> List[GrainPreprocessor]:
+  def get_preprocessors(self) -> List[AirIOPreprocessor]:
     if self._preprocessors is None:
       raise ValueError("Preprocessors have not been set on this task.")
     return list(self._preprocessors)
@@ -109,7 +109,9 @@ class Task(DatasetProviderBase):
     return self.source.get_data_source(split=split)
 
   def _switch_to_lazy_dataset(self):
-    # TODO(b/310685401): Populate this method.
+    for preprocessor in self.get_preprocessors():
+      if not isinstance(preprocessor, grain.Transformation):
+        return True
     return False
 
   def get_lazy_dataset(
@@ -147,7 +149,7 @@ class Task(DatasetProviderBase):
       preps.extend(feature_converter.get_transforms(sequence_lengths))
     if batch_size:
       preps.append(grain.Batch(batch_size=batch_size, drop_remainder=False))
-    runtime_args = airio_preps.AirIOInjectedRuntimeArgs(
+    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths=sequence_lengths, split=split
     )
     preprocessed_dss = []
@@ -156,7 +158,9 @@ class Task(DatasetProviderBase):
       next_epoch_rng, prep_rng = jax.random.split(next_epoch_rng)
       prep_rng, shuffle_rng = jax.random.split(prep_rng)
       for prep in preps:
-        ds = airio_preps.LazyDatasetTransform(prep)(ds, prep_rng, runtime_args)
+        ds, runtime_args = preprocessors_lib.LazyDatasetTransform(prep)(
+            ds, prep_rng, runtime_args
+        )
         prep_rng, _ = jax.random.split(prep_rng)
       if shuffle:
         shuffle_seed = int(jax.random.randint(shuffle_rng, [], 0, 2**16 - 1))
@@ -237,11 +241,11 @@ class Task(DatasetProviderBase):
       ops.append(grain.Batch(batch_size=batch_size, drop_remainder=False))
 
     # Add runtime args
-    runtime_args = airio_preps.AirIOInjectedRuntimeArgs(
+    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths=sequence_lengths, split=split
     )
     for op in ops:
-      if isinstance(op, airio_preps.FnTransforms):
+      if isinstance(op, preprocessors_lib.FnTransforms):
         op.runtime_args = runtime_args
 
     return self._load_data(source=source, sampler=sampler, ops=ops)
@@ -250,7 +254,7 @@ class Task(DatasetProviderBase):
       self,
       source: GrainDataSource,
       sampler: grain.IndexSampler,
-      ops: Sequence[GrainPreprocessor],
+      ops: Sequence[grain.Transformation],
   ) -> clu_dataset_iterator.DatasetIterator:
     """Returns a sampled data source after applying `ops`.
 
@@ -340,12 +344,12 @@ class Task(DatasetProviderBase):
       return accumulated_result
 
     # Apply all transformations, one by one.
-    runtime_args = airio_preps.AirIOInjectedRuntimeArgs(
+    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths=sequence_lengths, split=split
     )
     accumulated_ops = []
     for op in all_ops:
-      if isinstance(op, airio_preps.FnTransforms):
+      if isinstance(op, preprocessors_lib.FnTransforms):
         op.runtime_args = runtime_args
       accumulated_ops.append(op)
       records_next_step = self._load_data(
@@ -428,14 +432,14 @@ class Mixture(DatasetProviderBase):
           grain.Batch(batch_size=batch_size, drop_remainder=False)
       )
     if post_mix_preps:
-      runtime_args = airio_preps.AirIOInjectedRuntimeArgs(
+      runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
           sequence_lengths=sequence_lengths, split=split
       )
       post_mix_transforms = [
-          airio_preps.LazyDatasetTransform(p) for p in post_mix_preps
+          preprocessors_lib.LazyDatasetTransform(p) for p in post_mix_preps
       ]
       for t in post_mix_transforms:
-        ds = t(ds, runtime_args=runtime_args)
+        ds, runtime_args = t(ds, runtime_args=runtime_args)
     if num_epochs is None:
       ds = lazy_dataset.RepeatLazyMapDataset(ds, num_epochs=None)
     return ds
@@ -544,7 +548,7 @@ class TaskBuilder:
       self,
       task_name: str,
       source: data_sources.DataSource | None = None,
-      preprocessors: Sequence[GrainPreprocessor] | None = None,
+      preprocessors: Sequence[AirIOPreprocessor] | None = None,
   ):
     """Constructor for TaskBuilder.
 
@@ -586,7 +590,7 @@ class TaskBuilder:
     return self
 
   def set_preprocessors(
-      self, preprocessors: Sequence[GrainPreprocessor]
+      self, preprocessors: Sequence[AirIOPreprocessor]
   ) -> "TaskBuilder":
     self._preprocessors = list(preprocessors)
     return self
@@ -650,7 +654,7 @@ def get_vocabularies(
 
   vocabulary_map = {}
   for preproc in task.get_preprocessors():
-    if isinstance(preproc, airio_preps.MapFnTransform) and isinstance(
+    if isinstance(preproc, preprocessors_lib.MapFnTransform) and isinstance(
         preproc.map_fn, tokenizer.Tokenizer
     ):
       tokenizer_configs = preproc.map_fn.tokenizer_configs
