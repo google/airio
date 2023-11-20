@@ -14,10 +14,12 @@
 
 """Tests for packing."""
 
+import functools
 from absl.testing import absltest
 from absl.testing import parameterized
 from airio import preprocessors as preprocessors_lib
 from airio.common import packing
+from airio.common import preprocessors
 import grain.python as grain
 import numpy as np
 
@@ -42,36 +44,11 @@ class PackingTest(parameterized.TestCase):
         ([1, 2, 3, 4], [1, 1, 1, 1], [0, 1, 2, 3]),
         # Third element was fully packed and hence produced out of order.
         ([11, 12, 13, 14], [1, 1, 1, 1], [0, 1, 2, 3]),
-        # Second, fourth and five element packed together.
+        # Second, fourth and fifth element packed together.
         ([5, 6, 7, 8], [1, 1, 2, 3], [0, 1, 0, 0]),
     ]
     for actual, expected in zip(ds_iter, expected_elements, strict=True):
       # Elements are tuples with (inputs, inputs_segment_ids, inputs_positions).
-      np.testing.assert_array_equal(actual, expected)
-
-  def test_pack_single_feature_remainder_is_padded(self):
-    # 4 elements of variable sequence length.
-    input_elements = [[1, 2, 3, 4], [5, 6], [11, 12, 13, 14], [7]]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
-    ds = ds.map(np.asarray)
-    ds = packing.PackLazyMapDataset(
-        ds, feature_lengths=4, pool_size=10, num_partial_examples=10
-    )
-    ds_iter = iter(ds)
-
-    # Elements are tuples with (inputs, inputs_segment_ids, inputs_positions).
-    expected_elements = [
-        # First element was already fully packed on 'inputs'.
-        ([1, 2, 3, 4], [1, 1, 1, 1], [0, 1, 2, 3]),
-        # Third element was fully packed and hence produced out of order.
-        ([11, 12, 13, 14], [1, 1, 1, 1], [0, 1, 2, 3]),
-        # Second and fourth element packed together (plus padding).
-        ([5, 6, 7, 0], [1, 1, 2, 0], [0, 1, 0, 0]),
-    ]
-
-    for actual, expected in zip(ds_iter, expected_elements, strict=True):
-      # Elements are tuples with (inputs, inputs_segment_ids, inputs_positions).
-      self.assertLen(actual, 3)
       np.testing.assert_array_equal(actual, expected)
 
   # Same as above but elements are dictionaries.
@@ -172,17 +149,17 @@ class PackingTest(parameterized.TestCase):
         # First element was already fully packed on 'inputs'.
         {
             "inputs": [1, 2, 3, 4],
-            "targets": [10, 20, 0, 0],
+            "targets": [10, 20],
             "inputs_segment_ids": [1, 1, 1, 1],
             "inputs_positions": [0, 1, 2, 3],
-            "targets_segment_ids": [1, 1, 0, 0],
-            "targets_positions": [0, 1, 0, 0],
+            "targets_segment_ids": [1, 1],
+            "targets_positions": [0, 1],
         },
         # Second and fourth element packed together.
         {
-            "inputs": [5, 6, 7, 0],
-            "inputs_segment_ids": [1, 1, 2, 0],
-            "inputs_positions": [0, 1, 0, 0],
+            "inputs": [5, 6, 7],
+            "inputs_segment_ids": [1, 1, 2],
+            "inputs_positions": [0, 1, 0],
             "targets": [30, 40, 50, 60],
             "targets_segment_ids": [1, 1, 1, 2],
             "targets_positions": [0, 1, 2, 0],
@@ -193,9 +170,9 @@ class PackingTest(parameterized.TestCase):
             "inputs": [11, 12, 13, 14],
             "inputs_segment_ids": [1, 1, 1, 1],
             "inputs_positions": [0, 1, 2, 3],
-            "targets": [31, 41, 51, 0],
-            "targets_segment_ids": [1, 1, 1, 0],
-            "targets_positions": [0, 1, 2, 0],
+            "targets": [31, 41, 51],
+            "targets_segment_ids": [1, 1, 1],
+            "targets_positions": [0, 1, 2],
         },
     ]
     for actual, expected in zip(ds_iter, expected_elements, strict=True):
@@ -252,12 +229,12 @@ class PackingTest(parameterized.TestCase):
             "targets_positions": [0, 1, 2, 0],
         },
         {
-            "inputs": [1, 2, 3, 4, 7, 0],
-            "inputs_segment_ids": [1, 1, 1, 1, 2, 0],
-            "inputs_positions": [0, 1, 2, 3, 0, 0],
-            "targets": [10, 20, 60, 0],  # 50 gets dropped.
-            "targets_segment_ids": [1, 1, 2, 0],
-            "targets_positions": [0, 1, 0, 0],
+            "inputs": [1, 2, 3, 4, 7],
+            "inputs_segment_ids": [1, 1, 1, 1, 2],
+            "inputs_positions": [0, 1, 2, 3, 0],
+            "targets": [10, 20, 60],
+            "targets_segment_ids": [1, 1, 2],
+            "targets_positions": [0, 1, 0],
         },
     ]
     for actual, expected in zip(ds_iter, expected_elements, strict=True):
@@ -295,7 +272,7 @@ class PackingTest(parameterized.TestCase):
         num_partial_examples=10,
     )
     ds_iter = iter(ds)
-    expected_ids = [[[1, 1], [2, 2]], [[1, 2], [2, 1]]]
+    expected_ids = [[[1, 2], [2, 1]], [[1, 1], [2, 2]]]
     for actual, expected in zip(ds_iter, expected_ids, strict=True):
       np.testing.assert_array_equal(actual["id"], expected)
 
@@ -420,6 +397,58 @@ class PackingTest(parameterized.TestCase):
         },
     ]
 
+    for actual, expected in zip(ds_iter, expected_elements, strict=True):
+      # Compare keys.
+      self.assertSequenceEqual(sorted(actual), sorted(expected))
+      np.testing.assert_array_equal(actual[feature], expected[feature])
+
+  @parameterized.parameters(
+      "inputs",
+      "inputs_segment_ids",
+      "inputs_positions",
+  )
+  def test_pack_single_feature_with_padding(self, feature: str):
+    input_elements = [
+        {"inputs": [1, 2, 3, 4]},
+        {"inputs": [5, 6]},
+        {"inputs": [11, 12, 13, 14]},
+        {"inputs": [7]},
+    ]
+    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"inputs": 4}, split="unused"
+    )
+    packing_preprocessor = packing.AirIOPackDatasetPreprocessor(
+        pool_size=10, num_partial_examples=10
+    )
+    ds, updated_runtime_args = packing_preprocessor(ds, runtime_args)
+    pad_fn = functools.partial(
+        preprocessors.pad, runtime_args=updated_runtime_args
+    )
+    ds = ds.map(pad_fn)
+    ds_iter = iter(ds)
+
+    expected_elements = [
+        # First element was already fully packed on 'inputs'.
+        {
+            "inputs": [1, 2, 3, 4],
+            "inputs_segment_ids": [1, 1, 1, 1],
+            "inputs_positions": [0, 1, 2, 3],
+        },
+        # The third element is fully packed, hence yielded out of order.
+        {
+            "inputs": [11, 12, 13, 14],
+            "inputs_segment_ids": [1, 1, 1, 1],
+            "inputs_positions": [0, 1, 2, 3],
+        },
+        # Second and fourth element packed together (with padding).
+        {
+            "inputs": [5, 6, 7, 0],
+            "inputs_segment_ids": [1, 1, 2, 0],
+            "inputs_positions": [0, 1, 0, 0],
+        },
+    ]
     for actual, expected in zip(ds_iter, expected_elements, strict=True):
       # Compare keys.
       self.assertSequenceEqual(sorted(actual), sorted(expected))

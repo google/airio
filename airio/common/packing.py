@@ -270,7 +270,6 @@ class MultiBinPacker:
 
   def get_packed_example(self):
     return self._partially_packed_examples.popleft().pack_and_unflatten(
-        flat_feature_lengths=self._flat_feature_lengths,
         length_struct=self.feature_lengths,
     )
 
@@ -309,7 +308,6 @@ class MultiBinPacker:
     if fully_packed:
       assert fits
       packed = fully_packed.pack_and_unflatten(
-          flat_feature_lengths=self._flat_feature_lengths,
           length_struct=self.feature_lengths,
       )
       self._partially_packed_examples.remove(fully_packed)
@@ -324,7 +322,6 @@ class MultiBinPacker:
       if partially_packed.is_fully_packed():
         packed_examples.append(
             partially_packed.pack_and_unflatten(
-                flat_feature_lengths=self._flat_feature_lengths,
                 length_struct=self.feature_lengths,
             )
         )
@@ -347,6 +344,8 @@ class PartiallyPackedExample:
 
   # A list of examples that can be packed together.
   _partially_packed_flat_example_list: list[Any]
+  # Combined lengths of the partially packed example.
+  _combined_flat_lengths: list[int]
   # Remaining space available along
   _available_flat_lengths: list[int | None]
 
@@ -356,6 +355,9 @@ class PartiallyPackedExample:
   ):
     self._partially_packed_flat_example_list = []
     self._available_flat_lengths = available_flat_lengths
+    self._combined_flat_lengths = [
+        SKIP_FEATURE if l == SKIP_FEATURE else 0 for l in available_flat_lengths
+    ]
 
   def add_example(self, flat_ex: Any):
     self._partially_packed_flat_example_list.append(flat_ex)
@@ -364,7 +366,10 @@ class PartiallyPackedExample:
         # Feature should not be packed.
         continue
       length = len(flat_ex[i])
-      self._available_flat_lengths[i] -= length
+      self._available_flat_lengths[i] = max(
+          0, self._available_flat_lengths[i] - length
+      )
+      self._combined_flat_lengths[i] += length
 
   def example_fits(self, flat_ex: Any):
     for i in range(len(self._available_flat_lengths)):
@@ -377,26 +382,25 @@ class PartiallyPackedExample:
 
   def is_fully_packed(self):
     for length in self._available_flat_lengths:
-      if length:
+      if length and length != SKIP_FEATURE:
         return False
     return True
 
   def pack_and_unflatten(
       self,
-      flat_feature_lengths: Sequence[int | None],
       length_struct: PyTree[int | None],
   ):
     """Produces a packed, unflattened example."""
     flat_elements = self._partially_packed_flat_example_list
     flat_packed_element = []
-    for feature in range(len(flat_feature_lengths)):
-      if flat_feature_lengths[feature] == SKIP_FEATURE:
+    for feature in range(len(self._combined_flat_lengths)):
+      if self._combined_flat_lengths[feature] == SKIP_FEATURE:
         # Feature should not be packed.
         flat_packed_element.append(
             [flat_elements[i][feature] for i in range(len(flat_elements))]
         )
         continue
-      sequence_length = flat_feature_lengths[feature]
+      sequence_length = self._combined_flat_lengths[feature]
       remaining_dims = flat_elements[0][feature].shape[1:]
       shape = [sequence_length, *remaining_dims]
       dtype = flat_elements[0][feature].dtype
