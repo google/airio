@@ -384,9 +384,21 @@ class PackingTest(parameterized.TestCase):
     transform = packing.AirIOPackDatasetPreprocessor(
         pool_size=10, num_partial_examples=10
     )
-    ds = transform(ds, runtime_args)
+    ds, updated_runtime_args = transform(ds, runtime_args)
     ds_iter = iter(ds)
 
+    # Verify updated runtime args
+    expected_updated_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={
+            "inputs": 4,
+            "inputs_segment_ids": 4,
+            "inputs_positions": 4,
+        },
+        split="unused",
+    )
+    self.assertEqual(updated_runtime_args, expected_updated_runtime_args)
+
+    # Verify packed examples.
     expected_elements = [
         # First element was already fully packed on 'inputs'.
         {

@@ -163,7 +163,7 @@ class Task(DatasetProviderBase):
       next_epoch_rng, prep_rng = jax.random.split(next_epoch_rng)
       prep_rng, shuffle_rng = jax.random.split(prep_rng)
       for prep in preps:
-        ds = preprocessors_lib.LazyDatasetTransform(prep)(
+        ds, runtime_args = preprocessors_lib.LazyDatasetTransform(prep)(
             ds, prep_rng, runtime_args
         )
         prep_rng, _ = jax.random.split(prep_rng)
@@ -449,7 +449,7 @@ class Mixture(DatasetProviderBase):
           preprocessors_lib.LazyDatasetTransform(p) for p in post_mix_preps
       ]
       for t in post_mix_transforms:
-        ds = t(ds, runtime_args=runtime_args)
+        ds, runtime_args = t(ds, runtime_args=runtime_args)
     if num_epochs is None:
       ds = lazy_dataset.RepeatLazyMapDataset(ds, num_epochs=None)
     return ds

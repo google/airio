@@ -1033,8 +1033,7 @@ class DatasetProvidersTest(absltest.TestCase):
         ds: lazy_dataset.LazyMapDataset,
         rargs: preprocessors_lib.AirIOInjectedRuntimeArgs,
     ):
-      del rargs
-      return ds
+      return ds, rargs
 
     preprocessors = _create_preprocessors() + [  # LazyMapDataset preprocessor
         preprocessors_lib.PackTransform(

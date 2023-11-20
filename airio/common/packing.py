@@ -18,7 +18,7 @@ import collections
 import copy
 import dataclasses
 import math
-from typing import Any, Sequence, TypeVar
+from typing import Any, Sequence, TypeVar, Tuple
 from airio import preprocessors as preprocessors_lib
 import airio.common.constants
 import grain.python as grain
@@ -58,12 +58,32 @@ class AirIOPackDatasetPreprocessor:
       self,
       ds: lazy_dataset.LazyMapDataset,
       runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
-  ) -> lazy_dataset.LazyMapDataset:
+  ) -> Tuple[
+      lazy_dataset.LazyMapDataset, preprocessors_lib.AirIOInjectedRuntimeArgs
+  ]:
     return PackLazyMapDataset(
         ds,
         feature_lengths=runtime_args.sequence_lengths,
         pool_size=self.pool_size,
         num_partial_examples=self.num_partial_examples,
+    ), self.update_runtime_args(runtime_args)
+
+  def update_runtime_args(
+      self,
+      runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
+  ) -> preprocessors_lib.AirIOInjectedRuntimeArgs:
+    """Updates runtime args with new sequence lengths for subsequent preprocessors."""
+    seq_lens = runtime_args.sequence_lengths
+    new_seq_lens = {}
+    for feature in seq_lens:
+      new_seq_lens[feature] = seq_lens[feature]
+      if not seq_lens[feature] or seq_lens[feature] == SKIP_FEATURE:
+        continue
+      new_seq_lens[f"{feature}_segment_ids"] = seq_lens[feature]
+      new_seq_lens[f"{feature}_positions"] = seq_lens[feature]
+    return preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths=new_seq_lens,
+        split=runtime_args.split,
     )
 
 
