@@ -151,7 +151,7 @@ class PreprocessorsTest(absltest.TestCase):
         return element + rng.integers(0, 10)
 
     transform = TestRandomMap()
-    with self.assertRaisesRegex(ValueError, ".*is not safe"):
+    with self.assertRaisesRegex(ValueError, ".*is not reproducible"):
       _ = preprocessors.LazyDatasetTransform(transform)
 
   def test_filter_lazydataset_transform(self):
@@ -300,6 +300,22 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
     ds = lazy_dataset_transform(ds, runtime_args=self._runtime_args)
     self.assertListEqual(list(ds), [4])
+
+  def test_pack_transform(self):
+
+    def lazy_map_fn(
+        ds: lazy_dataset.LazyMapDataset,
+        run_args: preprocessors.AirIOInjectedRuntimeArgs,
+    ):
+      return ds.map(lambda x: x + run_args.sequence_lengths["val"])
+
+    run_args = preprocessors.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"val": 3}, split="unused"
+    )
+    transform = preprocessors.PackTransform(lazy_map_fn)
+    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = transform(ds, run_args)
+    self.assertListEqual(list(ds), list(range(3, 13)))
 
 
 if __name__ == "__main__":

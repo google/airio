@@ -16,6 +16,7 @@
 
 from absl.testing import absltest
 from absl.testing import parameterized
+from airio import preprocessors as preprocessors_lib
 from airio.common import packing
 import grain.python as grain
 import numpy as np
@@ -350,6 +351,66 @@ class PackingTest(parameterized.TestCase):
         },
     ]
     for actual, expected in zip(ds_iter, expected_elements, strict=True):
+      np.testing.assert_array_equal(actual[feature], expected[feature])
+
+  @parameterized.parameters(
+      "inputs",
+      "inputs_segment_ids",
+      "inputs_positions",
+  )
+  def test_airio_pack_preprocessor(self, feature: str):
+    input_elements = [
+        {
+            "inputs": [1, 2, 3, 4],
+        },
+        {
+            "inputs": [5, 6],
+        },
+        {
+            "inputs": [11, 12, 13, 14],
+        },
+        {
+            "inputs": [7],
+        },
+        {
+            "inputs": [8],
+        },
+    ]
+    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"inputs": 4}, split="unused"
+    )
+    transform = packing.AirIOPackDatasetPreprocessor(
+        pool_size=10, num_partial_examples=10
+    )
+    ds = transform(ds, runtime_args)
+    ds_iter = iter(ds)
+
+    expected_elements = [
+        # First element was already fully packed on 'inputs'.
+        {
+            "inputs": [1, 2, 3, 4],
+            "inputs_segment_ids": [1, 1, 1, 1],
+            "inputs_positions": [0, 1, 2, 3],
+        },
+        # Third element was fully packed and hence produced out of order.
+        {
+            "inputs": [11, 12, 13, 14],
+            "inputs_segment_ids": [1, 1, 1, 1],
+            "inputs_positions": [0, 1, 2, 3],
+        },
+        # Second, fourth and fifth element packed together.
+        {
+            "inputs": [5, 6, 7, 8],
+            "inputs_segment_ids": [1, 1, 2, 3],
+            "inputs_positions": [0, 1, 0, 0],
+        },
+    ]
+
+    for actual, expected in zip(ds_iter, expected_elements, strict=True):
+      # Compare keys.
+      self.assertSequenceEqual(sorted(actual), sorted(expected))
       np.testing.assert_array_equal(actual[feature], expected[feature])
 
 

@@ -93,13 +93,48 @@ FnTransforms = Union[MapFnTransform, RandomMapFnTransform, FilterFnTransform]
 
 
 @dataclasses.dataclass
+class PackTransform:
+  """Represents configuration for a packing preprocessor.
+
+  Attributes:
+    packing_preprocessor: The packing preprocessor. This is a `Callable` that
+      packs a `lazy_dataset.LazyMapDataset` based on sequence_lengths provided
+      via `AirIOInjectedRuntimeArgs`, and can be extended to other types, such
+      as a set of `grain.Transformation`s. A standard implementation is
+      available in airio/common.
+  """
+
+  packing_preprocessor: Callable[
+      [lazy_dataset.LazyMapDataset, AirIOInjectedRuntimeArgs],
+      lazy_dataset.LazyMapDataset,
+  ]
+
+  def __call__(
+      self,
+      ds: lazy_dataset.LazyMapDataset,
+      runtime_args: AirIOInjectedRuntimeArgs,
+  ):
+    packer = self.packing_preprocessor
+    if not isinstance(ds, lazy_dataset.LazyMapDataset):
+      raise ValueError(
+          f"Cannot apply LazyMapDataset packing: {str(packer)} to"
+          f" non-LazyMapDataset dataset: {str(ds)}"
+      )
+    return packer(ds, runtime_args)
+
+
+# This may be extended as needed.
+AirIOPreprocessor = grain.Transformation | PackTransform
+
+
+@dataclasses.dataclass
 class LazyDatasetTransform:
   """A convenience function to map Transforms to LazyDatasets."""
-  transform: grain.Transformation | grain.Operation
+  transform: AirIOPreprocessor
 
   def __post_init__(self):
     # TODO(b/300282178): Support flat-maps and many-to-one/many transforms.
-    if not isinstance(self.transform, grain.Transformation):
+    if not isinstance(self.transform, AirIOPreprocessor):
       raise ValueError(f"{str(self.transform)} is not supported")
     # TODO(b/300938204): Remove error for other RandomMapTransforms, once
     # these can be reproducibly processed.
@@ -107,7 +142,7 @@ class LazyDatasetTransform:
         self.transform, RandomMapFnTransform
     ):
       raise ValueError(
-          f"{str(self.transform)} is not safe. Use"
+          f"{str(self.transform)} is not reproducible. Use"
           " airio.preprocessors.RandomMapFnTransform instead."
       )
 
@@ -144,6 +179,8 @@ class LazyDatasetTransform:
             batch_size=self.transform.batch_size,
             drop_remainder=self.transform.drop_remainder,
         )
+      case PackTransform():
+        return self.transform(ds, runtime_args)
       case _:
         # Should be taken care of by post init validation.
         raise ValueError("%s is not supported" % str(self.transform))

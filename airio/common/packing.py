@@ -18,6 +18,7 @@ import copy
 import dataclasses
 import math
 from typing import Any, Sequence, TypeVar
+from airio import preprocessors as preprocessors_lib
 import airio.common.constants
 import grain.python as grain
 import jax
@@ -27,6 +28,24 @@ import numpy as np
 lazy_dataset = grain.experimental.lazy_dataset
 T = TypeVar("T")
 SKIP_FEATURE = airio.common.constants.SKIP_FEATURE
+
+
+@dataclasses.dataclass
+class AirIOPackDatasetPreprocessor:
+  pool_size: int
+  num_partial_examples: int
+
+  def __call__(
+      self,
+      ds: lazy_dataset.LazyMapDataset,
+      runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
+  ) -> lazy_dataset.LazyMapDataset:
+    return PackLazyMapDataset(
+        ds,
+        feature_lengths=runtime_args.sequence_lengths,
+        pool_size=self.pool_size,
+        num_partial_examples=self.num_partial_examples,
+    )
 
 
 @dataclasses.dataclass(frozen=False)
