@@ -259,7 +259,9 @@ class MultiBinPacker:
     packer = MultiBinPacker(feature_lengths, num_partial_examples)
     for example in dataset:
       packed_examples = packer.fit_example(example)
-      if packed_example: yield fully_packed
+      if packed_examples:
+        for packed in packed_examples:
+          yield packed
     while packer.has_partially_packed_examples():
       yield packer.get_packed_example()
     ```
@@ -319,7 +321,10 @@ class MultiBinPacker:
     return len(self._partially_packed_examples)
 
   def get_packed_example(self):
-    return self._partially_packed_examples.popleft().pack_and_unflatten(
+    if not self._partially_packed_examples:
+      raise ValueError("No packed examples available.")
+    return unflatten_packed_example(
+        self._partially_packed_examples.popleft().pack(),
         length_struct=self.feature_lengths,
     )
 
@@ -375,7 +380,8 @@ class MultiBinPacker:
     # Add to result if example fit and became fully packed
     if fully_packed:
       assert fits
-      packed = fully_packed.pack_and_unflatten(
+      packed = unflatten_packed_example(
+          fully_packed.pack(),
           length_struct=self.feature_lengths,
       )
       del self._partially_packed_examples[fully_packed_idx]
@@ -390,7 +396,8 @@ class MultiBinPacker:
       partially_packed.add_example(flat_ex)
       if partially_packed.is_fully_packed():
         packed_examples.append(
-            partially_packed.pack_and_unflatten(
+            unflatten_packed_example(
+                partially_packed.pack(),
                 length_struct=self.feature_lengths,
             )
         )
@@ -398,6 +405,153 @@ class MultiBinPacker:
         self._partially_packed_examples.append(partially_packed)
 
     return packed_examples
+
+
+class NoamPacker:
+  """An implementation of the popular Noam Packing algorithm.
+
+  This can be used to pack a fixed pool of examples (LazyMapDataset impl) or an
+  iterative stream of examples (LazyIterDataset impl). A typical workflow would
+  be:
+    ```
+    packer = NoamPacker(feature_lengths)
+    for example in dataset:
+      packed_examples = packer.fit_example(example)
+      if packed_examples:
+        for packed in packed_examples:
+          yield packed
+    while packer.has_partially_packed_examples():
+      yield packer.get_packed_example()
+    ```
+
+  This implements the following logic invoked in
+  `t5.data.preprocessors.span_corruption`:
+  ```
+  from t5.data import preprocessors
+  ds = preprocessors.reduce_concat_tokens(ds)
+      ds, feature_key="feature", batch_size=128
+  )
+  ds = preprocessors.split_tokens(
+      ds,
+      feature_key="feature",
+      min_tokens_per_segment=None,
+      max_tokens_per_segment=feature_length,
+      passthrough_feature_keys=passthrough_feature_keys,
+  )
+  ```
+  Noam packing appends sequences from consecutive examples until they exceed
+  desired packing lengths, then slices them, producing packed examples with zero
+  padding.  The remainder of a sliced example forms the beginning of the next
+  packed sequence. There may not be enough examples to fill the desired packed
+  length at the end of a pool / stream of examples, so there may be occasional
+  examples with padding.
+
+  A few things to keep in mind:
+    + Noam-packing should be used when examples have a single feature or
+    multiple correlated features (e.g. token ids, token weights). Otherwise,
+    sequences may get sliced to different lengths, causing misalignment.
+    + Noam-packing does not produce segment_ids and positions features, thus
+    treating the packed example as a single example without boundaries. Support
+    for marker features can be added.
+    + The append and slice approach leads to examples being possibly sliced and
+    distributed over multiple packed examples. Hence, shuffling the packed
+    dataset is highly recommended.
+    + When using this packer on a pool of examples (LazyMapDataset), it is
+    possible (although rare) that the packed dataset has more examples than the
+    unpacked dataset. In this case, packed examples may be capped because the
+    maximum possible size of a LazyMapDataset must be statically known.
+  """
+
+  def __init__(
+      self,
+      feature_lengths: PyTree[int] | None = None,
+  ):
+    self._feature_lengths = feature_lengths
+    self._flat_feature_lengths = flatten(feature_lengths)
+    self._partially_packed_example: PartiallyPackedExample = None
+    if feature_lengths:
+      self._partially_packed_example = PartiallyPackedExample(
+          copy.copy(self._flat_feature_lengths)
+      )
+
+  @property
+  def feature_lengths(self):
+    return self._feature_lengths
+
+  @property
+  def flat_feature_lengths(self):
+    return self._flat_feature_lengths
+
+  @feature_lengths.setter
+  def feature_lengths(self, feature_lengths):
+    if self._feature_lengths:
+      raise ValueError(
+          f"feature_lengths are already set to {self._feature_lengths} and"
+          f" cannot be overridden to {feature_lengths}."
+      )
+    self._feature_lengths = feature_lengths
+    self._flat_feature_lengths = flatten(feature_lengths)
+    self._partially_packed_example = PartiallyPackedExample(
+        copy.copy(self._flat_feature_lengths)
+    )
+
+  # pytype:disable=attribute-error
+  def has_partially_packed_examples(self):
+    return not self._partially_packed_example.is_empty()
+
+  def get_packed_example(self):
+    if self._partially_packed_example.is_empty():
+      raise ValueError("No packed examples available.")
+    return self._slice_and_keep_remainder()
+
+  def get_packed_feature_lengths(self):
+    if not self.feature_lengths:
+      raise ValueError("feature_lengths must be set before packing.")
+    return self.feature_lengths
+
+  def fit_example(self, ex: PyTree[np.ndarray]) -> Sequence[PyTree[np.ndarray]]:
+    """Fits example into existing partially packed example.
+
+    Args:
+      ex: An example to pack.
+
+    Returns:
+      A list of packed examples if fully packed examples were produced.
+    """
+    if not self.feature_lengths:
+      raise ValueError("feature_lengths must be set before packing.")
+    assert not self._partially_packed_example.is_fully_packed()
+
+    packed_examples = []
+
+    flat_ex = flatten(ex)
+    self._partially_packed_example.add_example(flat_ex)
+    # Keep slicing packed examples from the partially packed example until there
+    # is space available for a new example. Multiple slices may be needed if
+    # sequences are significantly longer than packed lengths.
+    while self._partially_packed_example.is_fully_packed():
+      packed_examples.append(self._slice_and_keep_remainder())
+
+    return packed_examples
+
+  def _slice_and_keep_remainder(self):
+    """Packs and slices at required lengths; adds remaining to new partially packed example."""
+    packed = self._partially_packed_example.pack()
+    # remove marker features.
+    packed = remove_packed_marker_features_flattened(
+        packed, self.flat_feature_lengths
+    )
+    trimmed = trim_flattened(copy.copy(packed), self.flat_feature_lengths)
+    remainder = remainder_after_trim_flattened(
+        copy.copy(packed), self.flat_feature_lengths
+    )
+    self._partially_packed_example = PartiallyPackedExample(
+        copy.copy(self.flat_feature_lengths)
+    )
+    if not is_empty_flattened(remainder, self.flat_feature_lengths):
+      self._partially_packed_example.add_example(remainder)
+    return unflatten_packed_example(trimmed, length_struct=self.feature_lengths)
+  # pytype:enable=attribute-error
 
 
 @dataclasses.dataclass
@@ -429,6 +583,7 @@ class PartiallyPackedExample:
     ]
 
   def add_example(self, flat_ex: Any):
+    """Adds example to partially packed example list."""
     self._partially_packed_flat_example_list.append(flat_ex)
     for i in range(len(self._available_flat_lengths)):
       if self._available_flat_lengths[i] == SKIP_FEATURE:
@@ -455,11 +610,14 @@ class PartiallyPackedExample:
         return False
     return True
 
-  def pack_and_unflatten(
-      self,
-      length_struct: PyTree[int],
-  ):
-    """Produces a packed, unflattened example."""
+  def is_empty(self):
+    for length in self._combined_flat_lengths:
+      if length and length != SKIP_FEATURE:
+        return False
+    return True
+
+  def pack(self):
+    """Produces a packed, flattened example."""
     flat_elements = self._partially_packed_flat_example_list
     flat_packed_element = []
     for feature in range(len(self._combined_flat_lengths)):
@@ -486,16 +644,7 @@ class PartiallyPackedExample:
         positions[start:end] = np.arange(length)
         start += length
       flat_packed_element.append((values, segmentations, positions))
-    packed_element = unflatten_as(length_struct, flat_packed_element)
-    # Special treatment for dictionaries.
-    if isinstance(packed_element, dict):
-      for key in list(packed_element):
-        value = packed_element[key]
-        if isinstance(value, tuple) and len(value) == 3:
-          packed_element[key] = value[0]
-          packed_element[f"{key}_segment_ids"] = value[1]
-          packed_element[f"{key}_positions"] = value[2]
-    return packed_element
+    return flat_packed_element
 
 
 def trim_flattened(flat_ex: list[np.ndarray], flat_lengths: list[int]):
@@ -507,6 +656,38 @@ def trim_flattened(flat_ex: list[np.ndarray], flat_lengths: list[int]):
   return flat_ex
 
 
+def remainder_after_trim_flattened(
+    flat_ex: list[np.ndarray], flat_lengths: list[int]
+):
+  for i in range(len(flat_lengths)):
+    if flat_lengths[i] == SKIP_FEATURE:
+      # Feature should not be trimmed.
+      continue
+    flat_ex[i] = flat_ex[i][flat_lengths[i]:, ...]
+  return flat_ex
+
+
+def is_empty_flattened(flat_ex, flat_lengths):
+  for i in range(len(flat_lengths)):
+    if flat_lengths[i] == SKIP_FEATURE:
+      # Feature should be ignored.
+      continue
+    if flat_ex[i].size:
+      return False
+  return True
+
+
+def remove_packed_marker_features_flattened(packed, flat_lengths):
+  packed_without_markers = []
+  for i in range(len(flat_lengths)):
+    if flat_lengths[i] == SKIP_FEATURE:
+      # Feature does not have markers.
+      packed_without_markers.append(packed[i])
+      continue
+    packed_without_markers.append(packed[i][0])
+  return packed_without_markers
+
+
 def flatten(structure):
   return jax.tree_util.tree_flatten(structure)[0]
 
@@ -515,3 +696,19 @@ def unflatten_as(structure, flat_sequence):
   return jax.tree_util.tree_unflatten(
       jax.tree_util.tree_structure(structure), flat_sequence
   )
+
+
+def unflatten_packed_example(
+    packed_flat_example: Sequence[np.ndarray], length_struct: PyTree[int]
+) -> PyTree[np.ndarray]:
+  """Unflattens packed example."""
+  packed_element = unflatten_as(length_struct, packed_flat_example)
+  # Special treatment for dictionaries.
+  if isinstance(packed_element, dict):
+    for key in list(packed_element):
+      value = packed_element[key]
+      if isinstance(value, tuple) and len(value) == 3:
+        packed_element[key] = value[0]
+        packed_element[f"{key}_segment_ids"] = value[1]
+        packed_element[f"{key}_positions"] = value[2]
+  return packed_element

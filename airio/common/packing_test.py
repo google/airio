@@ -26,7 +26,7 @@ import numpy as np
 lazy_dataset = grain.experimental.lazy_dataset
 
 
-class PackingTest(parameterized.TestCase):
+class MultiBinPackingTest(parameterized.TestCase):
 
   def test_pack_single_feature(self):
     # 5 elements of variable sequence length.
@@ -457,6 +457,416 @@ class PackingTest(parameterized.TestCase):
       # Compare keys.
       self.assertSequenceEqual(sorted(actual), sorted(expected))
       np.testing.assert_array_equal(actual[feature], expected[feature])
+
+  def test_multi_bin_packer_feature_unset_fails(self):
+    ex = {"inputs": np.asarray([1, 2, 3, 4])}
+    packer = packing.MultiBinPacker(num_partial_examples=10)
+    with self.assertRaisesRegex(ValueError, "feature_lengths must be set.*"):
+      packer.fit_example(ex)
+    with self.assertRaisesRegex(ValueError, "feature_lengths must be set.*"):
+      packer.get_packed_feature_lengths()
+
+  def test_multi_bin_packer_feature_override_fails(self):
+    packer = packing.MultiBinPacker(
+        feature_lengths={"inputs": 4}, num_partial_examples=10
+    )
+    with self.assertRaisesRegex(
+        ValueError, "feature_lengths are already set.*"
+    ):
+      packer.feature_lengths = {"inputs": 5}
+
+  def test_multi_bin_packer_no_packed_example(self):
+    packer = packing.MultiBinPacker(
+        feature_lengths={"inputs": 4}, num_partial_examples=10
+    )
+    with self.assertRaisesRegex(
+        ValueError, "No packed examples.*"
+    ):
+      packer.get_packed_example()
+
+
+class NoamPackingTest(parameterized.TestCase):
+
+  def test_pack_single_feature(self):
+    # 5 elements of variable sequence length.
+    input_elements = [[1, 2, 3, 4], [5, 6], [11, 12, 13, 14], [7]]
+    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = ds.map(np.asarray)
+    packer = packing.NoamPacker(feature_lengths=4)
+    ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
+    ds_iter = iter(ds)
+
+    expected_elements = [
+        # First element was already fully packed on 'inputs'.
+        [1, 2, 3, 4],
+        # Second and third (partial) element packed together.
+        [5, 6, 11, 12],
+        # Third (remainder) and fourth element packed together.
+        [13, 14, 7]
+    ]
+    for actual, expected in zip(ds_iter, expected_elements, strict=True):
+      # Elements are tuples with (inputs, inputs_segment_ids, inputs_positions).
+      np.testing.assert_array_equal(actual, expected)
+
+  def test_pack_single_feature_in_dict(self):
+    input_elements = [
+        {"inputs": [1, 2, 3, 4]},
+        {"inputs": [5, 6]},
+        {"inputs": [11, 12, 13, 14]},
+        {"inputs": [7]},
+    ]
+    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    packer = packing.NoamPacker(
+        feature_lengths={"inputs": 4}
+    )
+    ds = packing.PackLazyMapDataset(
+        ds, pool_size=10, packer=packer
+    )
+    ds_iter = iter(ds)
+
+    expected_elements = [
+        # First element was already fully packed on 'inputs'.
+        {
+            "inputs": [1, 2, 3, 4],
+        },
+        # Second and third (partial) element packed together.
+        {
+            "inputs": [5, 6, 11, 12],
+        },
+        # Third (remainder) and fourth element packed together.
+        {
+            "inputs": [13, 14, 7],
+        },
+    ]
+
+    for actual, expected in zip(ds_iter, expected_elements, strict=True):
+      # Compare keys.
+      self.assertSequenceEqual(sorted(actual), sorted(expected))
+      np.testing.assert_array_equal(actual["inputs"], expected["inputs"])
+
+  def test_pack_multiple_slices_from_examples(self):
+    input_elements = [
+        {"inputs": [0, 1, 2, 3, 4]},
+        {"inputs": [5]},
+        {"inputs": [6]},
+        {"inputs": [7]},
+        {"inputs": [8]},
+    ]
+    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    packer = packing.NoamPacker(
+        feature_lengths={"inputs": 2}
+    )
+    ds = packing.PackLazyMapDataset(
+        ds, pool_size=10, packer=packer
+    )
+    ds_iter = iter(ds)
+
+    # expected: [1, 2], [3, 4], [5, 6], ..., [18, 19]
+    expected_elements = [
+        {"inputs": [0, 1]},
+        {"inputs": [2, 3]},
+        {"inputs": [4, 5]},
+        {"inputs": [6, 7]},
+        {"inputs": [8]},
+    ]
+
+    for actual, expected in zip(ds_iter, expected_elements, strict=True):
+      # Compare keys.
+      self.assertSequenceEqual(sorted(actual), sorted(expected))
+      np.testing.assert_array_equal(actual["inputs"], expected["inputs"])
+
+  @parameterized.parameters(
+      "inputs",
+      "targets",
+  )
+  def test_pack_multiple_features_same_sequences_length(self, feature: str):
+    input_elements = [
+        {
+            "inputs": [1, 2, 3, 4],
+            "targets": [10, 20, 30, 40],
+        },
+        {
+            "inputs": [5, 6],
+            "targets": [30, 40],
+        },
+        {
+            "inputs": [11, 12, 13, 14],
+            "targets": [31, 41, 51, 61],
+        },
+        {
+            "inputs": [7],
+            "targets": [60],
+        },
+    ]
+    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    packer = packing.NoamPacker(
+        feature_lengths={"inputs": 4, "targets": 4}
+    )
+    ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
+    ds_iter = iter(ds)
+
+    expected_elements = [
+        # First element was already fully packed.
+        {
+            "inputs": [1, 2, 3, 4],
+            "targets": [10, 20, 30, 40],
+        },
+        # Second and third (partial) elements packed together.
+        {
+            "inputs": [5, 6, 11, 12],
+            "targets": [30, 40, 31, 41],
+        },
+        # Third (remainder) and fourth elements packed together.
+        {
+            "inputs": [13, 14, 7],
+            "targets": [51, 61, 60],
+        },
+    ]
+    for actual, expected in zip(ds_iter, expected_elements, strict=True):
+      # Compare keys.
+      self.assertSequenceEqual(sorted(actual), sorted(expected))
+      np.testing.assert_array_equal(actual[feature], expected[feature])
+
+  @parameterized.parameters(
+      "inputs",
+      "targets",
+  )
+  def test_pack_multiple_features_different_sequences_length(
+      self, feature: str
+  ):
+    input_elements = [
+        {
+            "inputs": [1, 2, 3, 4, 5, 6, 7, 8],
+            "targets": [10, 20, 30, 40],
+        },
+        {
+            "inputs": [5, 6, 7, 8, 9, 1],
+            "targets": [30, 40, 50],
+        },
+        {
+            "inputs": [11, 12],
+            "targets": [31],
+        },
+        {
+            "inputs": [7, 9],
+            "targets": [60],
+        },
+    ]
+    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    packer = packing.NoamPacker(
+        feature_lengths={"inputs": 6, "targets": 3}
+    )
+    ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
+    ds_iter = iter(ds)
+
+    expected_elements = [
+        {  # First element is sliced to produce first packed element.
+            "inputs": [1, 2, 3, 4, 5, 6],
+            "targets": [10, 20, 30],
+        },
+        {  # First (remainder) and second (partial) elements are packed.
+            "inputs": [7, 8, 5, 6, 7, 8],
+            "targets": [40, 30, 40],
+        },
+        {  # Second (remainder) third and fourth elements are packed.
+            "inputs": [9, 1, 11, 12, 7, 9],
+            "targets": [50, 31, 60],
+        },
+    ]
+    for actual, expected in zip(ds_iter, expected_elements, strict=True):
+      np.testing.assert_array_equal(actual[feature], expected[feature])
+
+  def test_do_not_pack_marked_features(self):
+    input_elements = [
+        {
+            "inputs": [1, 2, 3, 4],
+            "targets": [10],
+        },
+        {
+            "inputs": [5, 6],
+            "targets": [30],
+        },
+        {
+            "inputs": [11, 12, 13, 14],
+            "targets": [31],
+        },
+        {
+            "inputs": [7],
+            "targets": [60],
+        },
+    ]
+    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    packer = packing.NoamPacker(
+        feature_lengths={"inputs": 6, "targets": -1},
+    )
+    ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
+    ds_iter = iter(ds)
+    expected_targets = [[[10], [30]], [[31], [60]]]
+    for actual, expected in zip(ds_iter, expected_targets, strict=True):
+      np.testing.assert_array_equal(actual["targets"], expected)
+
+  @parameterized.parameters(
+      "input_tokens",
+      "input_vectors",
+  )
+  def test_pack_two_dimensional_features(self, feature: str):
+    input_elements = [
+        {
+            "input_tokens": [1, 2, 3],
+            "input_vectors": [[0, 1, 2], [1, 2, 3], [2, 3, 4]],
+        },
+        {
+            "input_tokens": [4, 5],
+            "input_vectors": [[3, 4, 5], [4, 5, 6]],
+        },
+        {
+            "input_tokens": [6],
+            "input_vectors": [[5, 6, 7]],
+        },
+    ]
+    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    packer = packing.NoamPacker(
+        feature_lengths={"input_tokens": 2, "input_vectors": 2}
+    )
+    ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
+    ds_iter = iter(ds)
+
+    expected_elements = [
+        {  # First element is sliced to produce first packed element.
+            "input_tokens": [1, 2],
+            "input_vectors": [[0, 1, 2], [1, 2, 3]],
+        },
+        {  # First (remainder) and second (partial) element are packed together.
+            "input_tokens": [3, 4],
+            "input_vectors": [[2, 3, 4], [3, 4, 5]],
+        },
+        {  # Second (remainder) and third element are packed together.
+            "input_tokens": [5, 6],
+            "input_vectors": [[4, 5, 6], [5, 6, 7]],
+        },
+    ]
+    for actual, expected in zip(ds_iter, expected_elements, strict=True):
+      np.testing.assert_array_equal(actual[feature], expected[feature])
+
+  def test_airio_pack_preprocessor(self):
+    input_elements = [
+        {"inputs": [1, 2, 3, 4]},
+        {"inputs": [5, 6]},
+        {"inputs": [11, 12, 13, 14]},
+        {"inputs": [7]},
+        {"inputs": [8]},
+    ]
+    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"inputs": 4}, split="unused"
+    )
+    packer = packing.NoamPacker()  # feature_lengths will be set before packing.
+    transform = packing.AirIOPackDatasetPreprocessor(
+        pool_size=10, packer=packer
+    )
+    ds, updated_runtime_args = transform(ds, runtime_args)
+    ds_iter = iter(ds)
+
+    # Verify updated runtime args
+    expected_updated_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"inputs": 4},
+        split="unused",
+    )
+    self.assertEqual(updated_runtime_args, expected_updated_runtime_args)
+
+    # Verify packed examples.
+    expected_elements = [
+        # First element was already fully packed.
+        {
+            "inputs": [1, 2, 3, 4],
+        },
+        # Second and third (partial) elements packed together.
+        {
+            "inputs": [5, 6, 11, 12],
+        },
+        # Third (remainder), fourth and fifth elements packed together.
+        {
+            "inputs": [13, 14, 7, 8],
+        },
+    ]
+
+    for actual, expected in zip(ds_iter, expected_elements, strict=True):
+      # Compare keys.
+      self.assertSequenceEqual(sorted(actual), sorted(expected))
+      np.testing.assert_array_equal(actual["inputs"], expected["inputs"])
+
+  def test_pack_single_feature_with_padding(self):
+    input_elements = [
+        {"inputs": [1, 2, 3, 4]},
+        {"inputs": [5, 6]},
+        {"inputs": [11, 12, 13, 14]},
+    ]
+    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"inputs": 4}, split="unused"
+    )
+    packer = packing.NoamPacker()  # feature_lengths will be set before packing.
+    packing_preprocessor = packing.AirIOPackDatasetPreprocessor(
+        pool_size=10, packer=packer
+    )
+    ds, updated_runtime_args = packing_preprocessor(ds, runtime_args)
+    pad_fn = functools.partial(
+        preprocessors.pad, runtime_args=updated_runtime_args
+    )
+    ds = ds.map(pad_fn)
+
+    ds_iter = iter(ds)
+
+    expected_elements = [
+        # First element was already fully packed.
+        {
+            "inputs": [1, 2, 3, 4],
+        },
+        # Second and third (partial) elements packed together.
+        {
+            "inputs": [5, 6, 11, 12],
+        },
+        # Remainder of third element, plus padding.
+        {
+            "inputs": [13, 14, 0, 0],
+        },
+    ]
+    for actual, expected in zip(ds_iter, expected_elements, strict=True):
+      # Compare keys.
+      self.assertSequenceEqual(sorted(actual), sorted(expected))
+      np.testing.assert_array_equal(actual["inputs"], expected["inputs"])
+
+  def test_noam_packer_feature_unset_fails(self):
+    ex = {"inputs": np.asarray([1, 2, 3, 4])}
+    packer = packing.NoamPacker()
+    with self.assertRaisesRegex(ValueError, "feature_lengths must be set.*"):
+      packer.fit_example(ex)
+    with self.assertRaisesRegex(ValueError, "feature_lengths must be set.*"):
+      packer.get_packed_feature_lengths()
+
+  def test_noam_packer_feature_override_fails(self):
+    packer = packing.NoamPacker(
+        feature_lengths={"inputs": 4}
+    )
+    with self.assertRaisesRegex(
+        ValueError, "feature_lengths are already set.*"
+    ):
+      packer.feature_lengths = {"inputs": 5}
+
+  def test_noam_packer_no_packed_example(self):
+    packer = packing.NoamPacker(feature_lengths={"inputs": 4})
+    with self.assertRaisesRegex(
+        ValueError, "No packed examples.*"
+    ):
+      packer.get_packed_example()
 
 
 if __name__ == "__main__":
