@@ -33,9 +33,8 @@ class PackingTest(parameterized.TestCase):
     input_elements = [[1, 2, 3, 4], [5, 6], [11, 12, 13, 14], [7], [8]]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(np.asarray)
-    ds = packing.PackLazyMapDataset(
-        ds, feature_lengths=4, pool_size=10, num_partial_examples=10
-    )
+    packer = packing.MultiBinPacker(feature_lengths=4, num_partial_examples=10)
+    ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
     ds_iter = iter(ds)
 
     # Elements are tuples with (inputs, inputs_segment_ids, inputs_positions).
@@ -77,8 +76,11 @@ class PackingTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    packer = packing.MultiBinPacker(
+        feature_lengths={"inputs": 4}, num_partial_examples=10
+    )
     ds = packing.PackLazyMapDataset(
-        ds, feature_lengths={"inputs": 4}, pool_size=10, num_partial_examples=10
+        ds, pool_size=10, packer=packer
     )
     ds_iter = iter(ds)
 
@@ -137,12 +139,10 @@ class PackingTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    ds = packing.PackLazyMapDataset(
-        ds,
-        feature_lengths={"inputs": 4, "targets": 4},
-        pool_size=10,
-        num_partial_examples=10,
+    packer = packing.MultiBinPacker(
+        feature_lengths={"inputs": 4, "targets": 4}, num_partial_examples=10
     )
+    ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
     ds_iter = iter(ds)
 
     expected_elements = [
@@ -211,12 +211,10 @@ class PackingTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    ds = packing.PackLazyMapDataset(
-        ds,
-        feature_lengths={"inputs": 6, "targets": 4},
-        pool_size=10,
-        num_partial_examples=10,
+    packer = packing.MultiBinPacker(
+        feature_lengths={"inputs": 6, "targets": 4}, num_partial_examples=10
     )
+    ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
     ds_iter = iter(ds)
 
     expected_elements = [
@@ -265,12 +263,11 @@ class PackingTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    ds = packing.PackLazyMapDataset(
-        ds,
+    packer = packing.MultiBinPacker(
         feature_lengths={"inputs": 6, "targets": 4, "id": -1},
-        pool_size=10,
         num_partial_examples=10,
     )
+    ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
     ds_iter = iter(ds)
     expected_ids = [[[1, 2], [2, 1]], [[1, 1], [2, 2]]]
     for actual, expected in zip(ds_iter, expected_ids, strict=True):
@@ -301,12 +298,11 @@ class PackingTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    ds = packing.PackLazyMapDataset(
-        ds,
+    packer = packing.MultiBinPacker(
         feature_lengths={"input_tokens": 3, "input_vectors": 3},
-        pool_size=10,
         num_partial_examples=10,
     )
+    ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
     ds_iter = iter(ds)
 
     expected_elements = [
@@ -358,8 +354,12 @@ class PackingTest(parameterized.TestCase):
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 4}, split="unused"
     )
+    packer = packing.MultiBinPacker(
+        num_partial_examples=10,
+        # feature_lengths unset, will be set before packing.
+    )
     transform = packing.AirIOPackDatasetPreprocessor(
-        pool_size=10, num_partial_examples=10
+        pool_size=10, packer=packer
     )
     ds, updated_runtime_args = transform(ds, runtime_args)
     ds_iter = iter(ds)
@@ -419,8 +419,12 @@ class PackingTest(parameterized.TestCase):
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 4}, split="unused"
     )
+    packer = packing.MultiBinPacker(
+        num_partial_examples=10,
+        # feature_lengths unset, will be set before packing.
+    )
     packing_preprocessor = packing.AirIOPackDatasetPreprocessor(
-        pool_size=10, num_partial_examples=10
+        pool_size=10, packer=packer
     )
     ds, updated_runtime_args = packing_preprocessor(ds, runtime_args)
     pad_fn = functools.partial(

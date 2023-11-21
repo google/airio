@@ -25,10 +25,65 @@ import grain.python as grain
 import jax
 from jaxtyping import PyTree  # pylint: disable=g-importing-member
 import numpy as np
+import typing_extensions
 
 lazy_dataset = grain.experimental.lazy_dataset
 T = TypeVar("T")
 SKIP_FEATURE = airio.common.constants.SKIP_FEATURE
+
+
+class PackerProtocol(typing_extensions.Protocol):
+  """Interface for a packer.
+
+  A typical workflow is:
+  ```
+  packer = PackerImpl(...)
+  examples = ...iterator or sequence of examples...
+  for example in examples:
+    packed_examples = packer.fit_example(example)
+    for packed_example in packed_examples:
+      yield packed_example
+  while packer.has_partially_packed_examples():
+    yield packer.get_packed_example()
+  ```
+  """
+
+  @property
+  def feature_lengths(self) -> PyTree[int]:
+    """The maximum feature lengths to pack to."""
+    ...
+
+  @feature_lengths.setter
+  def feature_lengths(self, feature_lengths: PyTree[int]):
+    """A setter for feature_lengths.
+
+    This is required because `feature_lengths` may not be known when
+    initializing the MultiBinPacker. Implementations should enforce that these
+    are set only once, and check that they are set before packing.
+
+    Args:
+      feature_lengths: the maximum feature lengths to pack to.
+    """
+    ...
+
+  def fit_example(self, ex: PyTree[np.ndarray]) -> Sequence[PyTree[np.ndarray]]:
+    """Fit an example, return fully packed examples if any."""
+    ...
+
+  def has_partially_packed_examples(self) -> bool:
+    """Returns True if there are partially packed examples."""
+    ...
+
+  def get_packed_example(self) -> PyTree[np.ndarray]:
+    """Gets a packed example from the partially packed buffer, if present."""
+    ...
+
+  def get_packed_feature_lengths(self) -> PyTree[int]:
+    """Returns feature lengths for packed examples.
+
+    This should any marker features added, e.g. segment_ids and positions.
+    """
+    ...
 
 
 @dataclasses.dataclass
@@ -46,13 +101,10 @@ class AirIOPackDatasetPreprocessor:
     pool_size: The number of examples that are pooled together and packed. A
       larger pool_size leads to potentially better packing but requires more
       memory.
-    num_partial_examples: The number of partially packed examples to maintain
-      during packing. Larger num_partial_examples leads to potentially better
-      packing but requires more memory.
+    packer: A `PackerProtocol` impl to pack examples.
   """
-
   pool_size: int
-  num_partial_examples: int
+  packer: PackerProtocol
 
   def __call__(
       self,
@@ -61,11 +113,11 @@ class AirIOPackDatasetPreprocessor:
   ) -> Tuple[
       lazy_dataset.LazyMapDataset, preprocessors_lib.AirIOInjectedRuntimeArgs
   ]:
+    self.packer.feature_lengths = runtime_args.sequence_lengths
     return PackLazyMapDataset(
         ds,
-        feature_lengths=runtime_args.sequence_lengths,
         pool_size=self.pool_size,
-        num_partial_examples=self.num_partial_examples,
+        packer=self.packer,
     ), self.update_runtime_args(runtime_args)
 
   def update_runtime_args(
@@ -73,16 +125,8 @@ class AirIOPackDatasetPreprocessor:
       runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
   ) -> preprocessors_lib.AirIOInjectedRuntimeArgs:
     """Updates runtime args with new sequence lengths for subsequent preprocessors."""
-    seq_lens = runtime_args.sequence_lengths
-    new_seq_lens = {}
-    for feature in seq_lens:
-      new_seq_lens[feature] = seq_lens[feature]
-      if not seq_lens[feature] or seq_lens[feature] == SKIP_FEATURE:
-        continue
-      new_seq_lens[f"{feature}_segment_ids"] = seq_lens[feature]
-      new_seq_lens[f"{feature}_positions"] = seq_lens[feature]
     return preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths=new_seq_lens,
+        sequence_lengths=self.packer.get_packed_feature_lengths(),
         split=runtime_args.split,
     )
 
@@ -105,27 +149,21 @@ class PackLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
 
   Attributes:
     parent: The dataset to pack.
-    feature_lengths: Maximum feature lengths to pack to.
     pool_size: The number of examples that are pooled together and packed. A
       larger pool_size leads to potentially better packing but requires more
       memory.
-    num_partial_examples: The number of partially packed examples to maintain
-      during packing. Larger num_partial_examples leads to potentially better
-      packing but requires more memory.
+    packer: A `PackerProtocol` impl to pack examples.
   """
 
   def __init__(
       self,
       parent: lazy_dataset.LazyMapDataset,
-      feature_lengths: PyTree[int],
       pool_size: int,
-      num_partial_examples: int,
+      packer: PackerProtocol
   ):
     super().__init__([parent])
     self._packed_ds = PoolLazyMapDataset(parent, pool_size)
-    pack_flatmap = PackPoolFlatMap(
-        feature_lengths, pool_size, num_partial_examples
-    )
+    pack_flatmap = PackPoolFlatMap(pool_size, packer)
     self._packed_ds = lazy_dataset.FlatMapLazyMapDataset(
         self._packed_ds, pack_flatmap
     )
@@ -185,30 +223,24 @@ class PackPoolFlatMap(grain.experimental.FlatMapTransform):
   match desired mixing proportions. Use a LazyIterDataset impl instead.
 
   Attrs:
-    feature_lengths: Maximum feature lengths to pack to.
     pool_size: The number of examples that are pooled together and packed. A
       larger pool_size leads to potentially better packing but requires more
       memory.
-    num_partial_examples: The number of partially packed examples to maintain
-      during packing. Larger num_partial_examples leads to potentially better
-      packing but requires more memory.
+    packer: A `PackerProtocol` impl to pack examples.
   """
 
   def __init__(
       self,
-      feature_lengths: PyTree[int],
       pool_size: int,
-      num_partial_examples: int,
+      packer: PackerProtocol,
   ):
     self.max_fan_out = pool_size
-    self.feature_lengths = feature_lengths
-    self.num_partial_examples = num_partial_examples
+    self.packer = packer
 
   def flat_map(self, example_pool):
-    packer = MultiBinPacker(
-        feature_lengths=self.feature_lengths,
-        num_partial_examples=self.num_partial_examples,
-    )
+    # Do not use the shared copy because `flat_map` may be called on multiple
+    # `example_pool`s in parallel.
+    packer = copy.deepcopy(self.packer)
     for ex in example_pool:
       packed_examples = packer.fit_example(ex)
       for packed_example in packed_examples:
@@ -243,27 +275,45 @@ class MultiBinPacker:
     the queue.
     + A partially packed example is yielded and removed from the queue as soon
     as it's fully packed, rather than at the end (less memory usage).
-    PackSequencesKOp may be different.
 
   Attrs:
-    feature_lengths: Maximum feature lengths to pack to.
     num_partial_examples: The number of partially packed examples to maintain
       during packing. Larger num_partial_examples leads to potentially better
       packing but requires more memory.
+    feature_lengths: Maximum feature lengths to pack to. Set to None (default)
+      if not known when initializing the MultiBinPacker, and can be set later.
+      Must be set before packing examples.
   """
 
-  feature_lengths: PyTree[int]
-  num_partial_examples: int
-  _partially_packed_examples: collections.deque["PartiallyPackedExample"]
-  _flat_feature_lengths: Sequence[int]
-
-  def __init__(self, feature_lengths, num_partial_examples):
-    self.feature_lengths = feature_lengths
+  def __init__(
+      self,
+      num_partial_examples: int,
+      feature_lengths: PyTree[int] | None = None,
+  ):
     self.num_partial_examples = num_partial_examples
+    self._feature_lengths = feature_lengths
     self._partially_packed_examples = collections.deque[
         PartiallyPackedExample
     ]()
-    self._flat_feature_lengths = flatten(self.feature_lengths)
+    self._flat_feature_lengths = flatten(feature_lengths)
+
+  @property
+  def feature_lengths(self):
+    return self._feature_lengths
+
+  @property
+  def flat_feature_lengths(self):
+    return self._flat_feature_lengths
+
+  @feature_lengths.setter
+  def feature_lengths(self, feature_lengths):
+    if self._feature_lengths:
+      raise ValueError(
+          f"feature_lengths are already set to {self._feature_lengths} and"
+          f" cannot be overridden to {feature_lengths}."
+      )
+    self._feature_lengths = feature_lengths
+    self._flat_feature_lengths = flatten(feature_lengths)
 
   def has_partially_packed_examples(self):
     return len(self._partially_packed_examples)
@@ -273,7 +323,20 @@ class MultiBinPacker:
         length_struct=self.feature_lengths,
     )
 
-  def fit_example(self, ex):
+  def get_packed_feature_lengths(self):
+    if not self.feature_lengths:
+      raise ValueError("feature_lengths must be set before packing.")
+    seq_lens = self.feature_lengths
+    new_seq_lens = {}
+    for feature in seq_lens:
+      new_seq_lens[feature] = seq_lens[feature]
+      if not seq_lens[feature] or seq_lens[feature] == SKIP_FEATURE:
+        continue
+      new_seq_lens[f"{feature}_segment_ids"] = seq_lens[feature]
+      new_seq_lens[f"{feature}_positions"] = seq_lens[feature]
+    return new_seq_lens
+
+  def fit_example(self, ex: PyTree[np.ndarray]) -> Sequence[PyTree[np.ndarray]]:
     """Fits example into existing partially packed examples or creates new.
 
     Args:
@@ -283,6 +346,9 @@ class MultiBinPacker:
       A list of packed examples if a fully packed example was produced, or if
       partially packed examples exceeded the maximum allowed number.
     """
+    if not self.feature_lengths:
+      raise ValueError("feature_lengths must be set before packing.")
+
     packed_examples = []
     # First, release any extra partially packed examples.
     while len(self._partially_packed_examples) > self.num_partial_examples:
@@ -290,18 +356,20 @@ class MultiBinPacker:
 
     # Flatten and trim example to max packed length to make packing feasible.
     flat_ex = flatten(ex)
-    flat_ex = trim_flattened(flat_ex, self._flat_feature_lengths)
+    flat_ex = trim_flattened(flat_ex, self.flat_feature_lengths)
 
     # Add if example fits an existing partially packed example; check if
     # resulting partially packed example becomes fully packed
     fits = False
     fully_packed: PartiallyPackedExample = None
-    for partially_packed in self._partially_packed_examples:
+    fully_packed_idx = None
+    for idx, partially_packed in enumerate(self._partially_packed_examples):
       if partially_packed.example_fits(flat_ex):
         fits = True
         partially_packed.add_example(flat_ex)
         if partially_packed.is_fully_packed():
           fully_packed = partially_packed
+          fully_packed_idx = idx
         break
 
     # Add to result if example fit and became fully packed
@@ -310,13 +378,14 @@ class MultiBinPacker:
       packed = fully_packed.pack_and_unflatten(
           length_struct=self.feature_lengths,
       )
-      self._partially_packed_examples.remove(fully_packed)
+      del self._partially_packed_examples[fully_packed_idx]
+      # self._partially_packed_examples.remove(fully_packed)
       packed_examples.append(packed)
 
     # If not, create new partially packed example; add to result if fully packed
     if not fits:
       partially_packed = PartiallyPackedExample(
-          copy.copy(self._flat_feature_lengths)
+          copy.copy(self.flat_feature_lengths)
       )
       partially_packed.add_example(flat_ex)
       if partially_packed.is_fully_packed():
@@ -343,15 +412,15 @@ class PartiallyPackedExample:
   """
 
   # A list of examples that can be packed together.
-  _partially_packed_flat_example_list: list[Any]
+  _partially_packed_flat_example_list: list[PyTree[np.ndarray]]
   # Combined lengths of the partially packed example.
   _combined_flat_lengths: list[int]
   # Remaining space available along
-  _available_flat_lengths: list[int | None]
+  _available_flat_lengths: list[int]
 
   def __init__(
       self,
-      available_flat_lengths: list[int | None],
+      available_flat_lengths: list[int],
   ):
     self._partially_packed_flat_example_list = []
     self._available_flat_lengths = available_flat_lengths
@@ -388,7 +457,7 @@ class PartiallyPackedExample:
 
   def pack_and_unflatten(
       self,
-      length_struct: PyTree[int | None],
+      length_struct: PyTree[int],
   ):
     """Produces a packed, unflattened example."""
     flat_elements = self._partially_packed_flat_example_list
@@ -429,7 +498,7 @@ class PartiallyPackedExample:
     return packed_element
 
 
-def trim_flattened(flat_ex, flat_lengths):
+def trim_flattened(flat_ex: list[np.ndarray], flat_lengths: list[int]):
   for i in range(len(flat_lengths)):
     if flat_lengths[i] == SKIP_FEATURE:
       # Feature should not be trimmed.
