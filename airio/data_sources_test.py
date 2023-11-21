@@ -23,6 +23,9 @@ from airio import data_sources
 import numpy as np
 import tensorflow_datasets as tfds
 
+import multiprocessing
+
+
 _SOURCE_NAME = "imdb_reviews"
 _SOURCE_NUM_EXAMPLES = 3
 _SOURCE_SPLITS = {"train", "test", "unsupervised"}
@@ -239,5 +242,66 @@ class FunctionDataSourceTest(absltest.TestCase):
     source = self._create_data_source(splits=_SOURCE_SPLITS)
     self.assertEqual(_SOURCE_SPLITS, source.splits)
 
+
+class JsonDataSourceTest(absltest.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.test_data_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "test_data",
+        "classification",
+    )
+
+  def _create_data_source(
+      self,
+      splits: Sequence[str] | None = None,
+  ):
+    """Creates a basic JsonDataSource."""
+    if splits is None:
+      splits = _SOURCE_SPLITS
+    split_to_filepattern = {}
+    for split in splits:
+      split_to_filepattern[split] = os.path.join(
+          self.test_data_dir, "classification.json"
+      )
+    return data_sources.JsonDataSource(
+        split_to_filepattern=split_to_filepattern,
+    )
+
+  def test_create(self):
+    source = data_sources.JsonDataSource([])
+    self.assertIsInstance(source, data_sources.DataSource)
+    self.assertIsInstance(source, data_sources.JsonDataSource)
+
+  def test_get_data_source(self):
+    source = self._create_data_source(splits=_SOURCE_SPLITS)
+    for split in _SOURCE_SPLITS:
+      data_source = source.get_data_source(split)
+      self.assertLen(data_source, 5)
+      data_source.close()
+      data_source.unlink()
+
+  def test_get_data_source_nonexistent_split(self):
+    source = self._create_data_source(splits=_SOURCE_SPLITS)
+    with self.assertRaisesRegex(ValueError, "Split nonexistent not found in"):
+      source.get_data_source("nonexistent")
+
+  def test_num_input_examples(self):
+    source = self._create_data_source(
+        splits=_SOURCE_SPLITS,
+    )
+    for split in _SOURCE_SPLITS:
+      self.assertEqual(source.num_input_examples(split), 5)
+
+  def test_num_input_examples_nonexistent_split(self):
+    source = self._create_data_source(splits=_SOURCE_SPLITS)
+    with self.assertRaisesRegex(ValueError, "Split nonexistent not found in"):
+      source.num_input_examples("nonexistent")
+
+  def test_splits(self):
+    source = self._create_data_source(splits=_SOURCE_SPLITS)
+    self.assertEqual(_SOURCE_SPLITS, source.splits)
+
 if __name__ == "__main__":
-  absltest.main()
+  multiprocessing.handle_test_main(absltest.main)
