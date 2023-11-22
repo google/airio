@@ -33,9 +33,9 @@ class PackingEquivalenceTest(absltest.TestCase):
     # airio / pygrain impl is slow. Remove when fixed.
     src_example_limit = 10000
 
-    # This test takes one file shard of the "c4/en:2.2.0" dataset, rekeys and
-    # tokenizes the examples, packs them using the noam packing impls in T5
-    # and AirIO respectively and verifies that they're exactly the same.
+    # This test takes one file shard (out of 1024) of the "c4/en:2.2.0" dataset,
+    # rekeys and tokenizes the examples, packs them using the noam packing impls
+    # in T5 and AirIO respectively and verifies that they're exactly the same.
     # There are 356,137 examples in the source, and packing produces 179,919
     # examples.
 
@@ -100,6 +100,178 @@ class PackingEquivalenceTest(absltest.TestCase):
       np.testing.assert_array_equal(
           seqio_packed["targets"], airio_packed["targets"]
       )
+
+  def test_single_bin_true_packing_equivalence_on_wmt(self):
+    # Note: The test is currently limited to 1000 source examples because the
+    # airio / pygrain impl is slow. Remove when fixed.
+    src_example_limit = 1000
+
+    # This test takes one file shard (out of 128) of the
+    # "wmt19_translate/de-en:1.0.0" dataset, preprocesses and tokenizes the
+    # examples, packs them using the single-bin true packing impls in SeqIO and
+    # AirIO respectively and verifies that they produce the same elements. There
+    # are 302,268 examples in the source, and packing produces 9,647 examples.
+
+    # Step 1: Prepare tokenized data to be used by both packing code paths.
+    # SeqIO is used for convenience.
+    output_features = {
+        "inputs": seqio.Feature(
+            vocabulary=t5.data.get_default_vocabulary(), add_eos=False
+        ),
+        "targets": seqio.Feature(
+            vocabulary=t5.data.get_default_vocabulary(), add_eos=False
+        ),
+    }
+    translate = functools.partial(
+        t5.data.preprocessors.translate,
+        source_language="en",
+        target_language="de",
+    )
+    tokenize = functools.partial(
+        seqio.preprocessors.tokenize,
+        output_features=output_features,
+        copy_pretokenized=False,
+        with_eos=False,
+    )
+
+    src = seqio.TfdsDataSource("wmt19_translate/de-en:1.0.0")
+    ds = src.get_dataset(
+        split="train",
+        shuffle=False,
+        seed=42,
+        shard_info=seqio.ShardInfo(index=0, num_shards=128),
+    )
+    ds = ds.take(src_example_limit)
+    ds = translate(ds)
+    ds = tokenize(ds)
+    feature_lengths = {"inputs": 1024, "targets": 1024}
+
+    # Step 2: Pack using seqio
+    packed_seqio_ds = ds.map(lambda x: x)  # make a copy
+    packed_seqio_ds = seqio.utils.trim_and_pack_dataset(
+        packed_seqio_ds,
+        feature_lengths=feature_lengths,
+        use_custom_ops=False,
+    )
+    packed_seqio_ds_iter = packed_seqio_ds.as_numpy_iterator()
+
+    # Step 3: Pack using AirIO
+    # Populate the tokenized dataset in-memory to create a LazyMapDataset; this
+    # is slow and expensive.
+    examples = list(ds.as_numpy_iterator())
+    packed_airio_ds = lazy_dataset.SourceLazyMapDataset(examples)
+    runtime_args = airio.preprocessors.AirIOInjectedRuntimeArgs(
+        sequence_lengths=feature_lengths, split="unused"
+    )
+    packed_airio_ds, updated_runtime_args = (
+        airio.common.packing.SingleBinTruePackPreprocessor(
+            packed_airio_ds, runtime_args
+        )
+    )
+    packed_airio_ds = packed_airio_ds.map(
+        functools.partial(airio.common.pad, runtime_args=updated_runtime_args))
+    packed_airio_ds_iter = iter(packed_airio_ds)
+
+    # Step 4: Verify that they are exactly the same.
+    for seqio_packed, airio_packed in zip(
+        packed_seqio_ds_iter, packed_airio_ds_iter, strict=True
+    ):
+      # Compare keys.
+      self.assertSequenceEqual(
+          sorted(seqio_packed.keys()), sorted(airio_packed.keys())
+      )
+      for k in seqio_packed.keys():
+        np.testing.assert_array_equal(seqio_packed[k], airio_packed[k])
+
+  def _hash(self, exs: list[dict[str, np.ndarray]]) -> set[int]:
+    return set(
+        [hash(tuple(ex[k].tobytes() for k in sorted(ex.keys()))) for ex in exs]
+    )
+
+  def test_multi_bin_true_packing_equivalence_on_wmt(self):
+    # Note: The test is currently limited to 1000 source examples because the
+    # airio / pygrain impl is slow. Remove when fixed.
+    src_example_limit = 1000
+
+    # This test takes one file shard (out of 128) of the
+    # "wmt19_translate/de-en:1.0.0" dataset, preprocesses and tokenizes the
+    # examples, packs them using the multi-bin true packing impls in SeqIO and
+    # AirIO respectively and verifies that they produce the same elements. The
+    # order of packed elements may vary because AirIO yields examples as soon as
+    # they are fully packed instead of waiting for the number of partially
+    # packed examples to exceed the threshold. There are 302,268 examples in the
+    # source, and packing produces 9,420 examples.
+    #
+    # Note: Yielded fully packed examples immediately may lead to differently
+    # (better) packed examples, because there are more partially packed examples
+    # available to fit examples into, but this is quite unlikely for large
+    # num_partial_examples (which is 1000 for multi-bin true packing).
+
+    # Step 1: Prepare tokenized data to be used by both packing code paths.
+    # SeqIO is used for convenience.
+    output_features = {
+        "inputs": seqio.Feature(
+            vocabulary=t5.data.get_default_vocabulary(), add_eos=False
+        ),
+        "targets": seqio.Feature(
+            vocabulary=t5.data.get_default_vocabulary(), add_eos=False
+        ),
+    }
+    translate = functools.partial(
+        t5.data.preprocessors.translate,
+        source_language="en",
+        target_language="de",
+    )
+    tokenize = functools.partial(
+        seqio.preprocessors.tokenize,
+        output_features=output_features,
+        copy_pretokenized=False,
+        with_eos=False,
+    )
+
+    src = seqio.TfdsDataSource("wmt19_translate/de-en:1.0.0")
+    ds = src.get_dataset(
+        split="train",
+        shuffle=False,
+        seed=42,
+        shard_info=seqio.ShardInfo(index=0, num_shards=128),
+    )
+    ds = ds.take(src_example_limit)
+    ds = translate(ds)
+    ds = tokenize(ds)
+    feature_lengths = {"inputs": 1024, "targets": 1024}
+
+    # Step 2: Pack using seqio
+    packed_seqio_ds = ds.map(lambda x: x)  # make a copy
+    packed_seqio_ds = seqio.utils.trim_and_pack_dataset(
+        packed_seqio_ds,
+        feature_lengths=feature_lengths,
+        use_custom_ops=True,
+    )
+    packed_seqio_ds = list(packed_seqio_ds.as_numpy_iterator())
+
+    # Step 3: Pack using AirIO
+    # Populate the tokenized dataset in-memory to create a LazyMapDataset; this
+    # is slow and expensive.
+    examples = list(ds.as_numpy_iterator())
+    packed_airio_ds = lazy_dataset.SourceLazyMapDataset(examples)
+    runtime_args = airio.preprocessors.AirIOInjectedRuntimeArgs(
+        sequence_lengths=feature_lengths, split="unused"
+    )
+    packed_airio_ds, updated_runtime_args = (
+        airio.common.packing.MultiBinTruePackPreprocessor(
+            packed_airio_ds, runtime_args
+        )
+    )
+    packed_airio_ds = packed_airio_ds.map(
+        functools.partial(airio.common.pad, runtime_args=updated_runtime_args))
+    packed_airio_ds = list(iter(packed_airio_ds))
+
+    # Step 4: Verify that examples are exactly the same, but possibly reordered.
+    # Hash examples and compare sets of hashes.
+    packed_seqio_ds_hashes = self._hash(packed_seqio_ds)
+    packed_airio_ds_hashes = self._hash(packed_airio_ds)
+    self.assertSetEqual(packed_seqio_ds_hashes, packed_airio_ds_hashes)
 
 
 if __name__ == "__main__":
