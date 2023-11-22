@@ -16,10 +16,10 @@
 
 from typing import Any, Dict
 from airio import preprocessors as preprocessors_lib
-import airio.common.constants
+from airio.common import constants
 import numpy as np
 
-SKIP_FEATURE = airio.common.constants.SKIP_FEATURE
+SKIP_FEATURE = constants.SKIP_FEATURE
 
 
 def trim(

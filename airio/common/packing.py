@@ -18,9 +18,9 @@ import collections
 import copy
 import dataclasses
 import math
-from typing import Any, Sequence, TypeVar, Tuple
+from typing import Any, Callable, Sequence, TypeVar, Tuple
 from airio import preprocessors as preprocessors_lib
-import airio.common.constants
+from airio.common import constants
 import grain.python as grain
 import jax
 from jaxtyping import PyTree  # pylint: disable=g-importing-member
@@ -29,7 +29,7 @@ import typing_extensions
 
 lazy_dataset = grain.experimental.lazy_dataset
 T = TypeVar("T")
-SKIP_FEATURE = airio.common.constants.SKIP_FEATURE
+SKIP_FEATURE = constants.SKIP_FEATURE
 
 
 class PackerProtocol(typing_extensions.Protocol):
@@ -100,10 +100,11 @@ class AirIOPackDatasetPreprocessor:
   Attributes:
     pool_size: The number of examples that are pooled together and packed. A
       larger pool_size leads to potentially better packing but requires more
-      memory.
+      memory. A function to compute pool size based on packed feature lengths is
+      also allowed.
     packer: A `PackerProtocol` impl to pack examples.
   """
-  pool_size: int
+  pool_size: int | Callable[[PyTree[int]], int]
   packer: PackerProtocol
 
   def __call__(
@@ -114,6 +115,8 @@ class AirIOPackDatasetPreprocessor:
       lazy_dataset.LazyMapDataset, preprocessors_lib.AirIOInjectedRuntimeArgs
   ]:
     self.packer.feature_lengths = runtime_args.sequence_lengths
+    if not isinstance(self.pool_size, int):
+      self.pool_size = self.pool_size(runtime_args.sequence_lengths)
     return PackLazyMapDataset(
         ds,
         pool_size=self.pool_size,
@@ -712,3 +715,20 @@ def unflatten_packed_example(
         packed_element[f"{key}_segment_ids"] = value[1]
         packed_element[f"{key}_positions"] = value[2]
   return packed_element
+
+
+NoamPackPreprocessor = AirIOPackDatasetPreprocessor(
+    packer=NoamPacker(), pool_size=128
+)
+
+
+SingleBinTruePackPreprocessor = AirIOPackDatasetPreprocessor(
+    packer=MultiBinPacker(num_partial_examples=1),
+    pool_size=lambda feature_lengths: max(flatten(feature_lengths)),
+)
+
+
+MultiBinTruePackPreprocessor = AirIOPackDatasetPreprocessor(
+    packer=MultiBinPacker(num_partial_examples=1000),
+    pool_size=lambda feature_lengths: max(flatten(feature_lengths)),
+)
