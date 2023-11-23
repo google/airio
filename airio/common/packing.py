@@ -58,8 +58,8 @@ class PackerProtocol(typing_extensions.Protocol):
     """A setter for feature_lengths.
 
     This is required because `feature_lengths` may not be known when
-    initializing the MultiBinPacker. Implementations should enforce that these
-    are set only once, and check that they are set before packing.
+    initializing the packer. Implementations should enforce that these are set
+    before packing.
 
     Args:
       feature_lengths: the maximum feature lengths to pack to.
@@ -81,21 +81,24 @@ class PackerProtocol(typing_extensions.Protocol):
   def get_packed_feature_lengths(self) -> PyTree[int]:
     """Returns feature lengths for packed examples.
 
-    This should any marker features added, e.g. segment_ids and positions.
+    This should add marker features if any, e.g. segment_ids and positions.
     """
     ...
 
 
 @dataclasses.dataclass
-class AirIOPackDatasetPreprocessor:
-  """Packs a dataset based on sequence lengths provided via AirIOInjectedRuntimeArgs.
+class AirIOPackDatasetMapPreprocessor:
+  """Packs a `LazyMapDataset`.
 
-  Replicates algorithms traditionally used in SeqIO. See PackLazyMapDataset for
-  more details. The output is a sparse dataset.
+  Creates pools of examples based on `pool_size` and applies the `packer` to
+  each pool to produce packed examples. Examples are packed to sequence lengths
+  provided via AirIOInjectedRuntimeArgs. See PackLazyMapDataset for more
+  details. The output is a sparse dataset.
 
   Be careful when mixing after packing, because sparse datasets mixed using a
-  LazyMapDataset impl will not match desired mixing proportions. Use a
-  LazyIterDataset impl instead.
+  LazyMapDataset impl will not match desired mixing proportions. Convert to
+  iter or use a LazyIterDataset impl instead (note that a LazyIterDataset
+  cannot be globally shuffled).
 
   Attributes:
     pool_size: The number of examples that are pooled together and packed. A
@@ -134,6 +137,48 @@ class AirIOPackDatasetPreprocessor:
     )
 
 
+@dataclasses.dataclass
+class AirIOPackDatasetIterPreprocessor:
+  """Packs a `LazyIterDataset`.
+
+  Iterates through the dataset and uses the `packer` to produce packed examples.
+  Examples are packed to sequence lengths provided via AirIOInjectedRuntimeArgs.
+  See PackLazyIterDataset for more details.
+
+  Unlike LazyMapDataset packing impls, datasets packed with this impl can be
+  mixed correctly because they don't produce empty elements. However, the packed
+  dataset cannot be globally shuffled, hence this is unsuitable for certain
+  packing algorithms like noam-packing.
+
+  Attributes:
+    packer: A `PackerProtocol` impl to pack examples.
+  """
+  packer: PackerProtocol
+
+  def __call__(
+      self,
+      ds: lazy_dataset.LazyIterDataset,
+      runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
+  ) -> Tuple[
+      lazy_dataset.LazyIterDataset, preprocessors_lib.AirIOInjectedRuntimeArgs
+  ]:
+    self.packer.feature_lengths = runtime_args.sequence_lengths
+    return PackLazyIterDataset(
+        ds,
+        packer=self.packer,
+    ), self.update_runtime_args(runtime_args)
+
+  def update_runtime_args(
+      self,
+      runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
+  ) -> preprocessors_lib.AirIOInjectedRuntimeArgs:
+    """Updates runtime args with new sequence lengths for subsequent preprocessors."""
+    return preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths=self.packer.get_packed_feature_lengths(),
+        split=runtime_args.split,
+    )
+
+
 @dataclasses.dataclass(frozen=False)
 class PackLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
   """Packs a dataset. Produces a sparse dataset.
@@ -147,8 +192,9 @@ class PackLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
 
   A sparse dataset is produced since the last step is a flat-map. Be careful
   when mixing after packing, because sparse datasets mixed using a
-  LazyMapDataset impl will not match desired mixing proportions. Use a
-  LazyIterDataset implementation instead.
+  LazyMapDataset impl will not match desired mixing proportions. Convert to
+  iter or use a LazyIterDataset impl instead (note that a LazyIterDataset
+  cannot be globally shuffled).
 
   Attributes:
     parent: The dataset to pack.
@@ -219,11 +265,12 @@ class PoolLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
 class PackPoolFlatMap(grain.experimental.FlatMapTransform):
   """Packs and yields a pool of examples.
 
-  Iterates through the pool of examples, and uses `MultiBinPacker` to fit them
-  and yield packed examples. See `MultiBinPacker` for more details. A sparse
-  dataset is produced since this is a flat-map. Be careful when mixing after
-  packing, because sparse datasets mixed using a LazyMapDataset impl will not
-  match desired mixing proportions. Use a LazyIterDataset impl instead.
+  Iterates through examples in the pool, and uses the provided `packer` to fit
+  and yield packed examples. See packer impls for details on packing algorithms.
+  A sparse dataset is produced since this is a flat-map. Be careful when mixing
+  after packing, because sparse datasets mixed using a LazyMapDataset impl will
+  not match desired mixing proportions. Convert to iter or use a LazyIterDataset
+  impl instead (note that a LazyIterDataset cannot be globally shuffled).
 
   Attrs:
     pool_size: The number of examples that are pooled together and packed. A
@@ -250,6 +297,84 @@ class PackPoolFlatMap(grain.experimental.FlatMapTransform):
         yield packed_example
     while packer.has_partially_packed_examples():
       yield packer.get_packed_example()
+
+
+class _PackLazyDatasetIterator(lazy_dataset.LazyDatasetIterator):
+  """See PackLazyIterDataset for details.
+
+  Warning: This object is not threadsafe!
+  """
+
+  def __init__(
+      self,
+      parent: lazy_dataset.LazyDatasetIterator,
+      packer: PackerProtocol,
+  ):
+    super().__init__()
+    self._parent = parent
+    self._packer = packer
+    self._packed_examples = collections.deque[PyTree[np.ndarray]]()
+
+  # pytype:disable=attribute-error
+  def __next__(self):
+    if self._packed_examples:
+      return self._packed_examples.popleft()
+    try:
+      while not self._packed_examples:
+        ex = next(self._parent)
+        for ex in self._packer.fit_example(ex):
+          self._packed_examples.append(ex)
+      return self._packed_examples.popleft()
+    except StopIteration as e:
+      if self._packed_examples:
+        return self._packed_examples.popleft()
+      if self._packer.has_partially_packed_examples():
+        return self._packer.get_packed_example()
+      raise e
+  # pytype:enable=attribute-error
+
+  def get_state(self):
+    return {
+        "parent": self._parent.get_state(),
+        "packer": copy.deepcopy(self._packer),
+        "packed_examples": copy.deepcopy(self._packed_examples),
+    }
+
+  def set_state(self, state):
+    self._parent.set_state(state["parent"])
+    self._packer = state["packer"]
+    self._packed_examples = state["packed_examples"]
+
+
+@dataclasses.dataclass(frozen=False)
+class PackLazyIterDataset(lazy_dataset.LazyIterDataset[T]):
+  """Packs a `LazyIterDataset`.
+
+  Iterates through parent dataset and applies the packer to examples. Yields
+  packed examples returned by the packer.
+
+  Unlike LazyMapDataset packing impls, datasets packed with this impl can be
+  mixed correctly because they don't produce empty elements. However, the packed
+  dataset cannot be globally shuffled, hence this is unsuitable for certain
+  packing algorithms like noam-packing.
+
+  Attributes:
+    parent: The dataset to pack.
+    packer: A `PackerProtocol` impl to pack examples.
+  """
+
+  def __init__(
+      self,
+      parent: lazy_dataset.LazyIterDataset,
+      packer: PackerProtocol
+  ):
+    super().__init__([parent])
+    self._packer = packer
+
+  def __iter__(self) -> lazy_dataset.LazyDatasetIterator:
+    return _PackLazyDatasetIterator(
+        iter(self._parent), self._packer
+    )  # pytype: disable=wrong-arg-types
 
 
 class MultiBinPacker:
@@ -356,7 +481,6 @@ class MultiBinPacker:
     """
     if not self.feature_lengths:
       raise ValueError("feature_lengths must be set before packing.")
-
     packed_examples = []
     # First, release any extra partially packed examples.
     while len(self._partially_packed_examples) > self.num_partial_examples:
@@ -406,7 +530,6 @@ class MultiBinPacker:
         )
       else:
         self._partially_packed_examples.append(partially_packed)
-
     return packed_examples
 
 
@@ -717,18 +840,26 @@ def unflatten_packed_example(
   return packed_element
 
 
-NoamPackPreprocessor = AirIOPackDatasetPreprocessor(
+NoamPackMapPreprocessor = AirIOPackDatasetMapPreprocessor(
     packer=NoamPacker(), pool_size=128
 )
 
-
-SingleBinTruePackPreprocessor = AirIOPackDatasetPreprocessor(
+SingleBinTruePackMapPreprocessor = AirIOPackDatasetMapPreprocessor(
     packer=MultiBinPacker(num_partial_examples=1),
-    pool_size=lambda feature_lengths: max(flatten(feature_lengths)),
+    pool_size=lambda feature_lengths: max(128, max(flatten(feature_lengths))),
 )
 
-
-MultiBinTruePackPreprocessor = AirIOPackDatasetPreprocessor(
+MultiBinTruePackPreprocessor = AirIOPackDatasetMapPreprocessor(
     packer=MultiBinPacker(num_partial_examples=1000),
-    pool_size=lambda feature_lengths: max(flatten(feature_lengths)),
+    pool_size=lambda feature_lengths: max(128, max(flatten(feature_lengths))),
+)
+
+NoamPackIterPreprocessor = AirIOPackDatasetIterPreprocessor(packer=NoamPacker())
+
+SingleBinTruePackIterPreprocessor = AirIOPackDatasetIterPreprocessor(
+    packer=MultiBinPacker(num_partial_examples=1),
+)
+
+MultiBinTruePackIterPreprocessor = AirIOPackDatasetIterPreprocessor(
+    packer=MultiBinPacker(num_partial_examples=1000),
 )

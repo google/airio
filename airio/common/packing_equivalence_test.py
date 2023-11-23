@@ -88,7 +88,7 @@ class PackingEquivalenceTest(absltest.TestCase):
     runtime_args = airio.preprocessors.AirIOInjectedRuntimeArgs(
         sequence_lengths={"targets": 1024}, split="unused"
     )
-    packed_airio_ds, _ = airio.common.packing.NoamPackPreprocessor(
+    packed_airio_ds, _ = airio.common.packing.NoamPackMapPreprocessor(
         packed_airio_ds, runtime_args
     )
     packed_airio_ds_iter = iter(packed_airio_ds)
@@ -164,7 +164,7 @@ class PackingEquivalenceTest(absltest.TestCase):
         sequence_lengths=feature_lengths, split="unused"
     )
     packed_airio_ds, updated_runtime_args = (
-        airio.common.packing.SingleBinTruePackPreprocessor(
+        airio.common.packing.SingleBinTruePackMapPreprocessor(
             packed_airio_ds, runtime_args
         )
     )
