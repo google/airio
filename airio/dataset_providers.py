@@ -119,6 +119,18 @@ class Task(DatasetProviderBase):
         return True
     return False
 
+  def get_updated_runtime_args(
+      self,
+      runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
+  ) -> preprocessors_lib.AirIOInjectedRuntimeArgs:
+    """Returns updated runtime args based on preprocessors and feature converter."""
+    # TODO(b/311543848): Add support for feature converter.
+    preps = self._preprocessors
+    for prep in preps:
+      transform = preprocessors_lib.LazyDatasetTransform(prep)
+      runtime_args = transform.get_updated_runtime_args(runtime_args)
+    return runtime_args
+
   def get_lazy_dataset(
       self,
       sequence_lengths: Mapping[str, int] | None,
@@ -163,9 +175,9 @@ class Task(DatasetProviderBase):
       next_epoch_rng, prep_rng = jax.random.split(next_epoch_rng)
       prep_rng, shuffle_rng = jax.random.split(prep_rng)
       for prep in preps:
-        ds, runtime_args = preprocessors_lib.LazyDatasetTransform(prep)(
-            ds, prep_rng, runtime_args
-        )
+        transform = preprocessors_lib.LazyDatasetTransform(prep)
+        ds = transform(ds, prep_rng, runtime_args)
+        runtime_args = transform.get_updated_runtime_args(runtime_args)
         prep_rng, _ = jax.random.split(prep_rng)
       if shuffle:
         shuffle_seed = int(jax.random.randint(shuffle_rng, [], 0, 2**16 - 1))
@@ -431,25 +443,32 @@ class Mixture(DatasetProviderBase):
       # Note: We may not need N epochs of a Task to populate N epochs of the
       # Mixture, but since these are lazily populated, we can skip calculating
       # the exact number of epochs required.
+    # Note: Use updated runtime args from the first Task. All updated runtime
+    # args must match, or mixing won't work (compute all updated runtime args
+    # and add a check here in the future if helpful).
+    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths=sequence_lengths, split=split
+    )
+    runtime_args = self.leaf_tasks[0].get_updated_runtime_args(runtime_args)
     ds = lazy_dataset_transforms.MixedLazyMapDataset(
         datasets, proportions, stop_on_empty_dataset=True
     )
     post_mix_preps = []
     if feature_converter:
-      post_mix_preps.extend(feature_converter.get_transforms(sequence_lengths))
+      post_mix_preps.extend(
+          feature_converter.get_transforms(runtime_args.sequence_lengths)
+      )
     if batch_size:
       post_mix_preps.append(
           grain.Batch(batch_size=batch_size, drop_remainder=False)
       )
     if post_mix_preps:
-      runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
-          sequence_lengths=sequence_lengths, split=split
-      )
       post_mix_transforms = [
           preprocessors_lib.LazyDatasetTransform(p) for p in post_mix_preps
       ]
       for t in post_mix_transforms:
-        ds, runtime_args = t(ds, runtime_args=runtime_args)
+        ds = t(ds, runtime_args=runtime_args)
+        runtime_args = t.get_updated_runtime_args(runtime_args)
     if num_epochs is None:
       ds = lazy_dataset.RepeatLazyMapDataset(ds, num_epochs=None)
     return ds
