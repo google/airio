@@ -217,17 +217,7 @@ class Task(DatasetProviderBase):
           shard_info=shard_info,
           num_epochs=num_epochs,
       )
-      # The sampler below is a no-op because sharding, shuffling and repeats are
-      # done using the lazy_dataset API. It may be removed when lazy_dataset
-      # releases.
-      sampler = grain.IndexSampler(
-          num_records=len(ds),
-          shard_options=grain.NoSharding(),
-          shuffle=False,
-          num_epochs=1,
-          seed=seed,
-      )
-      return self._load_data(source=ds, sampler=sampler, ops=[])
+      return dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader=ds)
     if shard_info is None:
       shard_options = grain.NoSharding()
     else:
@@ -483,21 +473,6 @@ class Mixture(DatasetProviderBase):
         seed=seed,
         shard_info=shard_info,
         num_epochs=num_epochs,
-    )
-    # The sampler below is a no-op because sharding, shuffling and repeats are
-    # done using the lazy_dataset API. It may be removed when lazy_dataset
-    # releases.
-    sampler = grain.IndexSampler(
-        num_records=len(ds),
-        shard_options=grain.NoSharding(),
-        shuffle=False,
-        num_epochs=1,
-        seed=seed,
-    )
-    ds = grain.DataLoader(
-        data_source=ds,
-        sampler=sampler,
-        operations=[],
     )
     return dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader=ds)
 
