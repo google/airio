@@ -259,7 +259,7 @@ class PackingEquivalenceTest(absltest.TestCase):
         sequence_lengths=feature_lengths, split="unused"
     )
     packed_airio_ds, updated_runtime_args = (
-        airio.common.packing.MultiBinTruePackPreprocessor(
+        airio.common.packing.MultiBinTruePackMapPreprocessor(
             packed_airio_ds, runtime_args
         )
     )

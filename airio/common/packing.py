@@ -849,7 +849,7 @@ SingleBinTruePackMapPreprocessor = AirIOPackDatasetMapPreprocessor(
     pool_size=lambda feature_lengths: max(128, max(flatten(feature_lengths))),
 )
 
-MultiBinTruePackPreprocessor = AirIOPackDatasetMapPreprocessor(
+MultiBinTruePackMapPreprocessor = AirIOPackDatasetMapPreprocessor(
     packer=MultiBinPacker(num_partial_examples=1000),
     pool_size=lambda feature_lengths: max(128, max(flatten(feature_lengths))),
 )
