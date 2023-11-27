@@ -21,7 +21,6 @@ from typing import Any, Iterable, List, Mapping, Protocol, Sequence, Union
 
 from airio import data_sources
 from airio import dataset_iterators
-from airio import feature_converters
 from airio import lazy_dataset_transforms
 # Import "preprocessors" as "preprocessors_lib" to prevent naming conflicts with
 # "preprocessors" attrs in this file.
@@ -61,8 +60,7 @@ class DatasetProviderBase(Protocol):
       self,
       sequence_lengths: Mapping[str, int] | None = None,
       split: str = tfds.Split.TRAIN,
-      feature_converter: feature_converters.PyGrainFeatureConverter
-      | None = None,
+      runtime_preprocessors: Sequence[AirIOPreprocessor] | None = None,
       batch_size: int | None = None,
       shuffle: bool = True,
       seed: int | None = 0,
@@ -122,10 +120,12 @@ class Task(DatasetProviderBase):
   def get_updated_runtime_args(
       self,
       runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
+      runtime_preprocessors: Sequence[AirIOPreprocessor] | None,
   ) -> preprocessors_lib.AirIOInjectedRuntimeArgs:
     """Returns updated runtime args based on preprocessors and feature converter."""
-    # TODO(b/311543848): Add support for feature converter.
     preps = self._preprocessors
+    if runtime_preprocessors:
+      preps.extend(runtime_preprocessors)
     for prep in preps:
       transform = preprocessors_lib.LazyDatasetTransform(prep)
       runtime_args = transform.get_updated_runtime_args(runtime_args)
@@ -135,7 +135,7 @@ class Task(DatasetProviderBase):
       self,
       sequence_lengths: Mapping[str, int] | None,
       split: str,
-      feature_converter: feature_converters.PyGrainFeatureConverter | None,
+      runtime_preprocessors: Sequence[AirIOPreprocessor] | None,
       batch_size: int | None,
       shuffle: bool,
       seed: int | None,
@@ -162,8 +162,8 @@ class Task(DatasetProviderBase):
 
     # Step 3: Run preprocessors and shuffle each epoch (if needed)
     preps = self._preprocessors
-    if feature_converter is not None:
-      preps.extend(feature_converter.get_transforms(sequence_lengths))
+    if runtime_preprocessors:
+      preps.extend(runtime_preprocessors)
     if batch_size:
       preps.append(grain.Batch(batch_size=batch_size, drop_remainder=False))
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
@@ -195,8 +195,7 @@ class Task(DatasetProviderBase):
       self,
       sequence_lengths: Mapping[str, int] | None = None,
       split: str = tfds.Split.TRAIN,
-      feature_converter: feature_converters.PyGrainFeatureConverter
-      | None = None,
+      runtime_preprocessors: Sequence[AirIOPreprocessor] | None = None,
       batch_size: int | None = None,
       shuffle: bool = True,
       seed: int | None = 0,
@@ -211,7 +210,7 @@ class Task(DatasetProviderBase):
       ds = self.get_lazy_dataset(
           sequence_lengths=sequence_lengths,
           split=split,
-          feature_converter=feature_converter,
+          runtime_preprocessors=runtime_preprocessors,
           batch_size=batch_size,
           shuffle=shuffle,
           seed=seed,
@@ -248,12 +247,8 @@ class Task(DatasetProviderBase):
     source = self._get_data_source_for_split(split=split)
 
     ops = self.get_preprocessors()
-    if feature_converter is not None:
-      ops.extend(
-          feature_converter.get_transforms(
-              task_feature_lengths=sequence_lengths
-          )
-      )
+    if runtime_preprocessors:
+      ops.extend(runtime_preprocessors)
     if batch_size:
       ops.append(grain.Batch(batch_size=batch_size, drop_remainder=False))
 
@@ -302,8 +297,7 @@ class Task(DatasetProviderBase):
       num_records: int = DEFAULT_NUM_RECORDS_TO_INSPECT,
       sequence_lengths: Mapping[str, int] | None = None,
       split: str = tfds.Split.TRAIN,
-      feature_converter: feature_converters.PyGrainFeatureConverter
-      | None = None,
+      runtime_preprocessors: Sequence[AirIOPreprocessor] | None = None,
       batch_size: int | None = None,
       shuffle: bool = True,
       seed: int | None = 0,
@@ -317,7 +311,7 @@ class Task(DatasetProviderBase):
       num_records: the number of records to include in the sample.
       sequence_lengths: mapping of each feature key to its sequence length.
       split: the split to sample from.
-      feature_converter: a feature converter.
+      runtime_preprocessors: A list of preprocessors to apply before batching.
       batch_size: the batch size.
       shuffle: whether to shuffle or not.
       seed: dataset seed.
@@ -349,12 +343,8 @@ class Task(DatasetProviderBase):
     source = self._get_data_source_for_split(split=split)
 
     all_ops = self.get_preprocessors()
-    if feature_converter is not None:
-      all_ops.extend(
-          feature_converter.get_transforms(
-              task_feature_lengths=sequence_lengths
-          )
-      )
+    if runtime_preprocessors:
+      all_ops.extend(runtime_preprocessors)
     if batch_size:
       all_ops.append(grain.Batch(batch_size=batch_size, drop_remainder=False))
 
@@ -408,8 +398,7 @@ class Mixture(DatasetProviderBase):
       self,
       sequence_lengths: Mapping[str, int] | None = None,
       split: str = tfds.Split.TRAIN,
-      feature_converter: feature_converters.PyGrainFeatureConverter
-      | None = None,
+      runtime_preprocessors: Sequence[AirIOPreprocessor] | None = None,
       batch_size: int | None = None,
       shuffle: bool = True,
       seed: int | None = 0,
@@ -428,7 +417,7 @@ class Mixture(DatasetProviderBase):
           task.get_lazy_dataset(
               sequence_lengths=sequence_lengths,
               split=split,
-              feature_converter=None,
+              runtime_preprocessors=None,
               batch_size=None,
               shuffle=shuffle,
               seed=seed,
@@ -449,15 +438,15 @@ class Mixture(DatasetProviderBase):
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths=sequence_lengths, split=split
     )
-    runtime_args = self.leaf_tasks[0].get_updated_runtime_args(runtime_args)
+    runtime_args = self.leaf_tasks[0].get_updated_runtime_args(
+        runtime_args, runtime_preprocessors=None
+    )
     ds = lazy_dataset_transforms.MixedLazyMapDataset(
         datasets, proportions, stop_on_empty_dataset=True
     )
     post_mix_preps = []
-    if feature_converter:
-      post_mix_preps.extend(
-          feature_converter.get_transforms(runtime_args.sequence_lengths)
-      )
+    if runtime_preprocessors:
+      post_mix_preps.extend(runtime_preprocessors)
     if batch_size:
       post_mix_preps.append(
           grain.Batch(batch_size=batch_size, drop_remainder=False)
@@ -477,8 +466,7 @@ class Mixture(DatasetProviderBase):
       self,
       sequence_lengths: Mapping[str, int] | None = None,
       split: str = tfds.Split.TRAIN,
-      feature_converter: feature_converters.PyGrainFeatureConverter
-      | None = None,
+      runtime_preprocessors: Sequence[AirIOPreprocessor] | None = None,
       batch_size: int | None = None,
       shuffle: bool = True,
       seed: int | None = 0,
@@ -489,7 +477,7 @@ class Mixture(DatasetProviderBase):
     ds = self.get_lazy_dataset(
         sequence_lengths=sequence_lengths,
         split=split,
-        feature_converter=feature_converter,
+        runtime_preprocessors=runtime_preprocessors,
         batch_size=batch_size,
         shuffle=shuffle,
         seed=seed,
@@ -651,7 +639,7 @@ def get_dataset(
     mixture_or_task: Task,
     sequence_lengths: Mapping[str, int] | None = None,
     split: str = "train",
-    feature_converter: feature_converters.PyGrainFeatureConverter | None = None,
+    runtime_preprocessors: Sequence[AirIOPreprocessor] | None = None,
     batch_size: int | None = None,
     shuffle: bool = False,
     num_epochs: int | None = 1,
@@ -661,7 +649,7 @@ def get_dataset(
   return mixture_or_task.get_dataset(
       split=split,
       sequence_lengths=sequence_lengths,
-      feature_converter=feature_converter,
+      runtime_preprocessors=runtime_preprocessors,
       batch_size=batch_size,
       shuffle=shuffle,
       num_epochs=num_epochs,

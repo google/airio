@@ -65,11 +65,16 @@ def create_task() -> dataset_providers.Task:
 def main(_) -> None:
   task = create_task()
   print(f"Task name: {task.name}\n")
-
+  runtime_preprocessors = (
+      # TODO(b/311543848): Fully remove FeatureConverter.
+      feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
+          {"inputs": 30, "targets": 5}
+      )
+  )
   ds = task.get_dataset(
       sequence_lengths={"inputs": 30, "targets": 5},
       split="train",
-      feature_converter=feature_converters.PyGrainEncDecFeatureConverter(),
+      runtime_preprocessors=runtime_preprocessors,
   )
 
   cnt = 0

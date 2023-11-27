@@ -81,8 +81,13 @@ def _create_preprocessors() -> Sequence[dataset_providers.AirIOPreprocessor]:
   ]
 
 
-def _create_feature_converter() -> feature_converters.PyGrainFeatureConverter:
-  return feature_converters.PyGrainEncDecFeatureConverter()
+def _create_runtime_preprocessors(
+    feature_lengths: Dict[str, int] | None = None,
+) -> Sequence[preprocessors_lib.AirIOPreprocessor]:
+  # TODO(b/311543848): Fully remove FeatureConverter.
+  return feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
+      task_feature_lengths=feature_lengths
+  )
 
 
 def _create_source(
@@ -277,7 +282,7 @@ class DatasetProvidersTest(absltest.TestCase):
     ]
     test_utils.assert_datasets_equal(ds, expected)
 
-  def test_task_get_dataset_with_feature_converter_without_batching(self):
+  def test_task_get_dataset_with_runtime_preps_without_batching(self):
     source = _create_source(
         source_name=_SOURCE_NAME,
         splits=_SOURCE_SPLITS,
@@ -286,7 +291,7 @@ class DatasetProvidersTest(absltest.TestCase):
     task = _create_task(source=source, preprocessors=_create_preprocessors())
     ds = task.get_dataset(
         split="train",
-        feature_converter=_create_feature_converter(),
+        runtime_preprocessors=_create_runtime_preprocessors(),
         shuffle=False,
     )
     expected = [
@@ -376,10 +381,11 @@ class DatasetProvidersTest(absltest.TestCase):
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
     task = _create_task(source=source, preprocessors=_create_preprocessors())
+    sequence_lengths = {"inputs": 20, "targets": 10}
     ds = task.get_dataset(
-        sequence_lengths={"inputs": 20, "targets": 10},
+        sequence_lengths=sequence_lengths,
         split="train",
-        feature_converter=_create_feature_converter(),
+        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
         batch_size=2,
         shuffle=False,
     )
@@ -491,7 +497,7 @@ class DatasetProvidersTest(absltest.TestCase):
     with self.assertRaisesRegex(ValueError, "Split nonexistent not found in"):
       task.get_dataset(split="nonexistent")
 
-  def test_task_get_dataset_by_step_without_feature_converter(self):
+  def test_task_get_dataset_by_step_without_runtime_preps(self):
     source = _create_source(source_name=_SOURCE_NAME)
     task = _create_task(source=source, preprocessors=_create_preprocessors())
     ds_by_step = task.get_dataset_by_step(num_records=1)
@@ -533,15 +539,16 @@ class DatasetProvidersTest(absltest.TestCase):
     for i, step in enumerate(expected):
       test_utils.assert_datasets_equal(ds_by_step[i], step)
 
-  def test_task_get_dataset_by_step_with_feature_converter(self):
+  def test_task_get_dataset_by_step_with_runtime_preps(self):
     source = _create_source()
     task = _create_task(source=source, preprocessors=_create_preprocessors())
-    feature_converter = _create_feature_converter()
+    sequence_lengths = {"inputs": 20, "targets": 10}
+    runtime_preprocessors = _create_runtime_preprocessors(sequence_lengths)
     ds_by_step = task.get_dataset_by_step(
         num_records=1,
-        sequence_lengths={"inputs": 20, "targets": 10},
+        sequence_lengths=sequence_lengths,
         batch_size=2,
-        feature_converter=feature_converter,
+        runtime_preprocessors=runtime_preprocessors,
         shuffle=False,
     )
     expected = [
@@ -825,7 +832,9 @@ class DatasetProvidersTest(absltest.TestCase):
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"val": 3}, split="train"
     )
-    updated_runtime_args = task.get_updated_runtime_args(runtime_args)
+    updated_runtime_args = task.get_updated_runtime_args(
+        runtime_args, runtime_preprocessors=None
+    )
     expected_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"val": 3, "new_val": 5, "another_val": 7},
         split="train",
@@ -1240,7 +1249,7 @@ class MixtureTest(absltest.TestCase):
         shuffle=False,
         shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
-        feature_converter=_create_feature_converter(),
+        runtime_preprocessors=_create_runtime_preprocessors(),
     )
     expected = [
         {
@@ -1263,12 +1272,10 @@ class MixtureTest(absltest.TestCase):
                 20,
                 2,
                 4,
-                0,
-                0,
             ],
-            "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
-            "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
-            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+            "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+            "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1],
         },
         {
             "encoder_input_tokens": [
@@ -1293,9 +1300,9 @@ class MixtureTest(absltest.TestCase):
                 21,
                 2,
             ],
-            "decoder_target_tokens": [3, 22, 4, 2, 18, 8, 25, 4, 0, 0],
-            "decoder_input_tokens": [3, 22, 4, 2, 18, 8, 25, 4, 0, 0],
-            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+            "decoder_target_tokens": [3, 22, 4, 2, 18, 8, 25, 4],
+            "decoder_input_tokens": [3, 22, 4, 2, 18, 8, 25, 4],
+            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1],
         },
     ]
     test_utils.assert_datasets_equal(ds, expected)
@@ -1631,18 +1638,19 @@ class MixtureTest(absltest.TestCase):
     ):
       _ = next(ds)
 
-  def test_mixture_with_feature_converter(self):
+  def test_mixture_with_runtime_preps(self):
     mix = dataset_providers.Mixture(
         name="test_mix",
         tasks=[self._imdb_task, self._simple_to_imdb_task],
         proportions=[1.0, 1.0],
     )
+    sequence_lengths = {"inputs": 20, "targets": 10}
     ds = mix.get_dataset(
-        sequence_lengths={"inputs": 20, "targets": 10},
+        sequence_lengths=sequence_lengths,
         shuffle=False,
         shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
-        feature_converter=_create_feature_converter(),
+        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
     )
     expected = [
         {  # imdb task
@@ -1715,18 +1723,19 @@ class MixtureTest(absltest.TestCase):
     ]
     test_utils.assert_datasets_equal(ds, expected)
 
-  def test_mixture_with_feature_converter_and_batching(self):
+  def test_mixture_with_runtime_preps_and_batching(self):
     mix = dataset_providers.Mixture(
         name="test_mix",
         tasks=[self._imdb_task, self._simple_to_imdb_task],
         proportions=[1.0, 1.0],
     )
+    sequence_lengths = {"inputs": 20, "targets": 10}
     ds = mix.get_dataset(
-        sequence_lengths={"inputs": 20, "targets": 10},
+        sequence_lengths=sequence_lengths,
         shuffle=False,
         shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
-        feature_converter=_create_feature_converter(),
+        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
         batch_size=2,
     )
     expected_first_batch = {
@@ -1784,7 +1793,7 @@ class MixtureTest(absltest.TestCase):
         shuffle=False,
         shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
-        feature_converter=None,
+        runtime_preprocessors=None,
         batch_size=2,
     )
     self.assertDictEqual(

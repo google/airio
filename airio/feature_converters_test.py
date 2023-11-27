@@ -137,11 +137,14 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
         splits=_SOURCE_SPLITS,
     )
     task = self._create_task(source)
+    sequence_lengths = {"inputs": 5, "targets": 4}
     feature_converter = self._create_feature_converter()
     ds = task.get_dataset(
-        sequence_lengths={"inputs": 5, "targets": 4},
+        sequence_lengths=sequence_lengths,
         split="train",
-        feature_converter=feature_converter,
+        runtime_preprocessors=feature_converter.get_transforms(
+            sequence_lengths
+        ),
         shuffle=False,
     )
     expected = [
@@ -175,7 +178,9 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
     ds = task.get_dataset(
         sequence_lengths=None,
         split="train",
-        feature_converter=feature_converter,
+        runtime_preprocessors=feature_converter.get_transforms(
+            task_feature_lengths=None
+        ),
         shuffle=False,
     )
     expected = [

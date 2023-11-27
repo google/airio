@@ -51,11 +51,16 @@ class TasksTest(absltest.TestCase):
         "inputs": _SOURCE_SEQUENCE_LENGTH,
         "targets": _SOURCE_SEQUENCE_LENGTH,
     }
+    runtime_preprocessors = (
+        airio.feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
+            sequence_lengths
+        )
+    )
     ds = wmt_task.get_dataset(
         sequence_lengths,
         "train",
         shuffle=False,
-        feature_converter=airio.feature_converters.PyGrainEncDecFeatureConverter(),
+        runtime_preprocessors=runtime_preprocessors,
         batch_size=2,
     )
     expected_first_batch = {
@@ -352,11 +357,16 @@ class TasksTest(absltest.TestCase):
         "inputs": _SOURCE_SEQUENCE_LENGTH,
         "targets": _SOURCE_SEQUENCE_LENGTH,
     }
+    runtime_preprocessors = (
+        airio.feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
+            sequence_lengths
+        )
+    )
     ds = nqo_task.get_dataset(
         sequence_lengths,
         "train",
         shuffle=False,
-        feature_converter=airio.feature_converters.PyGrainEncDecFeatureConverter(),
+        runtime_preprocessors=runtime_preprocessors,
         batch_size=2,
     )
     expected_first_batch = {
