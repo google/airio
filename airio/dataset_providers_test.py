@@ -802,6 +802,36 @@ class DatasetProvidersTest(absltest.TestCase):
     ]
     test_utils.assert_datasets_equal(ds, expected)
 
+  def test_get_updated_runtime_args(self):
+    def update_runtime_args_1(args):
+      args.sequence_lengths.update({"new_val": 5})
+      return args
+
+    def update_runtime_args_2(args):
+      args.sequence_lengths.update({"another_val": 7})
+      return args
+
+    prep_1 = preprocessors_lib.MapFnTransform(
+        lambda x: x,
+        update_runtime_args=update_runtime_args_1,
+    )
+    prep_2 = preprocessors_lib.MapFnTransform(
+        lambda x: x,
+        update_runtime_args=update_runtime_args_2,
+    )
+    task = dataset_providers.Task(
+        "test", source=_create_source(), preprocessors=[prep_1, prep_2]
+    )
+    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"val": 3}, split="train"
+    )
+    updated_runtime_args = task.get_updated_runtime_args(runtime_args)
+    expected_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"val": 3, "new_val": 5, "another_val": 7},
+        split="train",
+    )
+    self.assertEqual(updated_runtime_args, expected_runtime_args)
+
   def test_get_vocabularies_returns_correct_vocabularies(self):
     source = _create_source(
         source_name=_SOURCE_NAME,
@@ -1033,11 +1063,14 @@ class DatasetProvidersTest(absltest.TestCase):
         ds: lazy_dataset.LazyMapDataset,
         rargs: preprocessors_lib.AirIOInjectedRuntimeArgs,
     ):
-      return ds, rargs
+      del rargs
+      return ds
 
-    preprocessors = _create_preprocessors() + [  # LazyMapDataset preprocessor
-        preprocessors_lib.PackTransform(
-            packing_preprocessor=lazy_id_fn,
+    preprocessors = _create_preprocessors() + [
+        preprocessors_lib.LazyMapTransform(
+            lazy_id_fn,
+            update_runtime_args=lambda rargs: rargs,
+            has_none_elements=False,
         )
     ]
     source = _create_source(
@@ -1178,6 +1211,94 @@ class MixtureTest(absltest.TestCase):
         ])
         .build()
     )
+
+  def test_mixture_runtime_args_updated_by_task(self):
+    def update_runtime_args_fn(rargs):
+      return preprocessors_lib.AirIOInjectedRuntimeArgs(
+          sequence_lengths={"inputs": 20, "targets": 10}, split=rargs.split
+      )
+
+    task_with_runtime_args_update = (
+        dataset_providers.TaskBuilder.from_task(self._imdb_task)
+        .set_preprocessors(
+            self._imdb_task._preprocessors
+            + [
+                preprocessors_lib.MapFnTransform(
+                    lambda x: x, update_runtime_args=update_runtime_args_fn
+                ),
+            ]
+        )
+        .build()
+    )
+    mix = dataset_providers.Mixture(
+        name="test_mix",
+        tasks=[task_with_runtime_args_update],
+        proportions=[1.0],
+    )
+    ds = mix.get_dataset(
+        sequence_lengths={"xyz": 5, "abc": 7},  # will be updated
+        shuffle=False,
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
+        num_epochs=1,
+        feature_converter=_create_feature_converter(),
+    )
+    expected = [
+        {
+            "encoder_input_tokens": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                4,
+                2,
+                13,
+                3,
+                5,
+                20,
+                2,
+                4,
+                2,
+                20,
+                2,
+                4,
+                0,
+                0,
+            ],
+            "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
+            "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
+            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+        },
+        {
+            "encoder_input_tokens": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                20,
+                2,
+                3,
+                5,
+                8,
+                2,
+                13,
+                8,
+                21,
+                13,
+                8,
+                2,
+                21,
+                2,
+            ],
+            "decoder_target_tokens": [3, 22, 4, 2, 18, 8, 25, 4, 0, 0],
+            "decoder_input_tokens": [3, 22, 4, 2, 18, 8, 25, 4, 0, 0],
+            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+        },
+    ]
+    test_utils.assert_datasets_equal(ds, expected)
 
   def test_simple_mixture(self):
     mix = dataset_providers.Mixture(

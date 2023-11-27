@@ -18,7 +18,7 @@ import dataclasses
 import functools
 import inspect
 import time
-from typing import Any, Callable, Mapping, Tuple, Union
+from typing import Any, Callable, Mapping
 
 from airio import lazy_dataset_transforms
 import grain.python as grain
@@ -38,16 +38,16 @@ class AirIOInjectedRuntimeArgs:
   split: str
 
 
-MapFnCallable = Union[
-    Callable[[Any], Any], Callable[[Any, AirIOInjectedRuntimeArgs], Any]
-]
-RandomMapFnCallable = Union[
-    Callable[[Any, JaxRng], Any],
-    Callable[[Any, JaxRng, AirIOInjectedRuntimeArgs], Any],
-]
-FilterFnCallable = Union[
-    Callable[[Any], bool], Callable[[Any, AirIOInjectedRuntimeArgs], bool]
-]
+MapFnCallable = (
+    Callable[[Any], Any] | Callable[[Any, AirIOInjectedRuntimeArgs], Any]
+)
+RandomMapFnCallable = (
+    Callable[[Any, JaxRng], Any]
+    | Callable[[Any, JaxRng, AirIOInjectedRuntimeArgs], Any]
+)
+FilterFnCallable = (
+    Callable[[Any], bool] | Callable[[Any, AirIOInjectedRuntimeArgs], bool]
+)
 UpdateRuntimeArgsCallable = Callable[
     [AirIOInjectedRuntimeArgs], AirIOInjectedRuntimeArgs
 ]
@@ -125,42 +125,89 @@ class FilterFnTransform(grain.FilterTransform):
     return inject_runtime_args_to_fn(self.filter_fn, self.runtime_args)(element)
 
 
-FnTransforms = Union[MapFnTransform, RandomMapFnTransform, FilterFnTransform]
-
-
 @dataclasses.dataclass
-class PackTransform:
-  """Represents configuration for a packing preprocessor.
+class LazyMapTransform:
+  """AirIO preprocessor class for LazyMapDataset transformations.
+
+  Avoid using this Transform class if possible. It is important for users to set
+  the `update_runtime_args` and `produces_sparse_datasets` attributes correctly
+  because it is not possible to verify correctness at runtime.
 
   Attributes:
-    packing_preprocessor: The packing preprocessor. This is a `Callable` that
-      packs a `lazy_dataset.LazyMapDataset` based on sequence_lengths provided
-      via `AirIOInjectedRuntimeArgs`, and can be extended to other types, such
-      as a set of `grain.Transformation`s. A standard implementation is
-      available in airio/common.
+    transform: A `Callable` that preprocesses `lazy_dataset.LazyMapDataset`
+      based on runtime args like sequence lengths provided via
+      `AirIOInjectedRuntimeArgs`, and returns a `lazy_dataset.LazyMapDataset`.
+    update_runtime_args: A `Callable` that updates the
+      `AirIOInjectedRuntimeArgs` for use by subsequent transforms if this
+      transform modifies or adds new features (e.g. segment ids after packing).
+      Pass `lambda x: x` if runtime args aren't updated.
+    has_none_elements: A bool to indicate whether the transform removes examples
+      from the original dataset, e.g. filtering, packing, etc.
   """
 
-  packing_preprocessor: Callable[
+  transform: Callable[
       [lazy_dataset.LazyMapDataset, AirIOInjectedRuntimeArgs],
-      Tuple[lazy_dataset.LazyMapDataset, AirIOInjectedRuntimeArgs],
+      lazy_dataset.LazyMapDataset,
   ]
+  update_runtime_args: UpdateRuntimeArgsCallable
+  has_none_elements: bool
 
   def __call__(
       self,
       ds: lazy_dataset.LazyMapDataset,
       runtime_args: AirIOInjectedRuntimeArgs,
-  ):
-    packer = self.packing_preprocessor
+  ) -> lazy_dataset.LazyMapDataset:
     if not isinstance(ds, lazy_dataset.LazyMapDataset):
       raise ValueError(
-          f"Cannot apply LazyMapDataset packing: {str(packer)} to"
+          f"Cannot apply LazyMapDataset transform: {str(self.transform)} to"
           f" non-LazyMapDataset dataset: {str(ds)}"
       )
-    return packer(ds, runtime_args)
+    return self.transform(ds, runtime_args)
 
 
+@dataclasses.dataclass
+class LazyIterTransform:
+  """AirIO preprocessor class for LazyIterDataset transformations.
+
+  Avoid using this Transform class if possible. It is important for users to set
+  the `update_runtime_args` and `produces_sparse_datasets` attributes correctly
+  because it is not possible to verify correctness at runtime.
+
+  Attributes:
+    transform: A `Callable` that preprocesses `lazy_dataset.LazyIterDataset`
+      based on runtime args like sequence lengths provided via
+      `AirIOInjectedRuntimeArgs`, and returns a `lazy_dataset.LazyIterDataset`.
+    update_runtime_args: A `Callable` that updates the
+      `AirIOInjectedRuntimeArgs` for use by subsequent transforms if this
+      transform modifies or adds new features (e.g. segment ids after packing).
+      Pass `lambda x: x` if runtime args aren't updated.
+  """
+
+  transform: Callable[
+      [lazy_dataset.LazyIterDataset, AirIOInjectedRuntimeArgs],
+      lazy_dataset.LazyIterDataset,
+  ]
+  update_runtime_args: UpdateRuntimeArgsCallable
+
+  def __call__(
+      self,
+      ds: lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset,
+      runtime_args: AirIOInjectedRuntimeArgs,
+  ) -> lazy_dataset.LazyIterDataset:
+    if isinstance(ds, lazy_dataset.LazyMapDataset):
+      ds = ds.to_iter_dataset()
+    if not isinstance(ds, lazy_dataset.LazyIterDataset):
+      raise ValueError(
+          f"Cannot apply LazyIterDataset transform: {str(self.transform)} to"
+          f" non-LazyIterDataset dataset: {str(ds)}"
+      )
+    return self.transform(ds, runtime_args)
+
+
+FnTransforms = MapFnTransform | RandomMapFnTransform | FilterFnTransform
+LazyTransforms = LazyMapTransform | LazyIterTransform
 # This may be extended as needed.
-AirIOPreprocessor = grain.Transformation | PackTransform
+AirIOPreprocessor = grain.Transformation | LazyTransforms
 
 
 @dataclasses.dataclass
@@ -182,6 +229,20 @@ class LazyDatasetTransform:
           " airio.preprocessors.RandomMapFnTransform instead."
       )
 
+  def get_updated_runtime_args(
+      self, runtime_args: AirIOInjectedRuntimeArgs
+  ) -> AirIOInjectedRuntimeArgs:
+    # pytype:disable=attribute-error
+    if (
+        hasattr(self.transform, "update_runtime_args")
+        and self.transform.update_runtime_args
+    ):
+      return self.transform.update_runtime_args(runtime_args)
+    if isinstance(self.transform, LazyTransforms):
+      return self.transform.update_runtime_args(runtime_args)
+    return runtime_args
+    # pytype:enable=attribute-error
+
   def __call__(
       self,
       ds: lazy_dataset.LazyMapDataset,
@@ -189,47 +250,33 @@ class LazyDatasetTransform:
       runtime_args: AirIOInjectedRuntimeArgs | None = None,
   ):
     # pytype: disable=attribute-error
-    updated_runtime_args = runtime_args
     if isinstance(self.transform, FnTransforms):
       self.transform.runtime_args = runtime_args
-      if self.transform.update_runtime_args:
-        updated_runtime_args = self.transform.update_runtime_args(
-            updated_runtime_args
-        )
-      # Note: Runtime args support can be extended to general grain transforms
-      # by finding and setting attrs annotated with `AirIOInjectedRuntimeArgs`.
     match self.transform:
       case grain.MapTransform():
-        return (
-            lazy_dataset.MapLazyMapDataset(ds, self.transform),
-            updated_runtime_args,
-        )
+        return lazy_dataset.MapLazyMapDataset(ds, self.transform)
       case RandomMapFnTransform():
         # Special case to support reproducible stochastic transformations with
         # jax PRNGKeys.
         if rng is None:
           rng = jax.random.PRNGKey(np.int32(time.time()))
         map_fn = inject_runtime_args_to_fn(self.transform.map_fn, runtime_args)
-        return (
-            lazy_dataset_transforms.RandomMapFnLazyMapDataset(
-                ds,
-                map_fn=map_fn,
-                base_rng=rng,
-            ),
-            updated_runtime_args,
+        return lazy_dataset_transforms.RandomMapFnLazyMapDataset(
+            ds,
+            map_fn=map_fn,
+            base_rng=rng,
         )
       case grain.FilterTransform():
-        return (
-            lazy_dataset.FilterLazyMapDataset(ds, self.transform),
-            updated_runtime_args,
-        )
+        return lazy_dataset.FilterLazyMapDataset(ds, self.transform)
       case grain.Batch():
         return lazy_dataset.BatchLazyMapDataset(
             ds,
             batch_size=self.transform.batch_size,
             drop_remainder=self.transform.drop_remainder,
-        ), updated_runtime_args
-      case PackTransform():
+        )
+      case LazyMapTransform():
+        return self.transform(ds, runtime_args)
+      case LazyIterTransform():
         return self.transform(ds, runtime_args)
       case _:
         # Should be taken care of by post init validation.
