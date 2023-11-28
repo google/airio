@@ -20,7 +20,6 @@ from typing import Dict, Sequence
 from unittest import mock
 
 from absl.testing import absltest
-# from absl.testing import parameterized
 from airio import data_sources
 from airio import dataset_providers
 from airio import feature_converters
@@ -1919,6 +1918,44 @@ class MixturePropertiesTest(absltest.TestCase):
       _ = dataset_providers.Mixture(
           "invalid_mix", [self.tasks[0], self.tasks[0]], [1.0, 1.0]
       )
+
+
+class EvenSplitTest(absltest.TestCase):
+
+  def test_even_split_one_shard(self):
+    # Splitting into one shard returns the entire interval.
+    interval = dataset_providers._even_split(
+        num_examples=20, shard_index=0, shard_count=1
+    )
+    self.assertTupleEqual(interval, (0, 20))  # All 20 elements.
+
+  def test_even_split_two_shards(self):
+    # Splitting into two shards returns half the interval. Since the number is
+    # not perfectly divisible, the first shard has the extra element.
+    intervals = []
+    for i in range(2):
+      intervals.append(
+          dataset_providers._even_split(
+              num_examples=21, shard_index=i, shard_count=2
+          )
+      )
+    self.assertTupleEqual(intervals[0], (0, 11))  # First 11 elements.
+    self.assertTupleEqual(intervals[1], (11, 21))  # Last 10 elements.
+
+  def test_even_split_three_shards(self):
+    # Splitting into three shards returns a third of the interval. Since the
+    # number is not perfectly divisible, an extra element is added to the first
+    # and second shards. The third shard has one less element.
+    intervals = []
+    for i in range(3):
+      intervals.append(
+          dataset_providers._even_split(
+              num_examples=8, shard_index=i, shard_count=3
+          )
+      )
+    self.assertTupleEqual(intervals[0], (0, 3))  # First 3 elements.
+    self.assertTupleEqual(intervals[1], (3, 6))  # Next 3 elements.
+    self.assertTupleEqual(intervals[2], (6, 8))  # Last 2 elements.
 
 
 if __name__ == "__main__":

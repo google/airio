@@ -148,10 +148,12 @@ class Task(DatasetProviderBase):
         self._get_data_source_for_split(split=split)
     )
     if shard_info:
-      shard_options = grain.ShardOptions(
-          shard_index=shard_info.index, shard_count=shard_info.num_shards
+      start, end = _even_split(
+          len(ds),
+          shard_index=shard_info.index,
+          shard_count=shard_info.num_shards,
       )
-      ds = lazy_dataset_transforms.ShardLazyMapDataset(ds, shard_options)
+      ds = ds[start:end]
 
     # Step 2: Make epochs.
     if num_epochs:
@@ -431,9 +433,7 @@ class Mixture(DatasetProviderBase):
     runtime_args = self.leaf_tasks[0].get_updated_runtime_args(
         runtime_args, runtime_preprocessors=None
     )
-    ds = lazy_dataset_transforms.MixedLazyMapDataset(
-        datasets, proportions, stop_on_empty_dataset=True
-    )
+    ds = lazy_dataset.MixedLazyMapDataset(datasets, proportions)
     post_mix_preps = []
     if runtime_preprocessors:
       post_mix_preps.extend(runtime_preprocessors)
@@ -654,3 +654,30 @@ def get_vocabularies(
         vocabulary_map[feature_name] = tokenizer_config.vocab
 
   return vocabulary_map
+
+
+def _even_split(
+    num_examples: int, shard_index: int, shard_count: int
+) -> tuple[int, int]:
+  """Returns the interval for the shard when sharding `num_examples` evenly.
+
+  Args:
+    num_examples: Number of examples to shard.
+    shard_index: The shard index to return interval for.
+    shard_count: The total number of shards.
+
+  Returns:
+    Tuple with the start and end of the interval. The start is the first
+    example that should be included in this interval and end - 1 is the last
+    example to be include in the shard.
+  """
+  examples_per_shard = num_examples // shard_count
+  shard_start = examples_per_shard * shard_index
+  shard_end = examples_per_shard * (shard_index + 1)
+
+  # Handle remaining examples.
+  num_unused_examples = num_examples % shard_count
+  if num_unused_examples > 0:
+    shard_start += min(shard_index, num_unused_examples)
+    shard_end += min(shard_index + 1, num_unused_examples)
+  return shard_start, shard_end
