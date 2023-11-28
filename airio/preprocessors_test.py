@@ -493,6 +493,78 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     self.assertListEqual(list(ds), list(range(3, 13)))
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
+  def test_map_transform_on_iter_dataset(self):
+    transform = preprocessors.MapFnTransform(lambda x: x + 1)
+    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = ds.to_iter_dataset()
+    ds = preprocessors.LazyDatasetTransform(transform)(ds)
+    self.assertListEqual(list(ds), list(range(1, 11)))
+
+  def test_filter_transform_on_iter_dataset(self):
+    transform = preprocessors.FilterFnTransform(lambda x: x > 5)
+    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = ds.to_iter_dataset()
+    ds = preprocessors.LazyDatasetTransform(transform)(ds)
+    self.assertListEqual(list(ds), list(range(6, 10)))
+
+  def test_batch_transform_on_iter_dataset(self):
+    batch_with_drop = grain.Batch(batch_size=3, drop_remainder=True)
+    batch_without_drop = grain.Batch(batch_size=3, drop_remainder=False)
+    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = ds.to_iter_dataset()
+    ds_with_drop = preprocessors.LazyDatasetTransform(batch_with_drop)(ds)
+    ds_without_drop = preprocessors.LazyDatasetTransform(batch_without_drop)(ds)
+    self.assertListEqual(
+        [d.tolist() for d in ds_with_drop], [[0, 1, 2], [3, 4, 5], [6, 7, 8]]
+    )
+    self.assertListEqual(
+        [d.tolist() for d in ds_without_drop],
+        [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]],
+    )
+
+  def test_lazy_iter_transform_on_iter_dataset(self):
+    run_args = preprocessors.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"val": 3}, split="unused"
+    )
+    transform = preprocessors.LazyIterTransform(
+        lazy_iter_fn,
+        update_runtime_args=self._update_runtime_args,
+    )
+    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = ds.to_iter_dataset()
+    ds = transform(ds, run_args)
+    self.assertListEqual(list(ds), list(range(3, 13)))
+
+  def test_random_map_transform_on_iter_dataset_fails(self):
+    def test_random_map_fn(ex, rng):
+      return ex + int(jax.random.randint(rng, [], 0, 10))
+    transform = preprocessors.RandomMapFnTransform(test_random_map_fn)
+    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = ds.to_iter_dataset()
+    run_args = preprocessors.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"val": 3}, split="unused"
+    )
+    with self.assertRaisesRegex(
+        ValueError, "RandomMapFnTransform is not yet supported.*"
+    ):
+      _ = preprocessors.LazyDatasetTransform(transform)(ds, run_args)
+
+  def test_lazy_map_transform_on_iter_dataset_fails(self):
+    transform = preprocessors.LazyMapTransform(
+        lazy_map_fn,
+        update_runtime_args=self._update_runtime_args,
+        has_none_elements=False,
+    )
+    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = ds.to_iter_dataset()
+    run_args = preprocessors.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"val": 3}, split="unused"
+    )
+    with self.assertRaisesRegex(
+        ValueError, "Cannot apply LazyMapDataset transform.*"
+    ):
+      _ = transform(ds, run_args)
+
 
 if __name__ == "__main__":
   absltest.main()
