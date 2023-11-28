@@ -1880,7 +1880,7 @@ class CommonPackersTest(absltest.TestCase):
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 4}, split="unused"
     )
-    ds, updated_runtime_args = packing.MultiBinTruePackPreprocessor(
+    ds, updated_runtime_args = packing.MultiBinTruePackMapPreprocessor(
         ds, runtime_args
     )
     ds_iter = iter(ds)
