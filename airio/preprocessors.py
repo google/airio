@@ -28,6 +28,7 @@ import numpy as np
 # TODO(b/294122943): Implement flat_map.
 
 lazy_dataset = grain.experimental.lazy_dataset
+LazyDataset = lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset
 JaxRng = jax.Array
 
 
@@ -216,7 +217,6 @@ class LazyDatasetTransform:
   transform: AirIOPreprocessor
 
   def __post_init__(self):
-    # TODO(b/300282178): Support flat-maps and many-to-one/many transforms.
     if not isinstance(self.transform, AirIOPreprocessor):
       raise ValueError(f"{str(self.transform)} is not supported")
     # TODO(b/300938204): Remove error for other RandomMapTransforms, once
@@ -245,7 +245,7 @@ class LazyDatasetTransform:
 
   def __call__(
       self,
-      ds: lazy_dataset.LazyMapDataset,
+      ds: LazyDataset,
       rng: JaxRng | None = None,
       runtime_args: AirIOInjectedRuntimeArgs | None = None,
   ):
@@ -254,10 +254,16 @@ class LazyDatasetTransform:
       self.transform.runtime_args = runtime_args
     match self.transform:
       case grain.MapTransform():
-        return lazy_dataset.MapLazyMapDataset(ds, self.transform)
+        return ds.map(self.transform)
       case RandomMapFnTransform():
         # Special case to support reproducible stochastic transformations with
         # jax PRNGKeys.
+        # Note: LazyIterDatasets are not yet supported, but can be if needed.
+        if not isinstance(ds, lazy_dataset.LazyMapDataset):
+          raise ValueError(
+              "RandomMapFnTransform is not yet supported for"
+              " non-LazyMapDatasets. Please file a bug with the AirIO team."
+          )
         if rng is None:
           rng = jax.random.PRNGKey(np.int32(time.time()))
         map_fn = inject_runtime_args_to_fn(self.transform.map_fn, runtime_args)
@@ -267,10 +273,9 @@ class LazyDatasetTransform:
             base_rng=rng,
         )
       case grain.FilterTransform():
-        return lazy_dataset.FilterLazyMapDataset(ds, self.transform)
+        return ds.filter(self.transform)
       case grain.Batch():
-        return lazy_dataset.BatchLazyMapDataset(
-            ds,
+        return ds.batch(
             batch_size=self.transform.batch_size,
             drop_remainder=self.transform.drop_remainder,
         )
