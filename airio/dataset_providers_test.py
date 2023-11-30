@@ -136,6 +136,51 @@ def _create_task_builder(
   )
 
 
+class _TestFilterLazyDatasetIterator(lazy_dataset.LazyDatasetIterator):
+  """Iterator that filters elements based on an int threshold."""
+
+  def __init__(
+      self,
+      parent: lazy_dataset.LazyDatasetIterator,
+      threshold: int,
+  ):
+    super().__init__()
+    self._parent = parent
+    self._threshold = threshold
+    self._index = 0
+
+  def __next__(self):
+    while True:
+      elem = next(self._parent)
+      if elem > self._threshold:
+        return elem
+
+  def get_state(self):
+    return {"parent": self._parent.get_state(), "threshold": self._threshold}
+
+  def set_state(self, state):
+    self._parent.set_state(state["parent"])
+    self._threshold = state["threshold"]
+
+
+class TestFilterLazyIterDataset(lazy_dataset.LazyIterDataset):
+  """LazyIterDataset thatfilters elements based on an int threshold."""
+
+  def __init__(
+      self,
+      parent: lazy_dataset.LazyIterDataset,
+      threshold: int,
+  ):
+    super().__init__(parent)
+    self._threshold = threshold
+
+  def __iter__(self) -> _TestFilterLazyDatasetIterator:
+    return _TestFilterLazyDatasetIterator(
+        self._parent.__iter__(),
+        threshold=self._threshold,
+    )
+
+
 class DatasetProviderBaseTest(absltest.TestCase):
 
   @mock.patch.multiple(
@@ -148,6 +193,27 @@ class DatasetProviderBaseTest(absltest.TestCase):
 
 
 class DatasetProvidersTest(absltest.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    def test_map_fn(ex, idx):
+      return {"idx": idx, "val": ex}
+
+    def simple_to_imdb_map_fn(
+        ex, rargs: preprocessors_lib.AirIOInjectedRuntimeArgs
+    ):
+      return {
+          "inputs_pretokenized": f"{ex}",
+          "inputs": np.array([ex] * rargs.sequence_lengths["inputs"]),
+          "targets_pretokenized": f"{ex + 1}",
+          "targets": np.array([ex + 1] * rargs.sequence_lengths["targets"]),
+      }
+    self._map_transform_idx_1 = preprocessors_lib.MapFnTransform(
+        functools.partial(test_map_fn, idx=1)
+    )
+    self._simple_to_imdb_prep = preprocessors_lib.MapFnTransform(
+        simple_to_imdb_map_fn
+    )
 
   def test_create_task_with_source_only_succeeds(self):
     task = _create_task(source=_create_source(), preprocessors=None)
@@ -495,6 +561,140 @@ class DatasetProvidersTest(absltest.TestCase):
     task = _create_task(source=source, preprocessors=_create_preprocessors())
     with self.assertRaisesRegex(ValueError, "Split nonexistent not found in"):
       task.get_dataset(split="nonexistent")
+
+  def test_task_get_dataset_with_lazy_iter_prep(self):
+    task_with_iter = _create_task(
+        source=_create_fn_src(num_elements=10),
+        preprocessors=[
+            preprocessors_lib.LazyIterTransform(
+                lambda ds, _: TestFilterLazyIterDataset(ds, threshold=4),
+                update_runtime_args=lambda x: x,
+            ),
+            self._map_transform_idx_1,
+        ],
+        task_name="test_task_with_iter",
+    )
+    ds = task_with_iter.get_dataset(shuffle=False)
+    expected_dataset = [
+        {"idx": 1, "val": 5},
+        {"idx": 1, "val": 6},
+        {"idx": 1, "val": 7},
+        {"idx": 1, "val": 8},
+        {"idx": 1, "val": 9},
+    ]
+    self.assertListEqual(list(ds), expected_dataset)
+
+  def test_task_get_dataset_with_lazy_iter_prep_with_runtime_preps_and_batching(
+      self,
+  ):
+    task_with_iter = _create_task(
+        source=_create_fn_src(num_elements=10),
+        preprocessors=[
+            preprocessors_lib.LazyIterTransform(
+                lambda ds, _: TestFilterLazyIterDataset(ds, threshold=4),
+                update_runtime_args=lambda x: x,
+            ),
+            self._simple_to_imdb_prep,
+        ],
+        task_name="test_task_with_iter",
+    )
+    sequence_lengths = {"inputs": 2, "targets": 1}
+    ds = task_with_iter.get_dataset(
+        sequence_lengths=sequence_lengths,
+        shuffle=False,
+        runtime_preprocessors=_create_runtime_preprocessors(
+            sequence_lengths
+        ),
+        batch_size=4,
+    )
+    expected_dataset = [
+        {
+            "decoder_input_tokens": [[6], [7], [8], [9]],
+            "decoder_loss_weights": [[1], [1], [1], [1]],
+            "decoder_target_tokens": [[6], [7], [8], [9]],
+            "encoder_input_tokens": [[5, 5], [6, 6], [7, 7], [8, 8]],
+        },
+        {
+            "decoder_input_tokens": [[10]],
+            "decoder_loss_weights": [[1]],
+            "decoder_target_tokens": [[10]],
+            "encoder_input_tokens": [[9, 9]],
+        },
+    ]
+    expected_keys = [
+        "decoder_input_tokens",
+        "decoder_loss_weights",
+        "decoder_target_tokens",
+        "encoder_input_tokens",
+    ]
+    for actual, expected in zip(ds, expected_dataset):
+      self.assertSequenceEqual(sorted(actual.keys()), sorted(expected_keys))
+      for k in expected_keys:
+        np.testing.assert_array_equal(actual[k], expected[k])
+
+  def test_task_get_dataset_with_none_elements(self):
+    task_with_none = _create_task(
+        source=_create_fn_src(num_elements=10),
+        preprocessors=[
+            preprocessors_lib.FilterFnTransform(lambda x: x > 4),
+            self._map_transform_idx_1,
+        ],
+        task_name="test_task_with_none",
+    )
+    ds = task_with_none.get_dataset(shuffle=False)
+    expected_dataset = [
+        {"idx": 1, "val": 5},
+        {"idx": 1, "val": 6},
+        {"idx": 1, "val": 7},
+        {"idx": 1, "val": 8},
+        {"idx": 1, "val": 9},
+    ]
+    self.assertListEqual(list(ds), expected_dataset)
+
+  def test_task_get_dataset_with_none_elements_with_runtime_preps_and_batching(
+      self,
+  ):
+    task_with_iter = _create_task(
+        source=_create_fn_src(num_elements=10),
+        preprocessors=[
+            preprocessors_lib.FilterFnTransform(lambda x: x > 4),
+            self._simple_to_imdb_prep,
+        ],
+        task_name="test_task_with_none",
+    )
+    sequence_lengths = {"inputs": 2, "targets": 1}
+    ds = task_with_iter.get_dataset(
+        sequence_lengths=sequence_lengths,
+        shuffle=False,
+        runtime_preprocessors=_create_runtime_preprocessors(
+            sequence_lengths
+        ),
+        batch_size=4,
+    )
+    expected_dataset = [
+        {
+            "decoder_input_tokens": [[6], [7], [8], [9]],
+            "decoder_loss_weights": [[1], [1], [1], [1]],
+            "decoder_target_tokens": [[6], [7], [8], [9]],
+            "encoder_input_tokens": [[5, 5], [6, 6], [7, 7], [8, 8]],
+        },
+        {
+            "decoder_input_tokens": [[10]],
+            "decoder_loss_weights": [[1]],
+            "decoder_target_tokens": [[10]],
+            "encoder_input_tokens": [[9, 9]],
+        },
+    ]
+    expected_keys = [
+        "decoder_input_tokens",
+        "decoder_loss_weights",
+        "decoder_target_tokens",
+        "encoder_input_tokens",
+    ]
+    for actual, expected in zip(ds, expected_dataset):
+      self.assertSequenceEqual(sorted(actual.keys()), sorted(expected_keys))
+      for k in expected_keys:
+        np.testing.assert_array_equal(actual[k], expected[k])
 
   def test_task_get_dataset_by_step_without_runtime_preps(self):
     source = _create_source(source_name=_SOURCE_NAME)
@@ -1199,6 +1399,9 @@ class MixtureTest(absltest.TestCase):
     self._map_transform_idx_2 = preprocessors_lib.MapFnTransform(
         functools.partial(test_map_fn, idx=2)
     )
+    self._simple_to_imdb_prep = preprocessors_lib.MapFnTransform(
+        simple_to_imdb_map_fn
+    )
     self._simple_task_1 = _create_task(
         task_name="test_task1",
         source=_create_fn_src(),
@@ -1799,6 +2002,214 @@ class MixtureTest(absltest.TestCase):
         {k: v.tolist() for k, v in next(ds).items()},
         {"idx": [1, 2], "val": [0, 0]},
     )
+
+  def test_mixing_with_iter_test(self):
+    # Mix datasets that produce None elements and verify that mixture length and
+    # mixing rate are correct
+    task_with_none = _create_task(
+        source=_create_fn_src(num_elements=10),
+        preprocessors=[
+            preprocessors_lib.FilterFnTransform(lambda x: x > 4),
+            self._map_transform_idx_1,
+        ],
+        task_name="test_task_with_none",
+    )
+    ordinary_task = _create_task(
+        source=_create_fn_src(num_elements=10),
+        preprocessors=[self._map_transform_idx_2],
+        task_name="ordinary_task",
+    )
+    mix = dataset_providers.Mixture(
+        name="test_mix",
+        tasks=[task_with_none, ordinary_task],
+        proportions=[1.0, 1.0],
+    )
+    ds = mix.get_dataset(shuffle=False)
+    expected_dataset = [
+        {"idx": 2, "val": 0},  # task 2, example 1
+        {"idx": 1, "val": 5},  # task 1, example 6 (prev examples filtered)
+        {"idx": 2, "val": 1},  # task 2, example 2
+        {"idx": 1, "val": 6},  # task 1, example 7
+        {"idx": 2, "val": 2},  # task 2, example 3
+        {"idx": 1, "val": 7},  # task 1, example 8
+        {"idx": 2, "val": 3},  # task 2, example 4
+        {"idx": 1, "val": 8},  # task 1, example 9
+        {"idx": 2, "val": 4},  # task 2, example 5
+        {"idx": 1, "val": 9},  # task 1, example 10 (last example)
+        {"idx": 2, "val": 5},  # task 2, example 6
+        # There are 4 more elements available in `ordinary_task`, but mixing
+        # stops here because there are no more elements in `task_with_none`. The
+        # desired mixing rate is achieved.
+    ]
+    self.assertListEqual(list(ds), expected_dataset)
+
+  def test_mixing_with_iter_test_with_runtime_preps_and_batching(self):
+    # Mix datasets that produce None elements and verify that mixture length and
+    # mixing rate are correct.
+    task_with_none = _create_task(
+        source=_create_fn_src(num_elements=10),
+        preprocessors=[
+            preprocessors_lib.FilterFnTransform(lambda x: x > 4),
+            self._simple_to_imdb_prep,
+        ],
+        task_name="test_task_with_none",
+    )
+    ordinary_task = _create_task(
+        source=_create_fn_src(num_elements=10),
+        preprocessors=[
+            self._simple_to_imdb_prep,
+        ],
+        task_name="ordinary_task",
+    )
+    mix = dataset_providers.Mixture(
+        name="test_mix",
+        tasks=[task_with_none, ordinary_task],
+        proportions=[1.0, 1.0],
+    )
+    sequence_lengths = {"inputs": 2, "targets": 1}
+    ds = mix.get_dataset(
+        sequence_lengths=sequence_lengths,
+        shuffle=False,
+        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
+        batch_size=4,
+    )
+    expected_dataset = [
+        {  # task 2 ex 1, task 1 ex 6, task 2 ex 2, task 1 ex 7
+            "decoder_input_tokens": [[1], [6], [2], [7]],
+            "decoder_loss_weights": [[1], [1], [1], [1]],
+            "decoder_target_tokens": [[1], [6], [2], [7]],
+            "encoder_input_tokens": [[0, 0], [5, 5], [1, 1], [6, 6]],
+        },
+        {  # task 2 ex 3, task 1 ex 8, task 2 ex 4, task 1 ex 9
+            "decoder_input_tokens": [[3], [8], [4], [9]],
+            "decoder_loss_weights": [[1], [1], [1], [1]],
+            "decoder_target_tokens": [[3], [8], [4], [9]],
+            "encoder_input_tokens": [[2, 2], [7, 7], [3, 3], [8, 8]],
+        },
+        {  # task 2 ex 5, task 1 ex 10 (last example), task 2 ex 6
+            "decoder_input_tokens": [[5], [10], [6]],
+            "decoder_loss_weights": [[1], [1], [1]],
+            "decoder_target_tokens": [[5], [10], [6]],
+            "encoder_input_tokens": [[4, 4], [9, 9], [5, 5]],
+        },
+    ]
+    expected_keys = [
+        "decoder_input_tokens",
+        "decoder_loss_weights",
+        "decoder_target_tokens",
+        "encoder_input_tokens",
+    ]
+    for actual, expected in zip(ds, expected_dataset):
+      for k in expected_keys:
+        np.testing.assert_array_equal(actual[k], expected[k])
+
+  def test_mixing_with_lazy_iter_preprocessor(self):
+    # Mix tasks with LazyIter preprocessors and verify that mixture length and
+    # mixing rate are correct.
+    task_with_iter = _create_task(
+        source=_create_fn_src(num_elements=10),
+        preprocessors=[
+            preprocessors_lib.LazyIterTransform(
+                lambda ds, _: TestFilterLazyIterDataset(ds, threshold=4),
+                update_runtime_args=lambda x: x,
+            ),
+            self._map_transform_idx_1,
+        ],
+        task_name="test_task_with_iter",
+    )
+    ordinary_task = _create_task(
+        source=_create_fn_src(num_elements=10),
+        preprocessors=[self._map_transform_idx_2],
+        task_name="ordinary_task",
+    )
+    mix = dataset_providers.Mixture(
+        name="test_mix",
+        tasks=[task_with_iter, ordinary_task],
+        proportions=[1.0, 1.0],
+    )
+    ds = mix.get_dataset(shuffle=False)
+    expected_dataset = [
+        {"idx": 2, "val": 0},  # task 2, example 1
+        {"idx": 1, "val": 5},  # task 1, example 6 (prev examples filtered)
+        {"idx": 2, "val": 1},  # task 2, example 2
+        {"idx": 1, "val": 6},  # task 1, example 7
+        {"idx": 2, "val": 2},  # task 2, example 3
+        {"idx": 1, "val": 7},  # task 1, example 8
+        {"idx": 2, "val": 3},  # task 2, example 4
+        {"idx": 1, "val": 8},  # task 1, example 9
+        {"idx": 2, "val": 4},  # task 2, example 5
+        {"idx": 1, "val": 9},  # task 1, example 10 (last example)
+        {"idx": 2, "val": 5},  # task 2, example 6
+        # There are 4 more elements available in `ordinary_task`, but mixing
+        # stops here because there are no more elements in `task_with_none`. The
+        # desired mixing rate is achieved.
+    ]
+    self.assertListEqual(list(ds), expected_dataset)
+
+  def test_mixing_with_lazy_iter_preprocessor_with_runtime_preps_and_batching(
+      self,
+  ):
+    # Mix tasks with LazyIter preprocessors and verify that mixture length and
+    # mixing rate are correct.
+    task_with_none = _create_task(
+        source=_create_fn_src(num_elements=10),
+        preprocessors=[
+            preprocessors_lib.LazyIterTransform(
+                lambda ds, _: TestFilterLazyIterDataset(ds, threshold=4),
+                update_runtime_args=lambda x: x,
+            ),
+            self._simple_to_imdb_prep,
+        ],
+        task_name="test_task_with_none",
+    )
+    ordinary_task = _create_task(
+        source=_create_fn_src(num_elements=10),
+        preprocessors=[
+            self._simple_to_imdb_prep,
+        ],
+        task_name="ordinary_task",
+    )
+    mix = dataset_providers.Mixture(
+        name="test_mix",
+        tasks=[task_with_none, ordinary_task],
+        proportions=[1.0, 1.0],
+    )
+    sequence_lengths = {"inputs": 2, "targets": 1}
+    ds = mix.get_dataset(
+        sequence_lengths=sequence_lengths,
+        shuffle=False,
+        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
+        batch_size=4,
+    )
+    expected_dataset = [
+        {  # task 2 ex 1, task 1 ex 6, task 2 ex 2, task 1 ex 7
+            "decoder_input_tokens": [[1], [6], [2], [7]],
+            "decoder_loss_weights": [[1], [1], [1], [1]],
+            "decoder_target_tokens": [[1], [6], [2], [7]],
+            "encoder_input_tokens": [[0, 0], [5, 5], [1, 1], [6, 6]],
+        },
+        {  # task 2 ex 3, task 1 ex 8, task 2 ex 4, task 1 ex 9
+            "decoder_input_tokens": [[3], [8], [4], [9]],
+            "decoder_loss_weights": [[1], [1], [1], [1]],
+            "decoder_target_tokens": [[3], [8], [4], [9]],
+            "encoder_input_tokens": [[2, 2], [7, 7], [3, 3], [8, 8]],
+        },
+        {  # task 2 ex 5, task 1 ex 10 (last example), task 2 ex 6
+            "decoder_input_tokens": [[5], [10], [6]],
+            "decoder_loss_weights": [[1], [1], [1]],
+            "decoder_target_tokens": [[5], [10], [6]],
+            "encoder_input_tokens": [[4, 4], [9, 9], [5, 5]],
+        },
+    ]
+    expected_keys = [
+        "decoder_input_tokens",
+        "decoder_loss_weights",
+        "decoder_target_tokens",
+        "encoder_input_tokens",
+    ]
+    for actual, expected in zip(ds, expected_dataset):
+      for k in expected_keys:
+        np.testing.assert_array_equal(actual[k], expected[k])
 
 
 class MixturePropertiesTest(absltest.TestCase):

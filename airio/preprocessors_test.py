@@ -565,6 +565,42 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     ):
       _ = transform(ds, run_args)
 
+  def test_produces_none_elements_map_fn(self):
+    prep = preprocessors.MapFnTransform(lambda x: x + 1)
+    self.assertFalse(preprocessors.produces_none_elements(prep))
+
+  def test_produces_none_elements_filter_fn(self):
+    prep = preprocessors.FilterFnTransform(lambda x: x > 1)
+    self.assertTrue(preprocessors.produces_none_elements(prep))
+
+  def test_produces_none_elements_random_map_fn(self):
+    def test_random_map_fn(ex, rng):
+      return ex + int(jax.random.randint(rng, [], 0, 10))
+    prep = preprocessors.RandomMapFnTransform(test_random_map_fn)
+    self.assertFalse(preprocessors.produces_none_elements(prep))
+
+  def test_produces_none_elements_lazy_map_transform_with_none(self):
+    prep = preprocessors.LazyMapTransform(
+        lazy_map_fn,
+        update_runtime_args=self._update_runtime_args,
+        has_none_elements=True,
+    )
+    self.assertTrue(preprocessors.produces_none_elements(prep))
+
+  def test_produces_none_elements_lazy_map_transform_without_none(self):
+    prep = preprocessors.LazyMapTransform(
+        lazy_map_fn,
+        update_runtime_args=self._update_runtime_args,
+        has_none_elements=False,
+    )
+    self.assertFalse(preprocessors.produces_none_elements(prep))
+
+  def test_produces_none_elements_lazy_iter_transform(self):
+    prep = preprocessors.LazyIterTransform(
+        lazy_iter_fn,
+        update_runtime_args=self._update_runtime_args,
+    )
+    self.assertFalse(preprocessors.produces_none_elements(prep))
 
 if __name__ == "__main__":
   absltest.main()

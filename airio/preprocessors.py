@@ -211,6 +211,25 @@ LazyTransforms = LazyMapTransform | LazyIterTransform
 AirIOPreprocessor = grain.Transformation | LazyTransforms
 
 
+def produces_none_elements(
+    preprocessor: AirIOPreprocessor,
+) -> bool:
+  """Returns True if preprocessor produces None elements, e.g. filters and LazyMap transforms.
+
+  This is a best-effort check and may be wrong, e.g. a grain.MapTransform impl
+  could produce None elements, a LazyMapTransform `has_none_elements` attr could
+  be misconfigured, etc.
+
+  Args:
+    preprocessor: An `AirIOPreprocessor` to check.
+  """
+  if isinstance(preprocessor, grain.FilterTransform):
+    return True
+  if isinstance(preprocessor, LazyMapTransform):
+    return preprocessor.has_none_elements
+  return False
+
+
 @dataclasses.dataclass
 class LazyDatasetTransform:
   """A convenience function to map Transforms to LazyDatasets."""

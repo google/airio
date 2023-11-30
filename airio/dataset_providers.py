@@ -131,6 +131,17 @@ class Task(DatasetProviderBase):
       runtime_args = transform.get_updated_runtime_args(runtime_args)
     return runtime_args
 
+  def produces_none_elements(self) -> bool:
+    """Returns True if any preprocessor returns none elements.
+
+    This is a best-effort check and may be wrong.
+    """
+    preps = self._preprocessors
+    for prep in preps:
+      if preprocessors_lib.produces_none_elements(prep):
+        return True
+    return False
+
   def get_lazy_dataset(
       self,
       sequence_lengths: Mapping[str, int] | None,
@@ -141,7 +152,7 @@ class Task(DatasetProviderBase):
       seed: int | None,
       shard_info: ShardInfo | None,
       num_epochs: int | None,
-  ) -> lazy_dataset.LazyMapDataset:
+  ) -> lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset:
     """Returns a lazy dataset for Task source and preprocessors."""
     # Step 1: Get Source.
     ds = lazy_dataset.SourceLazyMapDataset(
@@ -396,7 +407,7 @@ class Mixture(DatasetProviderBase):
       seed: int | None = 0,
       shard_info: ShardInfo | None = None,
       num_epochs: int | None = 1,
-  ) -> lazy_dataset.LazyMapDataset:
+  ) -> lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset:
     """Returns a lazy dataset for the Mixture."""
     if num_epochs is None and shuffle:
       raise ValueError(
@@ -424,6 +435,37 @@ class Mixture(DatasetProviderBase):
       # Note: We may not need N epochs of a Task to populate N epochs of the
       # Mixture, but since these are lazily populated, we can skip calculating
       # the exact number of epochs required.
+    # If any Task dataset produces a LazyIterDataset, then use a LazyIter impl
+    # for mixing.
+    use_mix_iter = any(
+        [isinstance(ds, lazy_dataset.LazyIterDataset) for ds in datasets]
+    )
+    # If any Task dataset produces None elements, mixing it with a LazyMap impl
+    # will deviate from desired proportions because None elements will be
+    # sampled. A LazyIter impl for mixing must be used for correct behavior.
+    use_mix_iter = use_mix_iter or any(
+        [task.produces_none_elements() for task in self.leaf_tasks]
+    )
+
+    if use_mix_iter:
+      # Convert any LazyMapDatasets datasets to LazyIterDatasets.
+      datasets = [
+          ds.to_iter_dataset()
+          if isinstance(ds, lazy_dataset.LazyMapDataset)
+          else ds
+          for ds in datasets
+      ]
+      ds = lazy_dataset.MixedLazyIterDataset(datasets, proportions)
+    else:
+      ds = lazy_dataset.MixedLazyMapDataset(datasets, proportions)
+
+    post_mix_preps = []
+    if runtime_preprocessors:
+      post_mix_preps.extend(runtime_preprocessors)
+    if batch_size:
+      post_mix_preps.append(
+          grain.Batch(batch_size=batch_size, drop_remainder=False)
+      )
     # Note: Use updated runtime args from the first Task. All updated runtime
     # args must match, or mixing won't work (compute all updated runtime args
     # and add a check here in the future if helpful).
@@ -433,14 +475,6 @@ class Mixture(DatasetProviderBase):
     runtime_args = self.leaf_tasks[0].get_updated_runtime_args(
         runtime_args, runtime_preprocessors=None
     )
-    ds = lazy_dataset.MixedLazyMapDataset(datasets, proportions)
-    post_mix_preps = []
-    if runtime_preprocessors:
-      post_mix_preps.extend(runtime_preprocessors)
-    if batch_size:
-      post_mix_preps.append(
-          grain.Batch(batch_size=batch_size, drop_remainder=False)
-      )
     if post_mix_preps:
       post_mix_transforms = [
           preprocessors_lib.LazyDatasetTransform(p) for p in post_mix_preps
