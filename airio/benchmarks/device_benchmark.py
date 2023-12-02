@@ -96,5 +96,34 @@ def wmt_generated_data_benchmark(state):
           _sum_of_squares_dx_jit(x).block_until_ready()
 
 
+@google_benchmark.register
+@requires_tpu(2)
+def wmt_from_file_benchmark(state):
+  """Loads a WMT dataset from file onto TPUs and performs a simple calculation."""
+  wmt_task = examples.tasks.get_wmt_19_ende_v003_task(
+      tokenizer_configs=_get_tokenizer_configs()
+  )
+  ds = wmt_task.get_dataset(split="train")
+
+  element_count = 0
+  while state:
+    for element in ds:
+      for _, v in element.items():
+        if isinstance(v, np.ndarray):
+          if v.dtype == np.int64:
+            v = v.astype(np.float32)
+          # Transfer to device.
+          x = jax.device_put(v)
+          state.pause_timing()
+          # Compile.
+          _sum_of_squares_dx_jit(x).block_until_ready()
+          state.resume_timing()
+          # Run.
+          _sum_of_squares_dx_jit(x).block_until_ready()
+      element_count += 1
+      if element_count >= _SOURCE_NUM_EXAMPLES:
+        break
+
+
 if __name__ == "__main__":
   google_benchmark.main()
