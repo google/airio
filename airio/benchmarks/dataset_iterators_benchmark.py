@@ -15,7 +15,6 @@
 """Microbenchmarks for AirIO dataset_iterators functions."""
 
 import ast
-import json
 import os
 import tempfile
 from typing import Dict
@@ -141,13 +140,11 @@ def dataset_iterator_set_state(state):
   iterator_wrapper = airio.dataset_iterators.PyGrainDatasetIteratorWrapper(
       data_loader
   )
-  state_bytes = iterator_wrapper.get_state()
-  state_dict = json.loads(state_bytes)
+  iterator_state = iterator_wrapper.get_state()
   # Modify state to indicate that the first two elements have been read.
-  state_dict["last_seen_indices"]["0"] = 1
-  new_state = json.dumps(state_dict).encode()
+  iterator_state["last_seen_indices"]["0"] = 1
   while state:
-    _ = iterator_wrapper.set_state(new_state)
+    _ = iterator_wrapper.set_state(iterator_state)
 
 
 @google_benchmark.register
