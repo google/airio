@@ -192,10 +192,11 @@ class DatasetProviderBaseTest(absltest.TestCase):
     self.assertIsNone(base.num_input_examples(self, split=""))
 
 
-class DatasetProvidersTest(absltest.TestCase):
+class TaskTest(absltest.TestCase):
 
   def setUp(self):
     super().setUp()
+
     def test_map_fn(ex, idx):
       return {"idx": idx, "val": ex}
 
@@ -208,6 +209,7 @@ class DatasetProvidersTest(absltest.TestCase):
           "targets_pretokenized": f"{ex + 1}",
           "targets": np.array([ex + 1] * rargs.sequence_lengths["targets"]),
       }
+
     self._map_transform_idx_1 = preprocessors_lib.MapFnTransform(
         functools.partial(test_map_fn, idx=1)
     )
@@ -602,9 +604,7 @@ class DatasetProvidersTest(absltest.TestCase):
     ds = task_with_iter.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
-        runtime_preprocessors=_create_runtime_preprocessors(
-            sequence_lengths
-        ),
+        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
         batch_size=4,
     )
     expected_dataset = [
@@ -666,9 +666,7 @@ class DatasetProvidersTest(absltest.TestCase):
     ds = task_with_iter.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
-        runtime_preprocessors=_create_runtime_preprocessors(
-            sequence_lengths
-        ),
+        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
         batch_size=4,
     )
     expected_dataset = [
@@ -921,93 +919,6 @@ class DatasetProvidersTest(absltest.TestCase):
         list(ds_by_step[0]), dataset_providers.MAX_NUM_RECORDS_TO_INSPECT
     )
 
-  def test_get_dataset(self):
-    source = _create_source(
-        source_name=_SOURCE_NAME,
-        num_examples=_SOURCE_NUM_EXAMPLES,
-    )
-    task = _create_task(source=source, preprocessors=_create_preprocessors())
-    ds = dataset_providers.get_dataset(task)
-    expected = [
-        {
-            "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
-            "inputs": [
-                3,
-                8,
-                14,
-                21,
-                2,
-                3,
-                4,
-                2,
-                13,
-                3,
-                5,
-                20,
-                2,
-                4,
-                2,
-                20,
-                2,
-                4,
-            ],
-            "targets_pretokenized": "positive",
-            "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
-        },
-        {
-            "inputs_pretokenized": "imdb hj aijbcidcibdg",
-            "inputs": [
-                3,
-                8,
-                14,
-                21,
-                2,
-                3,
-                20,
-                2,
-                3,
-                5,
-                8,
-                2,
-                13,
-                8,
-                21,
-                13,
-                8,
-                2,
-                21,
-                2,
-            ],
-            "targets_pretokenized": "negative",
-            "targets": [3, 22, 4, 2, 18, 8, 25, 4],
-        },
-        {
-            "inputs_pretokenized": "imdb acdhdacfhhjb",
-            "inputs": [
-                3,
-                8,
-                14,
-                21,
-                2,
-                3,
-                5,
-                13,
-                21,
-                20,
-                21,
-                5,
-                13,
-                2,
-                20,
-                20,
-                2,
-            ],
-            "targets_pretokenized": "positive",
-            "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
-        },
-    ]
-    test_utils.assert_datasets_equal(ds, expected)
-
   def test_get_updated_runtime_args(self):
     def update_runtime_args_1(args):
       args.sequence_lengths.update({"new_val": 5})
@@ -1040,135 +951,7 @@ class DatasetProvidersTest(absltest.TestCase):
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
-  def test_get_vocabularies_returns_correct_vocabularies(self):
-    source = _create_source(
-        source_name=_SOURCE_NAME,
-        num_examples=_SOURCE_NUM_EXAMPLES,
-    )
-    task = _create_task(source=source, preprocessors=_create_preprocessors())
-    vocabs_map = dataset_providers.get_vocabularies(task)
-    expected = {
-        "inputs": _create_sentencepiece_vocab(),
-        "targets": _create_sentencepiece_vocab(),
-    }
-    self.assertEqual(vocabs_map, expected)
-
-  def test_get_vocabularies_returns_empty_map_when_no_tokenizer(self):
-    source = _create_source(
-        source_name=_SOURCE_NAME,
-        num_examples=_SOURCE_NUM_EXAMPLES,
-    )
-    task = _create_task(
-        source=source,
-        preprocessors=[preprocessors_lib.MapFnTransform(_imdb_preprocessor)],
-    )
-    vocabs_map = dataset_providers.get_vocabularies(task)
-    self.assertEmpty(vocabs_map)
-
-  def test_task_builder_from_task_copies_params_correctly(self):
-    """Verify that the TaskBuilder object is created with correct params."""
-    task = _create_task(
-        source=_create_source(),
-        task_name="dummy_airio_task",
-        preprocessors=_create_preprocessors(),
-    )
-    task_builder = dataset_providers.TaskBuilder.from_task(task)
-    self.assertEqual(task_builder._task_name, "dummy_airio_task")
-    self.assertEqual(task_builder._source, task.source)
-    self.assertEqual(task_builder._preprocessors, task.get_preprocessors())
-
-  def test_task_builder_build_copies_task_correctly(self):
-    task_name = "dummy_airio_task"
-    source = _create_source()
-    preprocessors = _create_preprocessors()
-    task_builder = _create_task_builder(
-        source=source,
-        preprocessors=preprocessors,
-        task_name=task_name,
-    )
-    new_task = task_builder.build()
-    self.assertEqual(new_task.name, task_name)
-    self.assertEqual(new_task.source, source)
-    self.assertEqual(new_task.get_preprocessors(), preprocessors)
-
-  def test_task_builder_set_name_updates_name_correctly(self):
-    source = _create_source()
-    preprocessors = _create_preprocessors()
-    task_builder = _create_task_builder(
-        source=source,
-        preprocessors=preprocessors,
-        task_name="dummy_airio_task",
-    )
-    task_builder.set_task_name("new_dummy_task")
-    new_task = task_builder.build()
-    self.assertEqual(new_task.name, "new_dummy_task")
-    # Verify rest of the properties are unchanged.
-    self.assertEqual(new_task.source, source)
-    self.assertEqual(new_task.get_preprocessors(), preprocessors)
-
-  def test_task_builder_set_preprocessors_updates_preprocessors_correctly(self):
-    task_name = "dummy_airio_task"
-    source = _create_source()
-    task_builder = _create_task_builder(
-        source=source,
-        preprocessors=_create_preprocessors(),
-        task_name=task_name,
-    )
-    new_preprocessors = [preprocessors_lib.MapFnTransform(_imdb_preprocessor)]
-    task_builder.set_preprocessors(new_preprocessors)
-    new_task = task_builder.build()
-    self.assertEqual(new_task.get_preprocessors(), new_preprocessors)
-    # Verify rest of the properties are unchanged.
-    self.assertEqual(new_task.name, task_name)
-    self.assertEqual(new_task.source, source)
-
-  def test_task_builder_set_data_source_updates_source_correctly(self):
-    task_name = "dummy_airio_task"
-    preprocessors = _create_preprocessors()
-    task_builder = _create_task_builder(
-        source=_create_source(),
-        preprocessors=preprocessors,
-        task_name=task_name,
-    )
-    new_splits = ["train"]
-    new_source = _create_source(splits=new_splits)
-    task_builder.set_data_source(new_source)
-    new_task = task_builder.build()
-    self.assertEqual(new_task.source, new_source)
-    # Verify rest of the properties are unchanged.
-    self.assertEqual(new_task.name, task_name)
-    self.assertEqual(new_task.get_preprocessors(), preprocessors)
-
-  def test_task_builder_raises_error_when_source_is_none(self):
-    task_builder = _create_task_builder(
-        source=None, preprocessors=_create_preprocessors()
-    )
-    with self.assertRaisesRegex(
-        ValueError, "Source has not been set on this task builder."
-    ):
-      task_builder.build()
-
-  def test_task_builder_raises_error_when_preprocessors_is_none(self):
-    task_builder = _create_task_builder(
-        source=_create_source(), preprocessors=None
-    )
-    with self.assertRaisesRegex(
-        ValueError, "Preprocessors have not been set on this task builder."
-    ):
-      task_builder.build()
-
-  def test_task_builder_repr(self):
-    task_builder = _create_task_builder(
-        source=_create_source(), task_name="dummy_airio_task"
-    )
-    self.assertStartsWith(
-        repr(task_builder),
-        "TaskBuilder(task_name=dummy_airio_task,"
-        " source=<airio.data_sources.TfdsDataSource",
-    )
-
   def test_task_get_dataset_with_runtime_args(self):
-
     def simple_to_imdb_map_fn(
         ex, rargs: preprocessors_lib.AirIOInjectedRuntimeArgs
     ):
@@ -1222,7 +1005,6 @@ class DatasetProvidersTest(absltest.TestCase):
     test_utils.assert_datasets_equal(list(ds), expected)
 
   def test_task_get_dataset_by_step_with_runtime_args(self):
-
     def simple_to_imdb_map_fn(
         ex, rargs: preprocessors_lib.AirIOInjectedRuntimeArgs
     ):
@@ -1368,6 +1150,111 @@ class DatasetProvidersTest(absltest.TestCase):
         },
     ]
     test_utils.assert_datasets_equal(ds, expected)
+
+
+class TaskBuilderTest(absltest.TestCase):
+
+  def test_task_builder_from_task_copies_params_correctly(self):
+    """Verify that the TaskBuilder object is created with correct params."""
+    task = _create_task(
+        source=_create_source(),
+        task_name="dummy_airio_task",
+        preprocessors=_create_preprocessors(),
+    )
+    task_builder = dataset_providers.TaskBuilder.from_task(task)
+    self.assertEqual(task_builder._task_name, "dummy_airio_task")
+    self.assertEqual(task_builder._source, task.source)
+    self.assertEqual(task_builder._preprocessors, task.get_preprocessors())
+
+  def test_task_builder_build_copies_task_correctly(self):
+    task_name = "dummy_airio_task"
+    source = _create_source()
+    preprocessors = _create_preprocessors()
+    task_builder = _create_task_builder(
+        source=source,
+        preprocessors=preprocessors,
+        task_name=task_name,
+    )
+    new_task = task_builder.build()
+    self.assertEqual(new_task.name, task_name)
+    self.assertEqual(new_task.source, source)
+    self.assertEqual(new_task.get_preprocessors(), preprocessors)
+
+  def test_task_builder_set_name_updates_name_correctly(self):
+    source = _create_source()
+    preprocessors = _create_preprocessors()
+    task_builder = _create_task_builder(
+        source=source,
+        preprocessors=preprocessors,
+        task_name="dummy_airio_task",
+    )
+    task_builder.set_task_name("new_dummy_task")
+    new_task = task_builder.build()
+    self.assertEqual(new_task.name, "new_dummy_task")
+    # Verify rest of the properties are unchanged.
+    self.assertEqual(new_task.source, source)
+    self.assertEqual(new_task.get_preprocessors(), preprocessors)
+
+  def test_task_builder_set_preprocessors_updates_preprocessors_correctly(self):
+    task_name = "dummy_airio_task"
+    source = _create_source()
+    task_builder = _create_task_builder(
+        source=source,
+        preprocessors=_create_preprocessors(),
+        task_name=task_name,
+    )
+    new_preprocessors = [preprocessors_lib.MapFnTransform(_imdb_preprocessor)]
+    task_builder.set_preprocessors(new_preprocessors)
+    new_task = task_builder.build()
+    self.assertEqual(new_task.get_preprocessors(), new_preprocessors)
+    # Verify rest of the properties are unchanged.
+    self.assertEqual(new_task.name, task_name)
+    self.assertEqual(new_task.source, source)
+
+  def test_task_builder_set_data_source_updates_source_correctly(self):
+    task_name = "dummy_airio_task"
+    preprocessors = _create_preprocessors()
+    task_builder = _create_task_builder(
+        source=_create_source(),
+        preprocessors=preprocessors,
+        task_name=task_name,
+    )
+    new_splits = ["train"]
+    new_source = _create_source(splits=new_splits)
+    task_builder.set_data_source(new_source)
+    new_task = task_builder.build()
+    self.assertEqual(new_task.source, new_source)
+    # Verify rest of the properties are unchanged.
+    self.assertEqual(new_task.name, task_name)
+    self.assertEqual(new_task.get_preprocessors(), preprocessors)
+
+  def test_task_builder_raises_error_when_source_is_none(self):
+    task_builder = _create_task_builder(
+        source=None, preprocessors=_create_preprocessors()
+    )
+    with self.assertRaisesRegex(
+        ValueError, "Source has not been set on this task builder."
+    ):
+      task_builder.build()
+
+  def test_task_builder_raises_error_when_preprocessors_is_none(self):
+    task_builder = _create_task_builder(
+        source=_create_source(), preprocessors=None
+    )
+    with self.assertRaisesRegex(
+        ValueError, "Preprocessors have not been set on this task builder."
+    ):
+      task_builder.build()
+
+  def test_task_builder_repr(self):
+    task_builder = _create_task_builder(
+        source=_create_source(), task_name="dummy_airio_task"
+    )
+    self.assertStartsWith(
+        repr(task_builder),
+        "TaskBuilder(task_name=dummy_airio_task,"
+        " source=<airio.data_sources.TfdsDataSource",
+    )
 
 
 class MixtureTest(absltest.TestCase):
@@ -2367,6 +2254,121 @@ class EvenSplitTest(absltest.TestCase):
     self.assertTupleEqual(intervals[0], (0, 3))  # First 3 elements.
     self.assertTupleEqual(intervals[1], (3, 6))  # Next 3 elements.
     self.assertTupleEqual(intervals[2], (6, 8))  # Last 2 elements.
+
+
+class DatasetProvidersTest(absltest.TestCase):
+
+  def test_get_dataset(self):
+    source = _create_source(
+        source_name=_SOURCE_NAME,
+        num_examples=_SOURCE_NUM_EXAMPLES,
+    )
+    task = _create_task(source=source, preprocessors=_create_preprocessors())
+    ds = dataset_providers.get_dataset(task)
+    expected = [
+        {
+            "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
+            "inputs": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                4,
+                2,
+                13,
+                3,
+                5,
+                20,
+                2,
+                4,
+                2,
+                20,
+                2,
+                4,
+            ],
+            "targets_pretokenized": "positive",
+            "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+        },
+        {
+            "inputs_pretokenized": "imdb hj aijbcidcibdg",
+            "inputs": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                20,
+                2,
+                3,
+                5,
+                8,
+                2,
+                13,
+                8,
+                21,
+                13,
+                8,
+                2,
+                21,
+                2,
+            ],
+            "targets_pretokenized": "negative",
+            "targets": [3, 22, 4, 2, 18, 8, 25, 4],
+        },
+        {
+            "inputs_pretokenized": "imdb acdhdacfhhjb",
+            "inputs": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                5,
+                13,
+                21,
+                20,
+                21,
+                5,
+                13,
+                2,
+                20,
+                20,
+                2,
+            ],
+            "targets_pretokenized": "positive",
+            "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+        },
+    ]
+    test_utils.assert_datasets_equal(ds, expected)
+
+  def test_get_vocabularies_returns_correct_vocabularies(self):
+    source = _create_source(
+        source_name=_SOURCE_NAME,
+        num_examples=_SOURCE_NUM_EXAMPLES,
+    )
+    task = _create_task(source=source, preprocessors=_create_preprocessors())
+    vocabs_map = dataset_providers.get_vocabularies(task)
+    expected = {
+        "inputs": _create_sentencepiece_vocab(),
+        "targets": _create_sentencepiece_vocab(),
+    }
+    self.assertEqual(vocabs_map, expected)
+
+  def test_get_vocabularies_returns_empty_map_when_no_tokenizer(self):
+    source = _create_source(
+        source_name=_SOURCE_NAME,
+        num_examples=_SOURCE_NUM_EXAMPLES,
+    )
+    task = _create_task(
+        source=source,
+        preprocessors=[preprocessors_lib.MapFnTransform(_imdb_preprocessor)],
+    )
+    vocabs_map = dataset_providers.get_vocabularies(task)
+    self.assertEmpty(vocabs_map)
 
 
 if __name__ == "__main__":
