@@ -35,6 +35,7 @@ JaxRng = jax.Array
 @dataclasses.dataclass
 class AirIOInjectedRuntimeArgs:
   """A set of attributes that can be injected into preprocessors at runtime."""
+
   sequence_lengths: Mapping[str, int]
   split: str
 
@@ -233,6 +234,7 @@ def produces_none_elements(
 @dataclasses.dataclass
 class LazyDatasetTransform:
   """A convenience function to map Transforms to LazyDatasets."""
+
   transform: AirIOPreprocessor
 
   def __post_init__(self):

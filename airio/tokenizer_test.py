@@ -15,6 +15,7 @@
 """Tests for airio.tokenizer."""
 
 import os
+from unittest import mock
 
 from absl.testing import absltest
 from airio import tokenizer
@@ -22,15 +23,17 @@ import numpy as np
 from seqio import vocabularies
 
 
+_TEST_DATA_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "test_data"
+)
+
+
 class TokenizerTest(absltest.TestCase):
 
   def setUp(self):
     super().setUp()
-    test_data_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "test_data"
-    )
     sentencepiece_vocab = vocabularies.SentencePieceVocabulary(
-        os.path.join(test_data_dir, "sentencepiece", "sentencepiece.model")
+        os.path.join(_TEST_DATA_DIR, "sentencepiece", "sentencepiece.model")
     )
     self.tokenizer_configs = {
         "inputs": tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),

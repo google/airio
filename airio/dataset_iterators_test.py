@@ -18,6 +18,7 @@ import ast
 import json
 import os
 from typing import Dict
+from unittest import mock
 
 from absl.testing import absltest
 from airio import dataset_iterators

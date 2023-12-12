@@ -15,6 +15,7 @@
 """Tests for lazy_dataset transforms."""
 
 from typing import Sequence
+from unittest import mock
 
 from absl.testing import absltest
 from absl.testing import parameterized
@@ -37,9 +38,7 @@ class ConcatLazyMapDatasetTest(parameterized.TestCase):
     for data_len in parent_lens:
       datasets.append(lazy_dataset.RangeLazyMapDataset(data_len))
 
-    ds = lazy_dataset_transforms.ConcatLazyMapDataset(
-        datasets
-    )
+    ds = lazy_dataset_transforms.ConcatLazyMapDataset(datasets)
     self.assertLen(ds, sum(parent_lens))
 
   def test_getitem(self):
@@ -50,9 +49,7 @@ class ConcatLazyMapDatasetTest(parameterized.TestCase):
         lazy_dataset.RangeLazyMapDataset(18, 19),
         lazy_dataset.RangeLazyMapDataset(19, 22),
     ]
-    ds = lazy_dataset_transforms.ConcatLazyMapDataset(
-        parents
-    )
+    ds = lazy_dataset_transforms.ConcatLazyMapDataset(parents)
     actual = [ds[i] for i in range(len(ds))]
     self.assertSequenceEqual(actual, range(22))
 
@@ -64,9 +61,7 @@ class ConcatLazyMapDatasetTest(parameterized.TestCase):
         lazy_dataset.RangeLazyMapDataset(18, 19),
         lazy_dataset.RangeLazyMapDataset(19, 22),
     ]
-    ds = lazy_dataset_transforms.ConcatLazyMapDataset(
-        parents
-    )
+    ds = lazy_dataset_transforms.ConcatLazyMapDataset(parents)
     ds_iter = iter(ds)
     actual = list(ds_iter)
     self.assertSequenceEqual(actual, range(22))
@@ -107,6 +102,7 @@ class RandomMapFnLazyMapDatasetTest(absltest.TestCase):
         ds, random_map_fn, jax.random.PRNGKey(42)
     )
     self.assertLen(ds, 5)
+
 
 if __name__ == "__main__":
   absltest.main()

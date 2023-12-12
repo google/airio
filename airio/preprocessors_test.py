@@ -14,6 +14,8 @@
 
 """Preprocessors tests."""
 
+from unittest import mock
+
 from absl.testing import absltest
 from airio import data_sources
 from airio import dataset_providers
@@ -26,21 +28,17 @@ lazy_dataset = grain.experimental.lazy_dataset
 
 
 def lazy_map_fn(
-        ds: lazy_dataset.LazyMapDataset,
-        run_args: preprocessors.AirIOInjectedRuntimeArgs,
+    ds: lazy_dataset.LazyMapDataset,
+    run_args: preprocessors.AirIOInjectedRuntimeArgs,
 ):
-  return ds.map(
-      lambda x: x + run_args.sequence_lengths["val"]
-  )
+  return ds.map(lambda x: x + run_args.sequence_lengths["val"])
 
 
 def lazy_iter_fn(
     ds: lazy_dataset.LazyIterDataset,
     run_args: preprocessors.AirIOInjectedRuntimeArgs,
 ):
-  return ds.map(
-      lambda x: x + run_args.sequence_lengths["val"]
-  )
+  return ds.map(lambda x: x + run_args.sequence_lengths["val"])
 
 
 class PreprocessorsTest(absltest.TestCase):
@@ -165,6 +163,7 @@ class PreprocessorsTest(absltest.TestCase):
   def test_random_map_lazydataset_transform_disallowed(self):
 
     class TestRandomMap(grain.RandomMapTransform):
+
       def random_map(self, element, rng: np.random.Generator):
         return element + rng.integers(0, 10)
 
@@ -198,6 +197,7 @@ class PreprocessorsTest(absltest.TestCase):
 
 
 class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
+
   def setUp(self):
     super().setUp()
     self._runtime_args = preprocessors.AirIOInjectedRuntimeArgs(
@@ -239,7 +239,6 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     self.assertListEqual(list(ds), list(range(3, 8)))
 
   def test_random_map_fn_preprocessor(self):
-
     def test_random_map_fn(
         ex, rng, r_args: preprocessors.AirIOInjectedRuntimeArgs
     ):
@@ -321,7 +320,6 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
   def test_random_map_fn_lazydataset_transform(self):
-
     def test_random_map_fn(
         ex, rng, r_args: preprocessors.AirIOInjectedRuntimeArgs
     ):
@@ -340,7 +338,6 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     self.assertListEqual(list(ds), [8, 7, 8, 15, 16])
 
   def test_random_map_fn_lazydataset_transform_updated_runtime_args(self):
-
     def test_random_map_fn(
         ex, rng, r_args: preprocessors.AirIOInjectedRuntimeArgs
     ):
@@ -538,6 +535,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
   def test_random_map_transform_on_iter_dataset_fails(self):
     def test_random_map_fn(ex, rng):
       return ex + int(jax.random.randint(rng, [], 0, 10))
+
     transform = preprocessors.RandomMapFnTransform(test_random_map_fn)
     ds = lazy_dataset.SourceLazyMapDataset(range(10))
     ds = ds.to_iter_dataset()
@@ -576,6 +574,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
   def test_produces_none_elements_random_map_fn(self):
     def test_random_map_fn(ex, rng):
       return ex + int(jax.random.randint(rng, [], 0, 10))
+
     prep = preprocessors.RandomMapFnTransform(test_random_map_fn)
     self.assertFalse(preprocessors.produces_none_elements(prep))
 
@@ -601,6 +600,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         update_runtime_args=self._update_runtime_args,
     )
     self.assertFalse(preprocessors.produces_none_elements(prep))
+
 
 if __name__ == "__main__":
   absltest.main()

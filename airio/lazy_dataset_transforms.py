@@ -16,12 +16,15 @@
 
 Most, if not all, of these should be upstreamed into the grain codebase.
 """
+
 import bisect
 import dataclasses
 import itertools
 from typing import Any, Callable, Sequence, TypeVar
+
 import grain.python as grain
 import jax
+
 
 lazy_dataset = grain.experimental.lazy_dataset
 JaxRng = jax.Array
