@@ -18,7 +18,7 @@ import collections
 import copy
 import dataclasses
 import math
-from typing import Any, Callable, Sequence, TypeVar, Tuple
+from typing import Any, Callable, Sequence, TypeVar
 from airio import preprocessors as preprocessors_lib
 from airio.common import constants
 import grain.python as grain
@@ -114,27 +114,20 @@ class AirIOPackDatasetMapPreprocessor:
       self,
       ds: lazy_dataset.LazyMapDataset,
       runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
-  ) -> Tuple[
-      lazy_dataset.LazyMapDataset, preprocessors_lib.AirIOInjectedRuntimeArgs
-  ]:
+  ) -> lazy_dataset.LazyMapDataset:
     self.packer.feature_lengths = runtime_args.sequence_lengths
     if not isinstance(self.pool_size, int):
       self.pool_size = self.pool_size(runtime_args.sequence_lengths)
-    return PackLazyMapDataset(
-        ds,
-        pool_size=self.pool_size,
-        packer=self.packer,
-    ), self.update_runtime_args(runtime_args)
+    return PackLazyMapDataset(ds, pool_size=self.pool_size, packer=self.packer)
 
   def update_runtime_args(
       self,
       runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
   ) -> preprocessors_lib.AirIOInjectedRuntimeArgs:
     """Updates runtime args with new sequence lengths for subsequent preprocessors."""
-    return preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths=self.packer.get_packed_feature_lengths(),
-        split=runtime_args.split,
-    )
+    updated = runtime_args.clone()
+    updated.sequence_lengths = self.packer.get_packed_feature_lengths()
+    return updated
 
 
 @dataclasses.dataclass
@@ -159,24 +152,18 @@ class AirIOPackDatasetIterPreprocessor:
       self,
       ds: lazy_dataset.LazyIterDataset,
       runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
-  ) -> Tuple[
-      lazy_dataset.LazyIterDataset, preprocessors_lib.AirIOInjectedRuntimeArgs
-  ]:
+  ) -> lazy_dataset.LazyIterDataset:
     self.packer.feature_lengths = runtime_args.sequence_lengths
-    return PackLazyIterDataset(
-        ds,
-        packer=self.packer,
-    ), self.update_runtime_args(runtime_args)
+    return PackLazyIterDataset(ds, packer=self.packer)
 
   def update_runtime_args(
       self,
       runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
   ) -> preprocessors_lib.AirIOInjectedRuntimeArgs:
     """Updates runtime args with new sequence lengths for subsequent preprocessors."""
-    return preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths=self.packer.get_packed_feature_lengths(),
-        split=runtime_args.split,
-    )
+    updated = runtime_args.clone()
+    updated.sequence_lengths = self.packer.get_packed_feature_lengths()
+    return updated
 
 
 @dataclasses.dataclass(frozen=False)
@@ -437,11 +424,6 @@ class MultiBinPacker:
 
   @feature_lengths.setter
   def feature_lengths(self, feature_lengths):
-    if self._feature_lengths:
-      raise ValueError(
-          f"feature_lengths are already set to {self._feature_lengths} and"
-          f" cannot be overridden to {feature_lengths}."
-      )
     self._feature_lengths = feature_lengths
     self._flat_feature_lengths = flatten(feature_lengths)
 
@@ -610,11 +592,6 @@ class NoamPacker:
 
   @feature_lengths.setter
   def feature_lengths(self, feature_lengths):
-    if self._feature_lengths:
-      raise ValueError(
-          f"feature_lengths are already set to {self._feature_lengths} and"
-          f" cannot be overridden to {feature_lengths}."
-      )
     self._feature_lengths = feature_lengths
     self._flat_feature_lengths = flatten(feature_lengths)
     self._partially_packed_example = PartiallyPackedExample(

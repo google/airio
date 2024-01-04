@@ -14,6 +14,7 @@
 
 """AirIO preprocessor classes."""
 
+import copy
 import dataclasses
 import functools
 import inspect
@@ -38,6 +39,10 @@ class AirIOInjectedRuntimeArgs:
 
   sequence_lengths: Mapping[str, int]
   split: str
+
+  def clone(self) -> "AirIOInjectedRuntimeArgs":
+    """Returns a deep copy of self."""
+    return copy.deepcopy(self)
 
 
 MapFnCallable = (

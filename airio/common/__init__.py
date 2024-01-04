@@ -17,5 +17,6 @@
 # pylint:disable=wildcard-import,g-bad-import-order,g-importing-member
 
 from airio.common.constants import *
+from airio.common.feature_converters import *
 from airio.common.packing import *
 from airio.common.preprocessors import *

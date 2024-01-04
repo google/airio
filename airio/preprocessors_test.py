@@ -219,10 +219,9 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     for k, v in run_args.sequence_lengths.items():
       new_seq_lens[f"{k}_new"] = v
       new_seq_lens[k] = v + 1
-    return preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths=new_seq_lens,
-        split=run_args.split,
-    )
+    updated = run_args.clone()
+    updated.sequence_lengths = new_seq_lens
+    return updated
 
   def test_map_fn_preprocessor(self):
     def test_map_fn(ex, run_args: preprocessors.AirIOInjectedRuntimeArgs):

@@ -361,7 +361,8 @@ class MultiBinPackingMapTest(parameterized.TestCase):
     transform = packing.AirIOPackDatasetMapPreprocessor(
         pool_size=10, packer=packer
     )
-    ds, updated_runtime_args = transform(ds, runtime_args)
+    ds = transform(ds, runtime_args)
+    updated_runtime_args = transform.update_runtime_args(runtime_args)
     ds_iter = iter(ds)
 
     # Verify updated runtime args
@@ -489,7 +490,10 @@ class MultiBinPackingMapTest(parameterized.TestCase):
     packing_preprocessor = packing.AirIOPackDatasetMapPreprocessor(
         pool_size=10, packer=packer
     )
-    ds, updated_runtime_args = packing_preprocessor(ds, runtime_args)
+    ds = packing_preprocessor(ds, runtime_args)
+    updated_runtime_args = packing_preprocessor.update_runtime_args(
+        runtime_args
+    )
     pad_fn = functools.partial(
         preprocessors.pad, runtime_args=updated_runtime_args
     )
@@ -528,15 +532,6 @@ class MultiBinPackingMapTest(parameterized.TestCase):
       packer.fit_example(ex)
     with self.assertRaisesRegex(ValueError, "feature_lengths must be set.*"):
       packer.get_packed_feature_lengths()
-
-  def test_multi_bin_packer_feature_override_fails(self):
-    packer = packing.MultiBinPacker(
-        feature_lengths={"inputs": 4}, num_partial_examples=10
-    )
-    with self.assertRaisesRegex(
-        ValueError, "feature_lengths are already set.*"
-    ):
-      packer.feature_lengths = {"inputs": 5}
 
   def test_multi_bin_packer_no_packed_example(self):
     packer = packing.MultiBinPacker(
@@ -833,7 +828,8 @@ class NoamPackingMapTest(parameterized.TestCase):
     transform = packing.AirIOPackDatasetMapPreprocessor(
         pool_size=10, packer=packer
     )
-    ds, updated_runtime_args = transform(ds, runtime_args)
+    ds = transform(ds, runtime_args)
+    updated_runtime_args = transform.update_runtime_args(runtime_args)
     ds_iter = iter(ds)
 
     # Verify updated runtime args
@@ -879,7 +875,10 @@ class NoamPackingMapTest(parameterized.TestCase):
     packing_preprocessor = packing.AirIOPackDatasetMapPreprocessor(
         pool_size=10, packer=packer
     )
-    ds, updated_runtime_args = packing_preprocessor(ds, runtime_args)
+    ds = packing_preprocessor(ds, runtime_args)
+    updated_runtime_args = packing_preprocessor.update_runtime_args(
+        runtime_args
+    )
     pad_fn = functools.partial(
         preprocessors.pad, runtime_args=updated_runtime_args
     )
@@ -950,15 +949,6 @@ class NoamPackingMapTest(parameterized.TestCase):
       packer.fit_example(ex)
     with self.assertRaisesRegex(ValueError, "feature_lengths must be set.*"):
       packer.get_packed_feature_lengths()
-
-  def test_noam_packer_feature_override_fails(self):
-    packer = packing.NoamPacker(
-        feature_lengths={"inputs": 4}
-    )
-    with self.assertRaisesRegex(
-        ValueError, "feature_lengths are already set.*"
-    ):
-      packer.feature_lengths = {"inputs": 5}
 
   def test_noam_packer_no_packed_example(self):
     packer = packing.NoamPacker(feature_lengths={"inputs": 4})
@@ -1292,7 +1282,8 @@ class MultiBinPackingIterTest(parameterized.TestCase):
     transform = packing.AirIOPackDatasetIterPreprocessor(
         packer=packer
     )
-    ds, updated_runtime_args = transform(ds, runtime_args)
+    ds = transform(ds, runtime_args)
+    updated_runtime_args = transform.update_runtime_args(runtime_args)
 
     # Verify updated runtime args
     expected_updated_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
@@ -1357,7 +1348,10 @@ class MultiBinPackingIterTest(parameterized.TestCase):
     packing_preprocessor = packing.AirIOPackDatasetIterPreprocessor(
         packer=packer
     )
-    ds, updated_runtime_args = packing_preprocessor(ds, runtime_args)
+    ds = packing_preprocessor(ds, runtime_args)
+    updated_runtime_args = packing_preprocessor.update_runtime_args(
+        runtime_args
+    )
     pad_fn = functools.partial(
         preprocessors.pad, runtime_args=updated_runtime_args
     )
@@ -1663,7 +1657,10 @@ class NoamPackingIterTest(parameterized.TestCase):
     )
     packer = packing.NoamPacker()  # feature_lengths will be set before packing.
     transform = packing.AirIOPackDatasetIterPreprocessor(packer=packer)
-    ds, updated_runtime_args = transform(ds, runtime_args)
+    ds = transform(ds, runtime_args)
+    updated_runtime_args = transform.update_runtime_args(
+        runtime_args
+    )
 
     # Verify updated runtime args
     expected_updated_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
@@ -1709,7 +1706,10 @@ class NoamPackingIterTest(parameterized.TestCase):
     packing_preprocessor = packing.AirIOPackDatasetIterPreprocessor(
         packer=packer
     )
-    ds, updated_runtime_args = packing_preprocessor(ds, runtime_args)
+    ds = packing_preprocessor(ds, runtime_args)
+    updated_runtime_args = packing_preprocessor.update_runtime_args(
+        runtime_args
+    )
     pad_fn = functools.partial(
         preprocessors.pad, runtime_args=updated_runtime_args
     )
@@ -1798,7 +1798,10 @@ class CommonPackersTest(absltest.TestCase):
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 4}, split="unused"
     )
-    ds, updated_runtime_args = packing.NoamPackMapPreprocessor(ds, runtime_args)
+    ds = packing.NoamPackMapPreprocessor(ds, runtime_args)
+    updated_runtime_args = packing.NoamPackMapPreprocessor.update_runtime_args(
+        runtime_args
+    )
     ds_iter = iter(ds)
 
     expected_elements = [
@@ -1825,8 +1828,13 @@ class CommonPackersTest(absltest.TestCase):
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 4}, split="unused"
     )
-    ds, updated_runtime_args = packing.SingleBinTruePackMapPreprocessor(
+    ds = packing.SingleBinTruePackMapPreprocessor(
         ds, runtime_args
+    )
+    updated_runtime_args = (
+        packing.SingleBinTruePackMapPreprocessor.update_runtime_args(
+            runtime_args
+        )
     )
     ds_iter = iter(ds)
 
@@ -1880,8 +1888,13 @@ class CommonPackersTest(absltest.TestCase):
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 4}, split="unused"
     )
-    ds, updated_runtime_args = packing.MultiBinTruePackMapPreprocessor(
+    ds = packing.MultiBinTruePackMapPreprocessor(
         ds, runtime_args
+    )
+    updated_runtime_args = (
+        packing.MultiBinTruePackMapPreprocessor.update_runtime_args(
+            runtime_args
+        )
     )
     ds_iter = iter(ds)
 
@@ -1934,8 +1947,13 @@ class CommonPackersTest(absltest.TestCase):
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 4}, split="unused"
     )
-    ds, updated_runtime_args = packing.NoamPackIterPreprocessor(
+    ds = packing.NoamPackIterPreprocessor(
         ds, runtime_args
+    )
+    updated_runtime_args = (
+        packing.NoamPackIterPreprocessor.update_runtime_args(
+            runtime_args
+        )
     )
 
     expected_elements = [
@@ -1962,8 +1980,13 @@ class CommonPackersTest(absltest.TestCase):
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 4}, split="unused"
     )
-    ds, updated_runtime_args = packing.SingleBinTruePackIterPreprocessor(
+    ds = packing.SingleBinTruePackIterPreprocessor(
         ds, runtime_args
+    )
+    updated_runtime_args = (
+        packing.SingleBinTruePackIterPreprocessor.update_runtime_args(
+            runtime_args
+        )
     )
 
     expected_elements = [
@@ -2016,8 +2039,13 @@ class CommonPackersTest(absltest.TestCase):
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 4}, split="unused"
     )
-    ds, updated_runtime_args = packing.MultiBinTruePackIterPreprocessor(
+    ds = packing.MultiBinTruePackIterPreprocessor(
         ds, runtime_args
+    )
+    updated_runtime_args = (
+        packing.MultiBinTruePackIterPreprocessor.update_runtime_args(
+            runtime_args
+        )
     )
 
     expected_elements = [
