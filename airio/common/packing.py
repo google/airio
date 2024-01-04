@@ -764,7 +764,8 @@ def remainder_after_trim_flattened(
 ):
   for i in range(len(flat_lengths)):
     if flat_lengths[i] == SKIP_FEATURE:
-      # Feature should not be trimmed.
+      # Feature should not be trimmed. Keep last item from the sequence.
+      flat_ex[i] = flat_ex[i][-1]
       continue
     flat_ex[i] = flat_ex[i][flat_lengths[i]:, ...]
   return flat_ex

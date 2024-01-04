@@ -1597,6 +1597,24 @@ class NoamPackingIterTest(parameterized.TestCase):
     for actual, expected in zip(ds, expected_targets, strict=True):
       np.testing.assert_array_equal(actual["targets"], expected)
 
+  def test_do_not_pack_marked_features_sliced_across_multiple(self):
+    input_elements = [
+        {"id": 0, "inputs": [0]},
+        {"id": 1, "inputs": [1, 2, 3, 4, 5]},
+        {"id": 2, "inputs": [5, 6, 7, 8, 9]},
+        {"id": 3, "inputs": [10]},
+    ]
+    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    ds = ds.to_iter_dataset()
+    packer = packing.NoamPacker(
+        feature_lengths={"inputs": 2, "id": -1},
+    )
+    ds = packing.PackLazyIterDataset(ds, packer=packer)
+    expected_ids = [[0, 1], [1], [1], [2], [2], [2, 3]]
+    for actual, expected in zip(ds, expected_ids, strict=True):
+      np.testing.assert_array_equal(actual["id"], expected)
+
   @parameterized.parameters(
       "input_tokens",
       "input_vectors",
