@@ -20,11 +20,11 @@ from unittest import mock
 
 from absl.testing import absltest
 from airio import data_sources
-from airio import dataset_providers
 from airio import feature_converters
 from airio import preprocessors
 from airio import test_utils
 from airio import tokenizer
+from airio.grain import dataset_providers as grain_dataset_providers
 import numpy as np
 import seqio
 from seqio import vocabularies
@@ -59,7 +59,7 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
 
   def _create_task(
       self, source: data_sources.DataSource, task_name: str = "dummy_airio_task"
-  ) -> dataset_providers.Task:
+  ) -> grain_dataset_providers.GrainTask:
     """Creates an example AirIO task."""
 
     def _imdb_preprocessor(raw_example: Dict[str, str]) -> Dict[str, str]:
@@ -80,7 +80,7 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
         os.path.join(test_data_dir, "sentencepiece", "sentencepiece.model")
     )
     tokenizer_config = tokenizer.TokenizerConfig(vocab=sentencepiece_vocab)
-    return dataset_providers.Task(
+    return grain_dataset_providers.GrainTask(
         name=task_name,
         source=source,
         preprocessors=[

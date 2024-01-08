@@ -18,6 +18,7 @@ from typing import Dict
 
 from absl import app
 import airio
+from airio.grain import dataset_providers
 from seqio import vocabularies
 
 
@@ -26,7 +27,7 @@ DEFAULT_VOCAB = vocabularies.SentencePieceVocabulary(DEFAULT_SPM_PATH)
 RECORDS_TO_INSPECT = 2
 
 
-def create_task() -> airio.dataset_providers.Task:
+def create_task() -> dataset_providers.GrainTask:
   """Create example AirIO task."""
 
   def _imdb_preprocessor(raw_example: Dict[str, bytes]) -> Dict[str, str]:
@@ -40,7 +41,7 @@ def create_task() -> airio.dataset_providers.Task:
       final_example["targets"] = "invalid"
     return final_example
 
-  return airio.dataset_providers.Task(
+  return dataset_providers.GrainTask(
       name="dummy_airio_task",
       source=airio.data_sources.TfdsDataSource(
           tfds_name="imdb_reviews/plain_text:1.0.0", splits=["train"]

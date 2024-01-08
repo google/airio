@@ -20,6 +20,7 @@ from typing import Dict
 
 from absl import logging
 import airio
+from airio.grain import dataset_providers
 import babel
 from seqio import vocabularies
 import tensorflow_datasets as tfds
@@ -33,7 +34,7 @@ _DEFAULT_VOCAB = vocabularies.SentencePieceVocabulary(
 
 def get_wmt_19_ende_v003_task(
     tokenizer_configs: Dict[str, airio.tokenizer.TokenizerConfig] | None = None,
-) -> airio.dataset_providers.Task:
+) -> dataset_providers.GrainTask:
   """Returns an AirIO Task for WMT 19 en/de dataset."""
   # source
   builder_config = tfds.translate.wmt19.Wmt19Translate.builder_configs["de-en"]
@@ -47,7 +48,7 @@ def get_wmt_19_ende_v003_task(
         "targets": airio.tokenizer.TokenizerConfig(vocab=_DEFAULT_VOCAB),
     }
 
-  return airio.dataset_providers.Task(
+  return dataset_providers.GrainTask(
       "wmt19_ende_v003",
       source=airio.data_sources.TfdsDataSource(
           tfds_name=tfds_name, splits=["train", "validation"]
@@ -71,7 +72,7 @@ def get_wmt_19_ende_v003_task(
 
 def get_nqo_v001_task(
     tokenizer_configs: Dict[str, airio.tokenizer.TokenizerConfig] | None = None,
-) -> airio.dataset_providers.Task:
+) -> dataset_providers.GrainTask:
   """Create example AirIO task."""
 
   # source
@@ -85,7 +86,7 @@ def get_nqo_v001_task(
         "targets": airio.tokenizer.TokenizerConfig(vocab=_DEFAULT_VOCAB),
     }
 
-  return airio.dataset_providers.Task(
+  return dataset_providers.GrainTask(
       name="dummy_airio_task",
       source=airio.data_sources.TfdsDataSource(
           tfds_name=tfds_name, splits=["train", "validation"]

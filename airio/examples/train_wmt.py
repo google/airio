@@ -21,8 +21,8 @@ import logging
 import tempfile
 
 from absl import app
-import airio
 from airio import examples
+from airio.grain import dataset_providers
 from seqio import vocabularies
 from t5x import adafactor
 from t5x import gin_utils
@@ -72,7 +72,7 @@ def get_t5_model(**config_overrides) -> models.EncoderDecoderModel:
   )
 
 
-def create_train_fn(task: airio.dataset_providers.Task):
+def create_train_fn(task: dataset_providers.GrainTask):
   """Returns a callable function for training."""
   train_dataset_cfg = utils.DatasetConfig(
       mixture_or_task_name=task,

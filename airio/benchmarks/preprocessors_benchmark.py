@@ -17,6 +17,7 @@
 import os
 
 import airio
+from airio.grain import dataset_providers
 import google_benchmark
 import grain.python as grain
 import jax
@@ -83,7 +84,7 @@ def map_fn_preprocessor(state):
   def test_map_fn(ex):
     return ex + 1
 
-  task = airio.dataset_providers.Task(
+  task = dataset_providers.GrainTask(
       name="test_task",
       source=_get_source(),
       preprocessors=[airio.preprocessors.MapFnTransform(test_map_fn)],
@@ -99,7 +100,7 @@ def random_map_fn_preprocessor(state):
   def test_random_map_fn(ex, rng):
     return ex + int(jax.random.randint(rng, [], 0, 10))
 
-  task = airio.dataset_providers.Task(
+  task = dataset_providers.GrainTask(
       name="test_task",
       source=_get_source(),
       preprocessors=[
@@ -117,7 +118,7 @@ def filter_fn_preprocessor(state):
   def test_filter_fn(ex):
     return ex > 2
 
-  task = airio.dataset_providers.Task(
+  task = dataset_providers.GrainTask(
       name="test_task",
       source=_get_source(),
       preprocessors=[airio.preprocessors.FilterFnTransform(test_filter_fn)],
@@ -133,7 +134,7 @@ def preprocessor_empty_preprocessed(state):
   def test_filter_fn(ex):
     return ex > 1000
 
-  task = airio.dataset_providers.Task(
+  task = dataset_providers.GrainTask(
       name="test_task",
       source=_get_source(),
       preprocessors=[airio.preprocessors.FilterFnTransform(test_filter_fn)],
@@ -152,7 +153,7 @@ def preprocessor_empty_intermediates(state):
   def test_filter_fn(ex):
     return ex > 1000
 
-  task = airio.dataset_providers.Task(
+  task = dataset_providers.GrainTask(
       name="test_task",
       source=_get_source(),
       preprocessors=[
@@ -234,7 +235,7 @@ def map_fn_preprocessor_with_runtime_args(state):
     return ex + run_args.sequence_lengths["val"]
 
   runtime_args = _get_runtime_args()
-  task = airio.dataset_providers.Task(
+  task = dataset_providers.GrainTask(
       name="test_task",
       source=_get_source(),
       preprocessors=[
@@ -259,7 +260,7 @@ def random_map_fn_preprocessor_with_runtime_args(state):
     )
 
   runtime_args = _get_runtime_args()
-  task = airio.dataset_providers.Task(
+  task = dataset_providers.GrainTask(
       name="test_task",
       source=_get_source(),
       preprocessors=[
@@ -280,7 +281,7 @@ def filter_fn_preprocessor_with_runtime_args(state):
     return ex > rargs.sequence_lengths["val"]
 
   runtime_args = _get_runtime_args()
-  task = airio.dataset_providers.Task(
+  task = dataset_providers.GrainTask(
       name="test_task",
       source=_get_source(),
       preprocessors=[

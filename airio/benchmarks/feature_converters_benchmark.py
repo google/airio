@@ -18,6 +18,7 @@ import os
 from typing import Dict
 
 import airio
+from airio.grain import dataset_providers
 import google_benchmark
 from seqio import vocabularies
 import tensorflow_datasets as tfds
@@ -44,7 +45,7 @@ def _create_feature_converter() -> (
   )
 
 
-def _create_task() -> airio.dataset_providers.Task:
+def _create_task() -> dataset_providers.GrainTask:
   """Create a simple task."""
   with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
     source = airio.data_sources.TfdsDataSource(
@@ -73,7 +74,7 @@ def _create_task() -> airio.dataset_providers.Task:
           )
       ),
   ]
-  return airio.dataset_providers.Task(
+  return dataset_providers.GrainTask(
       name="dummy_airio_task",
       source=source,
       preprocessors=preprocessors,

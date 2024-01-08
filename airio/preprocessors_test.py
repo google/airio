@@ -18,8 +18,8 @@ from unittest import mock
 
 from absl.testing import absltest
 from airio import data_sources
-from airio import dataset_providers
 from airio import preprocessors
+from airio.grain import dataset_providers as grain_dataset_providers
 import grain.python as grain
 import jax.random
 import numpy as np
@@ -56,7 +56,7 @@ class PreprocessorsTest(absltest.TestCase):
     def test_map_fn(ex):
       return ex + 1
 
-    task = dataset_providers.Task(
+    task = grain_dataset_providers.GrainTask(
         name="test_task",
         source=self._get_test_src(),
         preprocessors=[preprocessors.MapFnTransform(test_map_fn)],
@@ -68,7 +68,7 @@ class PreprocessorsTest(absltest.TestCase):
     def test_random_map_fn(ex, rng):
       return ex + int(jax.random.randint(rng, [], 0, 10))
 
-    task = dataset_providers.Task(
+    task = grain_dataset_providers.GrainTask(
         name="test_task",
         source=self._get_test_src(),
         preprocessors=[preprocessors.RandomMapFnTransform(test_random_map_fn)],
@@ -80,7 +80,7 @@ class PreprocessorsTest(absltest.TestCase):
     def test_filter_fn(ex):
       return ex > 2
 
-    task = dataset_providers.Task(
+    task = grain_dataset_providers.GrainTask(
         name="test_task",
         source=self._get_test_src(),
         preprocessors=[preprocessors.FilterFnTransform(test_filter_fn)],
@@ -98,7 +98,7 @@ class PreprocessorsTest(absltest.TestCase):
     def test_random_map_fn(ex, rng):
       return ex + int(jax.random.randint(rng, [], 0, 10))
 
-    task = dataset_providers.Task(
+    task = grain_dataset_providers.GrainTask(
         name="test_task",
         source=self._get_test_src(num_elements=0),
         preprocessors=[
@@ -114,7 +114,7 @@ class PreprocessorsTest(absltest.TestCase):
     def test_filter_fn(ex):
       return ex > 1000
 
-    task = dataset_providers.Task(
+    task = grain_dataset_providers.GrainTask(
         name="test_task",
         source=self._get_test_src(),
         preprocessors=[preprocessors.FilterFnTransform(test_filter_fn)],
@@ -129,7 +129,7 @@ class PreprocessorsTest(absltest.TestCase):
     def test_filter_fn(ex):
       return ex > 1000
 
-    task = dataset_providers.Task(
+    task = grain_dataset_providers.GrainTask(
         name="test_task",
         source=self._get_test_src(),
         preprocessors=[
@@ -227,7 +227,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     def test_map_fn(ex, run_args: preprocessors.AirIOInjectedRuntimeArgs):
       return ex + run_args.sequence_lengths["val"]
 
-    task = dataset_providers.Task(
+    task = grain_dataset_providers.GrainTask(
         name="test_task",
         source=self._get_test_src(),
         preprocessors=[
@@ -247,7 +247,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
           + int(jax.random.randint(rng, [], 0, 10))
       )
 
-    task = dataset_providers.Task(
+    task = grain_dataset_providers.GrainTask(
         name="test_task",
         source=self._get_test_src(),
         preprocessors=[
@@ -263,7 +263,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     def test_filter_fn(ex, rargs: preprocessors.AirIOInjectedRuntimeArgs):
       return ex > rargs.sequence_lengths["val"]
 
-    task = dataset_providers.Task(
+    task = grain_dataset_providers.GrainTask(
         name="test_task",
         source=self._get_test_src(),
         preprocessors=[
@@ -277,7 +277,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     def test_map_fn(ex, run_args):
       return ex + run_args.sequence_lengths["val"]
 
-    task = dataset_providers.Task(
+    task = grain_dataset_providers.GrainTask(
         name="test_task",
         source=self._get_test_src(),
         preprocessors=[
