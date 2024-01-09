@@ -21,9 +21,9 @@ from typing import Dict
 from unittest import mock
 
 from absl.testing import absltest
-from airio import dataset_iterators
 from airio import preprocessors
 from airio import tokenizer
+from airio.grain import dataset_iterators
 from clu.data import dataset_iterator
 import grain.python as grain
 import numpy as np
@@ -51,7 +51,7 @@ class DatasetIteratorsWithDataLoaderTest(absltest.TestCase):
   def setUp(self):
     super().setUp()
     self.test_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "test_data"
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "test_data"
     )
     sentencepiece_vocab = vocabularies.SentencePieceVocabulary(
         os.path.join(self.test_dir, "sentencepiece", "sentencepiece.model")
@@ -207,7 +207,7 @@ class DatasetIteratorsWithLazyMapDatasetTest(absltest.TestCase):
   def setUp(self):
     super().setUp()
     self.test_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "test_data"
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "test_data"
     )
     sentencepiece_vocab = vocabularies.SentencePieceVocabulary(
         os.path.join(self.test_dir, "sentencepiece", "sentencepiece.model")
@@ -340,7 +340,7 @@ class DatasetIteratorsWithLazyIterDatasetTest(absltest.TestCase):
   def setUp(self):
     super().setUp()
     self.test_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "test_data"
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "test_data"
     )
     sentencepiece_vocab = vocabularies.SentencePieceVocabulary(
         os.path.join(self.test_dir, "sentencepiece", "sentencepiece.model")
