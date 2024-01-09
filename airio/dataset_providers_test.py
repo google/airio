@@ -20,13 +20,10 @@ from typing import Dict, Sequence
 from unittest import mock
 
 from absl.testing import absltest
-from airio import data_sources
-from airio import dataset_providers
-from airio import feature_converters
+import airio
 from airio import preprocessors as preprocessors_lib
 from airio import test_utils
-from airio import tokenizer
-from airio.grain import dataset_providers as grain_dataset_providers
+from airio.grain import dataset_providers
 import grain.python as grain
 import numpy as np
 from seqio import vocabularies
@@ -61,8 +58,8 @@ def _create_sentencepiece_vocab() -> vocabularies.SentencePieceVocabulary:
   return sentencepiece_vocab
 
 
-def _create_tokenizer_config() -> tokenizer.TokenizerConfig:
-  return tokenizer.TokenizerConfig(vocab=_create_sentencepiece_vocab())
+def _create_tokenizer_config() -> airio.tokenizer.TokenizerConfig:
+  return airio.tokenizer.TokenizerConfig(vocab=_create_sentencepiece_vocab())
 
 
 def _create_preprocessors() -> Sequence[dataset_providers.AirIOPreprocessor]:
@@ -70,7 +67,7 @@ def _create_preprocessors() -> Sequence[dataset_providers.AirIOPreprocessor]:
   return [
       preprocessors_lib.MapFnTransform(_imdb_preprocessor),
       preprocessors_lib.MapFnTransform(
-          tokenizer.Tokenizer(
+          airio.tokenizer.Tokenizer(
               tokenizer_configs={
                   "inputs": tokenizer_config,
                   "targets": tokenizer_config,
@@ -84,8 +81,10 @@ def _create_runtime_preprocessors(
     feature_lengths: Dict[str, int] | None = None,
 ) -> Sequence[preprocessors_lib.AirIOPreprocessor]:
   # TODO(b/311543848): Fully remove FeatureConverter.
-  return feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
-      task_feature_lengths=feature_lengths
+  return (
+      airio.feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
+          task_feature_lengths=feature_lengths
+      )
   )
 
 
@@ -93,12 +92,14 @@ def _create_source(
     source_name: str = _SOURCE_NAME,
     splits: Sequence[str] | None = None,
     num_examples: int = _SOURCE_NUM_EXAMPLES,
-) -> data_sources.TfdsDataSource:
+) -> airio.data_sources.TfdsDataSource:
   """Creates a basic TfdsDataSource."""
   if splits is None:
     splits = _SOURCE_SPLITS
   with tfds.testing.mock_data(num_examples):
-    return data_sources.TfdsDataSource(tfds_name=source_name, splits=splits)
+    return airio.data_sources.TfdsDataSource(
+        tfds_name=source_name, splits=splits
+    )
 
 
 def _create_fn_src(num_elements=5):
@@ -106,18 +107,18 @@ def _create_fn_src(num_elements=5):
     del split
     return np.arange(num_elements)
 
-  return data_sources.FunctionDataSource(
+  return airio.data_sources.FunctionDataSource(
       dataset_fn=_dataset_fn, splits=["train"]
   )
 
 
 def _create_task(
-    source: data_sources.DataSource | None,
+    source: airio.data_sources.DataSource | None,
     preprocessors: Sequence[dataset_providers.AirIOPreprocessor] | None = None,
     task_name: str = "dummy_airio_task",
-) -> dataset_providers.Task:
+) -> airio.dataset_providers.Task:
   """Create example AirIO task."""
-  return dataset_providers.Task(
+  return airio.dataset_providers.Task(
       name=task_name,
       source=source,
       preprocessors=preprocessors,
@@ -125,11 +126,11 @@ def _create_task(
 
 
 def _create_task_builder(
-    source: data_sources.DataSource | None,
+    source: airio.data_sources.DataSource | None,
     preprocessors: Sequence[dataset_providers.AirIOPreprocessor] | None = None,
     task_name: str = "dummy_airio_task",
-) -> dataset_providers.TaskBuilder:
-  return dataset_providers.TaskBuilder(
+) -> airio.dataset_providers.TaskBuilder:
+  return airio.dataset_providers.TaskBuilder(
       task_name=task_name,
       source=source,
       preprocessors=preprocessors,
@@ -184,10 +185,10 @@ class TestFilterLazyIterDataset(lazy_dataset.LazyIterDataset):
 class DatasetProviderBaseTest(absltest.TestCase):
 
   @mock.patch.multiple(
-      dataset_providers.DatasetProviderBase, __abstractmethods__=set()
+      airio.dataset_providers.DatasetProviderBase, __abstractmethods__=set()
   )
   def test_protocol(self):
-    base = dataset_providers.DatasetProviderBase
+    base = airio.dataset_providers.DatasetProviderBase
     self.assertIsNone(base.get_dataset(self, split=""))
     self.assertIsNone(base.num_input_examples(self, split=""))
 
@@ -219,14 +220,14 @@ class TaskTest(absltest.TestCase):
 
   def test_create_task_with_source_only_succeeds(self):
     task = _create_task(source=_create_source(), preprocessors=None)
-    self.assertIsInstance(task.source, data_sources.DataSource)
-    self.assertIsInstance(task.source, data_sources.TfdsDataSource)
+    self.assertIsInstance(task.source, airio.data_sources.DataSource)
+    self.assertIsInstance(task.source, airio.data_sources.TfdsDataSource)
     self.assertEmpty(task.get_preprocessors())
 
   def test_create_task_with_source_and_empty_preprocessors_succeeds(self):
     task = _create_task(source=_create_source(), preprocessors=[])
-    self.assertIsInstance(task.source, data_sources.DataSource)
-    self.assertIsInstance(task.source, data_sources.TfdsDataSource)
+    self.assertIsInstance(task.source, airio.data_sources.DataSource)
+    self.assertIsInstance(task.source, airio.data_sources.TfdsDataSource)
     self.assertEmpty(task.get_preprocessors())
 
   def test_create_task(self):
@@ -236,8 +237,8 @@ class TaskTest(absltest.TestCase):
         preprocessors=_create_preprocessors(),
         task_name="dummy_airio_task",
     )
-    self.assertIsInstance(task.source, data_sources.DataSource)
-    self.assertIsInstance(task.source, data_sources.TfdsDataSource)
+    self.assertIsInstance(task.source, airio.data_sources.DataSource)
+    self.assertIsInstance(task.source, airio.data_sources.TfdsDataSource)
     self.assertEqual(task.name, "dummy_airio_task")
     self.assertEqual(task.splits, _SOURCE_SPLITS)
 
@@ -248,7 +249,9 @@ class TaskTest(absltest.TestCase):
 
   def test_none_splits(self):
     with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
-      source = data_sources.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=None)
+      source = airio.data_sources.TfdsDataSource(
+          tfds_name=_SOURCE_NAME, splits=None
+      )
     task = _create_task(source=source, preprocessors=_create_preprocessors())
     self.assertEmpty(task.splits)
 
@@ -278,7 +281,7 @@ class TaskTest(absltest.TestCase):
         lambda x: x,
         update_runtime_args=update_runtime_args_2,
     )
-    task = dataset_providers.Task(
+    task = airio.dataset_providers.Task(
         "test", source=_create_source(), preprocessors=[prep_1, prep_2]
     )
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
@@ -303,7 +306,7 @@ class TaskBuilderTest(absltest.TestCase):
         task_name="dummy_airio_task",
         preprocessors=_create_preprocessors(),
     )
-    task_builder = dataset_providers.TaskBuilder.from_task(task)
+    task_builder = airio.dataset_providers.TaskBuilder.from_task(task)
     self.assertEqual(task_builder._task_name, "dummy_airio_task")
     self.assertEqual(task_builder._source, task.source)
     self.assertEqual(task_builder._preprocessors, task.get_preprocessors())
@@ -445,7 +448,7 @@ class MixtureTest(absltest.TestCase):
         source=imdb_source, preprocessors=_create_preprocessors()
     )
     self._simple_to_imdb_task = (
-        dataset_providers.TaskBuilder.from_task(self._simple_task_1)
+        airio.dataset_providers.TaskBuilder.from_task(self._simple_task_1)
         .set_preprocessors([
             preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn),
         ])
@@ -466,17 +469,17 @@ class MixturePropertiesTest(absltest.TestCase):
               task_name=f"test_task_{i}",
           )
       )
-    self.simple_mix = dataset_providers.Mixture(
+    self.simple_mix = airio.dataset_providers.Mixture(
         name="test_mix_1",
         tasks=self.tasks[:3],
         proportions=[1.0, 0.5, 2.0],
     )
-    self.mix_of_mix = dataset_providers.Mixture(
+    self.mix_of_mix = airio.dataset_providers.Mixture(
         name="test_mix_2",
         tasks=[self.simple_mix, self.tasks[3]],
         proportions=[0.5, 0.7],
     )
-    self.mix_of_mix_of_mix = dataset_providers.Mixture(
+    self.mix_of_mix_of_mix = airio.dataset_providers.Mixture(
         name="test_mix_3",
         tasks=[self.simple_mix, self.mix_of_mix, self.tasks[4]],
         proportions=[0.5, 0.7, 0.8],
@@ -558,7 +561,7 @@ class MixturePropertiesTest(absltest.TestCase):
         ValueError,
         "Mixture invalid_mix must have same number of tasks and proportions.*",
     ):
-      _ = dataset_providers.Mixture(
+      _ = airio.dataset_providers.Mixture(
           "invalid_mix", [self.tasks[0], self.tasks[1]], [1.0]
       )
 
@@ -567,7 +570,7 @@ class MixturePropertiesTest(absltest.TestCase):
         ValueError,
         "Mixture invalid_mix has duplicate tasks.*",
     ):
-      _ = dataset_providers.Mixture(
+      _ = airio.dataset_providers.Mixture(
           "invalid_mix", [self.tasks[0], self.tasks[0]], [1.0, 1.0]
       )
 
@@ -579,12 +582,12 @@ class DatasetProvidersTest(absltest.TestCase):
         source_name=_SOURCE_NAME,
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
-    task = grain_dataset_providers.GrainTask(
+    task = dataset_providers.GrainTask(
         name="dummy_airio_task",
         source=source,
         preprocessors=_create_preprocessors(),
     )
-    ds = dataset_providers.get_dataset(task)
+    ds = airio.dataset_providers.get_dataset(task)
     expected = [
         {
             "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
@@ -671,7 +674,7 @@ class DatasetProvidersTest(absltest.TestCase):
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
     task = _create_task(source=source, preprocessors=_create_preprocessors())
-    vocabs_map = dataset_providers.get_vocabularies(task)
+    vocabs_map = airio.dataset_providers.get_vocabularies(task)
     expected = {
         "inputs": _create_sentencepiece_vocab(),
         "targets": _create_sentencepiece_vocab(),
@@ -687,7 +690,7 @@ class DatasetProvidersTest(absltest.TestCase):
         source=source,
         preprocessors=[preprocessors_lib.MapFnTransform(_imdb_preprocessor)],
     )
-    vocabs_map = dataset_providers.get_vocabularies(task)
+    vocabs_map = airio.dataset_providers.get_vocabularies(task)
     self.assertEmpty(vocabs_map)
 
 

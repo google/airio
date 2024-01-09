@@ -17,10 +17,7 @@
 from typing import Dict
 
 from absl import app
-from airio import data_sources
-from airio import feature_converters
-from airio import preprocessors
-from airio import tokenizer
+import airio
 from airio.grain import dataset_providers as grain_dataset_providers
 from seqio import vocabularies
 
@@ -45,16 +42,20 @@ def create_task() -> grain_dataset_providers.GrainTask:
 
   return grain_dataset_providers.GrainTask(
       name="dummy_airio_task",
-      source=data_sources.TfdsDataSource(
+      source=airio.data_sources.TfdsDataSource(
           tfds_name="imdb_reviews/plain_text:1.0.0", splits=["train"]
       ),
       preprocessors=[
-          preprocessors.MapFnTransform(_imdb_preprocessor),
-          preprocessors.MapFnTransform(
-              tokenizer.Tokenizer(
+          airio.preprocessors.MapFnTransform(_imdb_preprocessor),
+          airio.preprocessors.MapFnTransform(
+              airio.tokenizer.Tokenizer(
                   tokenizer_configs={
-                      "inputs": tokenizer.TokenizerConfig(vocab=DEFAULT_VOCAB),
-                      "targets": tokenizer.TokenizerConfig(vocab=DEFAULT_VOCAB),
+                      "inputs": airio.tokenizer.TokenizerConfig(
+                          vocab=DEFAULT_VOCAB
+                      ),
+                      "targets": airio.tokenizer.TokenizerConfig(
+                          vocab=DEFAULT_VOCAB
+                      ),
                   },
               )
           ),
@@ -67,7 +68,7 @@ def main(_) -> None:
   print(f"Task name: {task.name}\n")
   runtime_preprocessors = (
       # TODO(b/311543848): Fully remove FeatureConverter.
-      feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
+      airio.feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
           {"inputs": 30, "targets": 5}
       )
   )

@@ -16,10 +16,7 @@
 
 from typing import Any, Iterable, Mapping, Sequence
 
-from airio import data_sources
-from airio import dataset_iterators
-from airio import dataset_providers
-from airio import lazy_dataset_transforms
+import airio
 # Import "preprocessors" as "preprocessors_lib" to prevent naming conflicts with
 # "preprocessors" attrs in this file.
 from airio import preprocessors as preprocessors_lib
@@ -38,11 +35,11 @@ GrainDataSource = grain.RandomAccessDataSource
 AirIOPreprocessor = preprocessors_lib.AirIOPreprocessor
 
 
-class GrainTask(dataset_providers.Task):
+class GrainTask(airio.dataset_providers.Task):
   """A class to manage a dataset and its related metrics."""
 
   name: str
-  source: data_sources.DataSource
+  source: airio.data_sources.DataSource
 
   def _get_data_source_for_split(self, split: str) -> GrainDataSource:
     if self.source is None:
@@ -66,7 +63,7 @@ class GrainTask(dataset_providers.Task):
       batch_size: int | None,
       shuffle: bool,
       seed: int | None,
-      shard_info: dataset_providers.ShardInfo | None,
+      shard_info: airio.dataset_providers.ShardInfo | None,
       num_epochs: int | None,
   ) -> lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset:
     """Returns a lazy dataset for Task source and preprocessors."""
@@ -117,7 +114,7 @@ class GrainTask(dataset_providers.Task):
     # Step 4: Combine epochs if needed
     if len(preprocessed_dss) == 1:
       return preprocessed_dss[0]
-    return lazy_dataset_transforms.ConcatLazyMapDataset(preprocessed_dss)
+    return airio.lazy_dataset_transforms.ConcatLazyMapDataset(preprocessed_dss)
 
   # TODO(sahildua): Add logging.
   def get_dataset(
@@ -128,7 +125,7 @@ class GrainTask(dataset_providers.Task):
       batch_size: int | None = None,
       shuffle: bool = True,
       seed: int | None = 0,
-      shard_info: dataset_providers.ShardInfo | None = None,
+      shard_info: airio.dataset_providers.ShardInfo | None = None,
       num_epochs: int | None = 1,
   ) -> clu_dataset_iterator.DatasetIterator:
     """Returns the dataset iterator as per the task configuration."""
@@ -146,7 +143,9 @@ class GrainTask(dataset_providers.Task):
           shard_info=shard_info,
           num_epochs=num_epochs,
       )
-      return dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader=ds)
+      return airio.dataset_iterators.PyGrainDatasetIteratorWrapper(
+          data_loader=ds
+      )
     if shard_info is None:
       shard_options = grain.NoSharding()
     else:
@@ -209,7 +208,7 @@ class GrainTask(dataset_providers.Task):
         operations=ops,
     )
 
-    return dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader=ds)
+    return airio.dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader=ds)
 
   def get_dataset_by_step(
       self,
@@ -291,7 +290,7 @@ class GrainTask(dataset_providers.Task):
     return accumulated_result
 
 
-class GrainMixture(dataset_providers.Mixture):
+class GrainMixture(airio.dataset_providers.Mixture):
   """A class for mixture of Tasks."""
 
   def get_lazy_dataset(
@@ -302,7 +301,7 @@ class GrainMixture(dataset_providers.Mixture):
       batch_size: int | None = None,
       shuffle: bool = True,
       seed: int | None = 0,
-      shard_info: dataset_providers.ShardInfo | None = None,
+      shard_info: airio.dataset_providers.ShardInfo | None = None,
       num_epochs: int | None = 1,
   ) -> lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset:
     """Returns a lazy dataset for the Mixture."""
@@ -393,7 +392,7 @@ class GrainMixture(dataset_providers.Mixture):
       batch_size: int | None = None,
       shuffle: bool = True,
       seed: int | None = 0,
-      shard_info: dataset_providers.ShardInfo | None = None,
+      shard_info: airio.dataset_providers.ShardInfo | None = None,
       num_epochs: int | None = 1,
   ) -> clu_dataset_iterator.DatasetIterator:
     """Returns the dataset iterator."""
@@ -407,10 +406,10 @@ class GrainMixture(dataset_providers.Mixture):
         shard_info=shard_info,
         num_epochs=num_epochs,
     )
-    return dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader=ds)
+    return airio.dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader=ds)
 
 
-class GrainTaskBuilder(dataset_providers.TaskBuilder):
+class GrainTaskBuilder(airio.dataset_providers.TaskBuilder):
   """Builder class for building GrainTask object.
 
   In order to create a GrainTask object, build() method should be called on the
