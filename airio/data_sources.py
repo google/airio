@@ -14,9 +14,11 @@
 
 """Data Source implementations for AirIO."""
 
+import json
 import typing
 from typing import Iterable, Mapping, Protocol, Union
 
+import grain.python as grain
 import numpy as np
 import tensorflow_datasets as tfds
 
@@ -34,44 +36,35 @@ class DataSource(Protocol):
     ...
 
 
-@typing.runtime_checkable
-class DatasetFnCallable(Protocol):
-  """Protocol for a function that returns a numpy array based on split."""
-
-  def __call__(self, split: str) -> np.ndarray:
-    ...
-
-
-class FunctionDataSource(DataSource):
-  """A `DataSource` that uses a function to provide the input data."""
+class ArrayRecordDataSource(DataSource):
+  """Wrapper for grain.ArrayRecordDataSource with multiple splits support."""
 
   def __init__(
       self,
-      dataset_fn: DatasetFnCallable,
-      splits: Iterable[str],
+      split_to_filepattern: Mapping[str, Union[str, Iterable[str]]],
   ):
-    """FunctionDataSource constructor.
+    self._split_to_filepattern = split_to_filepattern
 
-    Args:
-      dataset_fn: a function with the signature `dataset_fn(split)' that returns
-        a numpy array.
-      splits: an iterable of applicable string split names.
-    """
-    self._dataset_fn = dataset_fn
-    self.splits = splits
+    self.splits = set(self._split_to_filepattern)
+    self._sources = {}
+    for split in self.splits:
+      self._sources[split] = grain.ArrayRecordDataSource(
+          self._split_to_filepattern[split],
+      )
 
-  def get_data_source(self, split: str) -> np.ndarray:
-    ds = self._dataset_fn(split=split)
-    return ds
+  def get_data_source(self, split: str) -> grain.ArrayRecordDataSource:
+    if split not in self._sources:
+      raise ValueError(f'Split {split} not found in {self.splits}.')
+    return self._sources[split]
 
   def num_input_examples(self, split: str) -> int:
-    if split not in self.splits:
+    if split not in self._sources:
       raise ValueError(f'Split {split} not found in {self.splits}.')
-    return self._dataset_fn(split=split).size
+    return len(self._sources[split])
 
 
 class TfdsDataSource(DataSource):
-  """Wrapper for tfds.data_source with multiple splits support."""
+  """Wrapper for grain.TfdsDataSource with multiple splits support."""
 
   def __init__(
       self,
@@ -110,4 +103,72 @@ class TfdsDataSource(DataSource):
       raise ValueError(
           f'Split {split} not found in {self.splits} for {self._tfds_name}.'
       )
+    return len(self._sources[split])
+
+
+@typing.runtime_checkable
+class DatasetFnCallable(Protocol):
+  """Protocol for a function that returns a numpy array based on split."""
+
+  def __call__(self, split: str) -> np.ndarray:
+    ...
+
+
+class FunctionDataSource(DataSource):
+  """A `DataSource` that uses a function to provide the input data."""
+
+  def __init__(
+      self,
+      dataset_fn: DatasetFnCallable,
+      splits: Iterable[str],
+  ):
+    """FunctionDataSource constructor.
+
+    Args:
+      dataset_fn: a function with the signature `dataset_fn(split)' that returns
+        a numpy array.
+      splits: an iterable of applicable string split names.
+    """
+    self._dataset_fn = dataset_fn
+    self.splits = splits
+
+  def get_data_source(self, split: str) -> np.ndarray:
+    ds = self._dataset_fn(split=split)
+    return ds
+
+  def num_input_examples(self, split: str) -> int:
+    if split not in self.splits:
+      raise ValueError(f'Split {split} not found in {self.splits}.')
+    return self._dataset_fn(split=split).size
+
+
+class JsonDataSource(DataSource):
+  """Wrapper for grain.InMemoryDataSource that uses json file(s) as input data."""
+
+  def __init__(
+      self,
+      split_to_filepattern: Mapping[str, Union[str, Iterable[str]]],
+  ):
+    """JsonDataSource constructor.
+
+    Args:
+      split_to_filepattern: a mapping of split name to file pattern(s). File
+        pattern(s) can be a single string or iterable.
+    """
+    self._split_to_filepattern = split_to_filepattern
+
+    self.splits = set(self._split_to_filepattern)
+    self._sources = {}
+    for split in self.splits:
+      elements = json.load(open(self._split_to_filepattern[split]))
+      self._sources[split] = grain.InMemoryDataSource(elements=elements)
+
+  def get_data_source(self, split: str) -> grain.InMemoryDataSource:
+    if split not in self._sources:
+      raise ValueError(f'Split {split} not found in {self.splits}.')
+    return self._sources[split]
+
+  def num_input_examples(self, split: str) -> int:
+    if split not in self._sources:
+      raise ValueError(f'Split {split} not found in {self.splits}.')
     return len(self._sources[split])

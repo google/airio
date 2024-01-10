@@ -20,13 +20,13 @@ from typing import Dict, Sequence
 from unittest import mock
 
 from absl.testing import absltest
-import airio
-# Import "preprocessors" as "preprocessors_lib" to prevent naming conflicts with
-# "preprocessors" attrs in this file.
+from airio import data_sources
+from airio import dataset_providers
+from airio import feature_converters
 from airio import preprocessors as preprocessors_lib
 from airio import test_utils
-from airio.grain import data_sources
-from airio.grain import dataset_providers
+from airio import tokenizer
+from airio.grain import dataset_providers as grain_dataset_providers
 import grain.python as grain
 import jax
 import numpy as np
@@ -63,8 +63,8 @@ def _create_sentencepiece_vocab() -> vocabularies.SentencePieceVocabulary:
   return sentencepiece_vocab
 
 
-def _create_tokenizer_config() -> airio.tokenizer.TokenizerConfig:
-  return airio.tokenizer.TokenizerConfig(vocab=_create_sentencepiece_vocab())
+def _create_tokenizer_config() -> tokenizer.TokenizerConfig:
+  return tokenizer.TokenizerConfig(vocab=_create_sentencepiece_vocab())
 
 
 def _create_preprocessors() -> Sequence[dataset_providers.AirIOPreprocessor]:
@@ -72,7 +72,7 @@ def _create_preprocessors() -> Sequence[dataset_providers.AirIOPreprocessor]:
   return [
       preprocessors_lib.MapFnTransform(_imdb_preprocessor),
       preprocessors_lib.MapFnTransform(
-          airio.tokenizer.Tokenizer(
+          tokenizer.Tokenizer(
               tokenizer_configs={
                   "inputs": tokenizer_config,
                   "targets": tokenizer_config,
@@ -86,10 +86,8 @@ def _create_runtime_preprocessors(
     feature_lengths: Dict[str, int] | None = None,
 ) -> Sequence[preprocessors_lib.AirIOPreprocessor]:
   # TODO(b/311543848): Fully remove FeatureConverter.
-  return (
-      airio.feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
-          task_feature_lengths=feature_lengths
-      )
+  return feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
+      task_feature_lengths=feature_lengths
   )
 
 
@@ -110,18 +108,18 @@ def _create_fn_src(num_elements=5):
     del split
     return np.arange(num_elements)
 
-  return airio.data_sources.FunctionDataSource(
+  return data_sources.FunctionDataSource(
       dataset_fn=_dataset_fn, splits=["train"]
   )
 
 
 def _create_task(
-    source: airio.data_sources.DataSource | None,
+    source: data_sources.DataSource | None,
     preprocessors: Sequence[dataset_providers.AirIOPreprocessor] | None = None,
     task_name: str = "dummy_airio_task",
-) -> dataset_providers.GrainTask:
+) -> grain_dataset_providers.GrainTask:
   """Create example AirIO task."""
-  return dataset_providers.GrainTask(
+  return grain_dataset_providers.GrainTask(
       name=task_name,
       source=source,
       preprocessors=preprocessors,
@@ -129,11 +127,11 @@ def _create_task(
 
 
 def _create_task_builder(
-    source: airio.data_sources.DataSource | None,
+    source: data_sources.DataSource | None,
     preprocessors: Sequence[dataset_providers.AirIOPreprocessor] | None = None,
     task_name: str = "dummy_airio_task",
-) -> dataset_providers.GrainTaskBuilder:
-  return dataset_providers.GrainTaskBuilder(
+) -> grain_dataset_providers.GrainTaskBuilder:
+  return grain_dataset_providers.GrainTaskBuilder(
       task_name=task_name,
       source=source,
       preprocessors=preprocessors,
@@ -188,10 +186,10 @@ class TestFilterLazyIterDataset(lazy_dataset.LazyIterDataset):
 class DatasetProviderBaseTest(absltest.TestCase):
 
   @mock.patch.multiple(
-      airio.dataset_providers.DatasetProviderBase, __abstractmethods__=set()
+      dataset_providers.DatasetProviderBase, __abstractmethods__=set()
   )
   def test_protocol(self):
-    base = airio.dataset_providers.DatasetProviderBase
+    base = dataset_providers.DatasetProviderBase
     self.assertIsNone(base.get_dataset(self, split=""))
     self.assertIsNone(base.num_input_examples(self, split=""))
 
@@ -223,13 +221,13 @@ class TaskTest(absltest.TestCase):
 
   def test_create_task_with_source_only_succeeds(self):
     task = _create_task(source=_create_source(), preprocessors=None)
-    self.assertIsInstance(task.source, airio.data_sources.DataSource)
+    self.assertIsInstance(task.source, data_sources.DataSource)
     self.assertIsInstance(task.source, data_sources.TfdsDataSource)
     self.assertEmpty(task.get_preprocessors())
 
   def test_create_task_with_source_and_empty_preprocessors_succeeds(self):
     task = _create_task(source=_create_source(), preprocessors=[])
-    self.assertIsInstance(task.source, airio.data_sources.DataSource)
+    self.assertIsInstance(task.source, data_sources.DataSource)
     self.assertIsInstance(task.source, data_sources.TfdsDataSource)
     self.assertEmpty(task.get_preprocessors())
 
@@ -240,7 +238,7 @@ class TaskTest(absltest.TestCase):
         preprocessors=_create_preprocessors(),
         task_name="dummy_airio_task",
     )
-    self.assertIsInstance(task.source, airio.data_sources.DataSource)
+    self.assertIsInstance(task.source, data_sources.DataSource)
     self.assertIsInstance(task.source, data_sources.TfdsDataSource)
     self.assertEqual(task.name, "dummy_airio_task")
     self.assertEqual(task.splits, _SOURCE_SPLITS)
@@ -555,7 +553,7 @@ class TaskTest(absltest.TestCase):
     source = _create_source(num_examples=_SOURCE_NUM_EXAMPLES)
     task = _create_task(source=source, preprocessors=_create_preprocessors())
     ds = task.get_dataset(
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=1)
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=1)
     )
     num_examples = 0
     for _ in ds:
@@ -911,18 +909,18 @@ class TaskTest(absltest.TestCase):
     ds_by_step = task.get_dataset_by_step(num_records=-1)
     self.assertLen(
         list(ds_by_step[0]),
-        dataset_providers.DEFAULT_NUM_RECORDS_TO_INSPECT,
+        grain_dataset_providers.DEFAULT_NUM_RECORDS_TO_INSPECT,
     )
     ds_by_step = task.get_dataset_by_step(num_records=0)
     self.assertLen(
         list(ds_by_step[0]),
-        dataset_providers.DEFAULT_NUM_RECORDS_TO_INSPECT,
+        grain_dataset_providers.DEFAULT_NUM_RECORDS_TO_INSPECT,
     )
     ds_by_step = task.get_dataset_by_step(
-        num_records=dataset_providers.MAX_NUM_RECORDS_TO_INSPECT + 1,
+        num_records=grain_dataset_providers.MAX_NUM_RECORDS_TO_INSPECT + 1,
     )
     self.assertLen(
-        list(ds_by_step[0]), dataset_providers.MAX_NUM_RECORDS_TO_INSPECT
+        list(ds_by_step[0]), grain_dataset_providers.MAX_NUM_RECORDS_TO_INSPECT
     )
 
   def test_get_updated_runtime_args(self):
@@ -942,7 +940,7 @@ class TaskTest(absltest.TestCase):
         lambda x: x,
         update_runtime_args=update_runtime_args_2,
     )
-    task = dataset_providers.GrainTask(
+    task = grain_dataset_providers.GrainTask(
         "test", source=_create_source(), preprocessors=[prep_1, prep_2]
     )
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
@@ -1167,7 +1165,7 @@ class TaskBuilderTest(absltest.TestCase):
         task_name="dummy_airio_task",
         preprocessors=_create_preprocessors(),
     )
-    task_builder = dataset_providers.GrainTaskBuilder.from_task(task)
+    task_builder = grain_dataset_providers.GrainTaskBuilder.from_task(task)
     self.assertEqual(task_builder._task_name, "dummy_airio_task")
     self.assertEqual(task_builder._source, task.source)
     self.assertEqual(task_builder._preprocessors, task.get_preprocessors())
@@ -1259,7 +1257,7 @@ class TaskBuilderTest(absltest.TestCase):
     self.assertStartsWith(
         repr(task_builder),
         "GrainTaskBuilder(task_name=dummy_airio_task,"
-        " source=<airio.grain.data_sources.TfdsDataSource",
+        " source=<airio.data_sources.TfdsDataSource",
     )
 
 
@@ -1309,7 +1307,7 @@ class MixtureTest(absltest.TestCase):
         source=imdb_source, preprocessors=_create_preprocessors()
     )
     self._simple_to_imdb_task = (
-        dataset_providers.GrainTaskBuilder.from_task(self._simple_task_1)
+        grain_dataset_providers.GrainTaskBuilder.from_task(self._simple_task_1)
         .set_preprocessors([
             preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn),
         ])
@@ -1323,7 +1321,7 @@ class MixtureTest(absltest.TestCase):
       )
 
     task_with_runtime_args_update = (
-        dataset_providers.GrainTaskBuilder.from_task(self._imdb_task)
+        grain_dataset_providers.GrainTaskBuilder.from_task(self._imdb_task)
         .set_preprocessors(
             self._imdb_task._preprocessors
             + [
@@ -1334,7 +1332,7 @@ class MixtureTest(absltest.TestCase):
         )
         .build()
     )
-    mix = dataset_providers.GrainMixture(
+    mix = grain_dataset_providers.GrainMixture(
         name="test_mix",
         tasks=[task_with_runtime_args_update],
         proportions=[1.0],
@@ -1342,7 +1340,7 @@ class MixtureTest(absltest.TestCase):
     ds = mix.get_dataset(
         sequence_lengths={"xyz": 5, "abc": 7},  # will be updated
         shuffle=False,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
         runtime_preprocessors=_create_runtime_preprocessors(),
     )
@@ -1403,7 +1401,7 @@ class MixtureTest(absltest.TestCase):
     test_utils.assert_datasets_equal(ds, expected)
 
   def test_simple_mixture(self):
-    mix = dataset_providers.GrainMixture(
+    mix = grain_dataset_providers.GrainMixture(
         name="test_mix",
         tasks=[self._simple_task_1, self._simple_task_2],
         proportions=[1.0, 1.0],
@@ -1426,7 +1424,7 @@ class MixtureTest(absltest.TestCase):
     )
 
   def test_simple_mixture_stop_on_empty(self):
-    mix = dataset_providers.GrainMixture(
+    mix = grain_dataset_providers.GrainMixture(
         name="test_mix",
         tasks=[self._simple_task_1, self._simple_task_2],
         proportions=[2.0, 1.0],
@@ -1447,14 +1445,14 @@ class MixtureTest(absltest.TestCase):
     )
 
   def test_mixture_sharding(self):
-    mix = dataset_providers.GrainMixture(
+    mix = grain_dataset_providers.GrainMixture(
         name="test_mix",
         tasks=[self._simple_task_1, self._simple_task_2],
         proportions=[2.0, 1.0],
     )
     ds = mix.get_dataset(
         shuffle=False,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
     )
     self.assertListEqual(
         list(ds),
@@ -1468,7 +1466,7 @@ class MixtureTest(absltest.TestCase):
     )
 
   def test_mixture_shuffling(self):
-    mix = dataset_providers.GrainMixture(
+    mix = grain_dataset_providers.GrainMixture(
         name="test_mix",
         tasks=[self._simple_task_1, self._simple_task_2],
         proportions=[2.0, 1.0],
@@ -1476,7 +1474,7 @@ class MixtureTest(absltest.TestCase):
     ds = mix.get_dataset(
         shuffle=True,
         seed=42,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
     )
     self.assertListEqual(
         list(ds),
@@ -1494,7 +1492,7 @@ class MixtureTest(absltest.TestCase):
       new_callable=mock.NonCallableMock,
   )
   def test_single_epoch_concat_not_called(self, unused_mock_concat_fn):
-    mix = dataset_providers.GrainMixture(
+    mix = grain_dataset_providers.GrainMixture(
         name="test_mix",
         tasks=[self._simple_task_1, self._simple_task_2],
         proportions=[1.0, 1.0],
@@ -1521,7 +1519,7 @@ class MixtureTest(absltest.TestCase):
       _ = mix.get_dataset(shuffle=False, num_epochs=2)
 
   def test_multi_epoch(self):
-    mix = dataset_providers.GrainMixture(
+    mix = grain_dataset_providers.GrainMixture(
         name="test_mix",
         tasks=[self._simple_task_1, self._simple_task_2],
         proportions=[2.0, 1.0],
@@ -1529,7 +1527,7 @@ class MixtureTest(absltest.TestCase):
     ds = mix.get_dataset(
         shuffle=True,
         seed=42,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=2,
     )
     self.assertListEqual(
@@ -1560,7 +1558,7 @@ class MixtureTest(absltest.TestCase):
       return ex
 
     task1 = (
-        dataset_providers.GrainTaskBuilder.from_task(self._simple_task_1)
+        grain_dataset_providers.GrainTaskBuilder.from_task(self._simple_task_1)
         .set_preprocessors([
             self._map_transform_idx_1,
             preprocessors_lib.RandomMapFnTransform(test_random_map_fn),
@@ -1568,14 +1566,14 @@ class MixtureTest(absltest.TestCase):
         .build()
     )
     task2 = (
-        dataset_providers.GrainTaskBuilder.from_task(self._simple_task_2)
+        grain_dataset_providers.GrainTaskBuilder.from_task(self._simple_task_2)
         .set_preprocessors([
             self._map_transform_idx_2,
             preprocessors_lib.RandomMapFnTransform(test_random_map_fn),
         ])
         .build()
     )
-    mix = dataset_providers.GrainMixture(
+    mix = grain_dataset_providers.GrainMixture(
         name="test_mix", tasks=[task1, task2], proportions=[2.0, 1.0]
     )
     ds = mix.get_lazy_dataset(
@@ -1583,7 +1581,7 @@ class MixtureTest(absltest.TestCase):
         "train",
         shuffle=True,
         seed=42,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=2,
     )
     self.assertListEqual(
@@ -1604,14 +1602,14 @@ class MixtureTest(absltest.TestCase):
     )
 
   def test_indefinite_repeat(self):
-    mix = dataset_providers.GrainMixture(
+    mix = grain_dataset_providers.GrainMixture(
         name="test_mix",
         tasks=[self._simple_task_1, self._simple_task_2],
         proportions=[2.0, 1.0],
     )
     ds = mix.get_dataset(
         shuffle=False,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=None,
     )
     self.assertListEqual(
@@ -1634,7 +1632,7 @@ class MixtureTest(absltest.TestCase):
     )
 
   def test_mixture_with_different_sources_and_preprocessors(self):
-    mix = dataset_providers.GrainMixture(
+    mix = grain_dataset_providers.GrainMixture(
         name="test_mix",
         tasks=[self._imdb_task, self._simple_to_imdb_task],
         proportions=[1.0, 1.0],
@@ -1642,7 +1640,7 @@ class MixtureTest(absltest.TestCase):
     ds = mix.get_dataset(
         sequence_lengths={"inputs": 20, "targets": 10},
         shuffle=False,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
     )
     expected = [
@@ -1715,14 +1713,14 @@ class MixtureTest(absltest.TestCase):
     test_utils.assert_datasets_equal(ds, expected)
 
   def test_mixture_with_different_output_features_fail_batching(self):
-    mix = dataset_providers.GrainMixture(
+    mix = grain_dataset_providers.GrainMixture(
         name="test_mix",
         tasks=[self._imdb_task, self._simple_task_1],
         proportions=[1.0, 1.0],
     )
     ds = mix.get_dataset(
         shuffle=False,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
         batch_size=2,
     )
@@ -1734,7 +1732,7 @@ class MixtureTest(absltest.TestCase):
       _ = next(ds)
 
   def test_mixture_with_runtime_preps(self):
-    mix = dataset_providers.GrainMixture(
+    mix = grain_dataset_providers.GrainMixture(
         name="test_mix",
         tasks=[self._imdb_task, self._simple_to_imdb_task],
         proportions=[1.0, 1.0],
@@ -1743,7 +1741,7 @@ class MixtureTest(absltest.TestCase):
     ds = mix.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
         runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
     )
@@ -1819,7 +1817,7 @@ class MixtureTest(absltest.TestCase):
     test_utils.assert_datasets_equal(ds, expected)
 
   def test_mixture_with_runtime_preps_and_batching(self):
-    mix = dataset_providers.GrainMixture(
+    mix = grain_dataset_providers.GrainMixture(
         name="test_mix",
         tasks=[self._imdb_task, self._simple_to_imdb_task],
         proportions=[1.0, 1.0],
@@ -1828,7 +1826,7 @@ class MixtureTest(absltest.TestCase):
     ds = mix.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
         runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
         batch_size=2,
@@ -1878,7 +1876,7 @@ class MixtureTest(absltest.TestCase):
     )
 
   def test_mixture_with_batching_only(self):
-    mix = dataset_providers.GrainMixture(
+    mix = grain_dataset_providers.GrainMixture(
         name="test_mix",
         tasks=[self._simple_task_1, self._simple_task_2],
         proportions=[1.0, 1.0],
@@ -1886,7 +1884,7 @@ class MixtureTest(absltest.TestCase):
     ds = mix.get_dataset(
         sequence_lengths={"inputs": 20, "targets": 10},
         shuffle=False,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
         runtime_preprocessors=None,
         batch_size=2,
@@ -1912,7 +1910,7 @@ class MixtureTest(absltest.TestCase):
         preprocessors=[self._map_transform_idx_2],
         task_name="ordinary_task",
     )
-    mix = dataset_providers.GrainMixture(
+    mix = grain_dataset_providers.GrainMixture(
         name="test_mix",
         tasks=[task_with_none, ordinary_task],
         proportions=[1.0, 1.0],
@@ -1954,7 +1952,7 @@ class MixtureTest(absltest.TestCase):
         ],
         task_name="ordinary_task",
     )
-    mix = dataset_providers.GrainMixture(
+    mix = grain_dataset_providers.GrainMixture(
         name="test_mix",
         tasks=[task_with_none, ordinary_task],
         proportions=[1.0, 1.0],
@@ -2015,7 +2013,7 @@ class MixtureTest(absltest.TestCase):
         preprocessors=[self._map_transform_idx_2],
         task_name="ordinary_task",
     )
-    mix = dataset_providers.GrainMixture(
+    mix = grain_dataset_providers.GrainMixture(
         name="test_mix",
         tasks=[task_with_iter, ordinary_task],
         proportions=[1.0, 1.0],
@@ -2062,7 +2060,7 @@ class MixtureTest(absltest.TestCase):
         ],
         task_name="ordinary_task",
     )
-    mix = dataset_providers.GrainMixture(
+    mix = grain_dataset_providers.GrainMixture(
         name="test_mix",
         tasks=[task_with_none, ordinary_task],
         proportions=[1.0, 1.0],
@@ -2118,17 +2116,17 @@ class MixturePropertiesTest(absltest.TestCase):
               task_name=f"test_task_{i}",
           )
       )
-    self.simple_mix = dataset_providers.GrainMixture(
+    self.simple_mix = grain_dataset_providers.GrainMixture(
         name="test_mix_1",
         tasks=self.tasks[:3],
         proportions=[1.0, 0.5, 2.0],
     )
-    self.mix_of_mix = dataset_providers.GrainMixture(
+    self.mix_of_mix = grain_dataset_providers.GrainMixture(
         name="test_mix_2",
         tasks=[self.simple_mix, self.tasks[3]],
         proportions=[0.5, 0.7],
     )
-    self.mix_of_mix_of_mix = dataset_providers.GrainMixture(
+    self.mix_of_mix_of_mix = grain_dataset_providers.GrainMixture(
         name="test_mix_3",
         tasks=[self.simple_mix, self.mix_of_mix, self.tasks[4]],
         proportions=[0.5, 0.7, 0.8],
@@ -2210,7 +2208,7 @@ class MixturePropertiesTest(absltest.TestCase):
         ValueError,
         "Mixture invalid_mix must have same number of tasks and proportions.*",
     ):
-      _ = dataset_providers.GrainMixture(
+      _ = grain_dataset_providers.GrainMixture(
           "invalid_mix", [self.tasks[0], self.tasks[1]], [1.0]
       )
 
@@ -2219,7 +2217,7 @@ class MixturePropertiesTest(absltest.TestCase):
         ValueError,
         "Mixture invalid_mix has duplicate tasks.*",
     ):
-      _ = dataset_providers.GrainMixture(
+      _ = grain_dataset_providers.GrainMixture(
           "invalid_mix", [self.tasks[0], self.tasks[0]], [1.0, 1.0]
       )
 
@@ -2228,7 +2226,7 @@ class EvenSplitTest(absltest.TestCase):
 
   def test_even_split_one_shard(self):
     # Splitting into one shard returns the entire interval.
-    interval = dataset_providers._even_split(
+    interval = grain_dataset_providers._even_split(
         num_examples=20, shard_index=0, shard_count=1
     )
     self.assertTupleEqual(interval, (0, 20))  # All 20 elements.
@@ -2239,7 +2237,7 @@ class EvenSplitTest(absltest.TestCase):
     intervals = []
     for i in range(2):
       intervals.append(
-          dataset_providers._even_split(
+          grain_dataset_providers._even_split(
               num_examples=21, shard_index=i, shard_count=2
           )
       )
@@ -2253,7 +2251,7 @@ class EvenSplitTest(absltest.TestCase):
     intervals = []
     for i in range(3):
       intervals.append(
-          dataset_providers._even_split(
+          grain_dataset_providers._even_split(
               num_examples=8, shard_index=i, shard_count=3
           )
       )
@@ -2270,7 +2268,7 @@ class DatasetProvidersTest(absltest.TestCase):
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
     task = _create_task(source=source, preprocessors=_create_preprocessors())
-    ds = airio.dataset_providers.get_dataset(task)
+    ds = dataset_providers.get_dataset(task)
     expected = [
         {
             "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
@@ -2357,7 +2355,7 @@ class DatasetProvidersTest(absltest.TestCase):
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
     task = _create_task(source=source, preprocessors=_create_preprocessors())
-    vocabs_map = airio.dataset_providers.get_vocabularies(task)
+    vocabs_map = dataset_providers.get_vocabularies(task)
     expected = {
         "inputs": _create_sentencepiece_vocab(),
         "targets": _create_sentencepiece_vocab(),
@@ -2373,7 +2371,7 @@ class DatasetProvidersTest(absltest.TestCase):
         source=source,
         preprocessors=[preprocessors_lib.MapFnTransform(_imdb_preprocessor)],
     )
-    vocabs_map = airio.dataset_providers.get_vocabularies(task)
+    vocabs_map = dataset_providers.get_vocabularies(task)
     self.assertEmpty(vocabs_map)
 
 

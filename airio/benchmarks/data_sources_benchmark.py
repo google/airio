@@ -17,7 +17,6 @@
 import os
 
 import airio
-from airio.grain import data_sources
 import google_benchmark
 import numpy as np
 import tensorflow_datasets as tfds
@@ -31,8 +30,6 @@ def generate_function_data_source(split: str):
   if split not in _SOURCE_SPLITS:
     raise ValueError(f"Split {split} not found in {_SOURCE_SPLITS}.")
   return np.array(range(_SOURCE_NUM_EXAMPLES))
-
-
 
 
 @google_benchmark.register
@@ -111,8 +108,6 @@ def tfds_data_source_splits(state):
     )
   while state:
     _ = ds.splits
-
-
 
 
 if __name__ == "__main__":
