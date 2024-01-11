@@ -24,10 +24,11 @@ from absl.testing import absltest
 from airio import dataset_iterators
 from airio import preprocessors
 from airio import tokenizer
-from clu.data import dataset_iterator
+from clu.data import dataset_iterator as clu_dataset_iterator
 import grain.python as grain
 import numpy as np
 from seqio import vocabularies
+
 
 lazy_dataset = grain.experimental.lazy_dataset
 
@@ -44,6 +45,21 @@ def _parse_and_preprocess(raw_example: bytes) -> Dict[str, str]:
   else:
     final_example["targets"] = "invalid"
   return final_example
+
+
+class AirIODatasetIteratorsTest(absltest.TestCase):
+
+  @mock.patch.multiple(
+      dataset_iterators.AirIODatasetIterator, __abstractmethods__=set()
+  )
+  def test_abstract_class(self):
+    iterator = dataset_iterators.AirIODatasetIterator
+    with self.assertRaises(NotImplementedError):
+      iterator.peek(self)
+      iterator.peek_async(self)
+      iterator.get_state(self)
+      iterator.set_state(self, {})
+      iterator.__repr__(self)
 
 
 class DatasetIteratorsWithDataLoaderTest(absltest.TestCase):
@@ -89,8 +105,12 @@ class DatasetIteratorsWithDataLoaderTest(absltest.TestCase):
     self.assertDictEqual(
         iterator_wrapper.element_spec,
         {
-            "inputs": dataset_iterator.ArraySpec(dtype=np.int64, shape=(4,)),
-            "targets": dataset_iterator.ArraySpec(dtype=np.int64, shape=(8,)),
+            "inputs": clu_dataset_iterator.ArraySpec(
+                dtype=np.int64, shape=(4,)
+            ),
+            "targets": clu_dataset_iterator.ArraySpec(
+                dtype=np.int64, shape=(8,)
+            ),
         },
     )
 
@@ -202,6 +222,7 @@ class DatasetIteratorsWithDataLoaderTest(absltest.TestCase):
     self.assertEqual(second_element["inputs_pretokenized"], "def")
 
 
+
 class DatasetIteratorsWithLazyMapDatasetTest(absltest.TestCase):
 
   def setUp(self):
@@ -242,8 +263,12 @@ class DatasetIteratorsWithLazyMapDatasetTest(absltest.TestCase):
     self.assertDictEqual(
         iterator_wrapper.element_spec,
         {
-            "inputs": dataset_iterator.ArraySpec(dtype=np.int64, shape=(4,)),
-            "targets": dataset_iterator.ArraySpec(dtype=np.int64, shape=(8,)),
+            "inputs": clu_dataset_iterator.ArraySpec(
+                dtype=np.int64, shape=(4,)
+            ),
+            "targets": clu_dataset_iterator.ArraySpec(
+                dtype=np.int64, shape=(8,)
+            ),
         },
     )
 
@@ -376,8 +401,12 @@ class DatasetIteratorsWithLazyIterDatasetTest(absltest.TestCase):
     self.assertDictEqual(
         iterator_wrapper.element_spec,
         {
-            "inputs": dataset_iterator.ArraySpec(dtype=np.int64, shape=(4,)),
-            "targets": dataset_iterator.ArraySpec(dtype=np.int64, shape=(8,)),
+            "inputs": clu_dataset_iterator.ArraySpec(
+                dtype=np.int64, shape=(4,)
+            ),
+            "targets": clu_dataset_iterator.ArraySpec(
+                dtype=np.int64, shape=(8,)
+            ),
         },
     )
 

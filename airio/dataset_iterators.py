@@ -14,12 +14,13 @@
 
 """AirIO-specific dataset iterators."""
 
+import collections
 import concurrent.futures
 import json
 from typing import Any
 
 from clu import asynclib
-from clu.data import dataset_iterator
+from clu.data import dataset_iterator as clu_dataset_iterator
 from etils import epath
 import grain.python as grain
 import numpy as np
@@ -28,10 +29,37 @@ lazy_dataset = grain.experimental.lazy_dataset
 LazyDataset = lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset
 
 
-class PyGrainDatasetIteratorWrapper(dataset_iterator.DatasetIterator):
+class AirIODatasetIterator(clu_dataset_iterator.DatasetIterator):
+  """Wrapper iterator for AirIO."""
+
+  _iterator: collections.abc.Iterator[Any] = None
+
+  def __next__(self) -> clu_dataset_iterator.Element:
+    raise NotImplementedError()
+
+  def peek(self) -> clu_dataset_iterator.Element:
+    raise NotImplementedError()
+
+  def peek_async(
+      self,
+  ) -> concurrent.futures.Future[clu_dataset_iterator.Element]:
+    raise NotImplementedError()
+
+  def get_state(self) -> dict[str, Any]:
+    raise NotImplementedError()
+
+  def set_state(self, state: dict[str, Any]) -> None:
+    raise NotImplementedError()
+
+  def __repr__(self) -> str:
+    return f"AirIODatasetIterator(), state: {self.get_state()!r}"
+
+
+class PyGrainDatasetIteratorWrapper(AirIODatasetIterator):
   """Wrapper iterator for grain.PyGrainDatasetIterator."""
 
   def __init__(self, data_loader: grain.DataLoader | LazyDataset):
+    super().__init__()
     self._data_loader = data_loader
     self._iterator = data_loader.__iter__()
     self._state_as_dict = isinstance(self._data_loader, LazyDataset)
@@ -41,22 +69,22 @@ class PyGrainDatasetIteratorWrapper(dataset_iterator.DatasetIterator):
     self._peek_future = None
     self._pool = None
 
-  def __next__(self) -> dataset_iterator.Element:
+  def __next__(self) -> clu_dataset_iterator.Element:
     return next(self._iterator)
 
   @property
-  def element_spec(self) -> dataset_iterator.ElementSpec:
+  def element_spec(self) -> clu_dataset_iterator.ElementSpec:
     local_iter = iter(self._data_loader)
     first_element = next(local_iter)
     element_spec = {}
     for k, v in first_element.items():
       if isinstance(v, np.ndarray):
-        element_spec[k] = dataset_iterator.ArraySpec(
+        element_spec[k] = clu_dataset_iterator.ArraySpec(
             dtype=v.dtype, shape=tuple(v.shape)
         )
     return element_spec
 
-  def peek(self) -> dataset_iterator.Element:
+  def peek(self) -> clu_dataset_iterator.Element:
     """Returns the next element without consuming it.
 
     This will get the next element from the underlying iterator. The element
@@ -70,7 +98,9 @@ class PyGrainDatasetIteratorWrapper(dataset_iterator.DatasetIterator):
       self._peek = next(local_iter)
     return self._peek
 
-  def peek_async(self) -> concurrent.futures.Future[dataset_iterator.Element]:
+  def peek_async(
+      self,
+  ) -> concurrent.futures.Future[clu_dataset_iterator.Element]:
     """Same as peek() but returns the Future of the element.
 
     Users can call this to warm up the iterator.
