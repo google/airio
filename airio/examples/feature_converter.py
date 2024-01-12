@@ -19,6 +19,7 @@ from typing import Dict
 from absl import app
 import airio
 from airio.grain import dataset_providers as grain_dataset_providers
+from airio.grain import feature_converters
 from seqio import vocabularies
 
 
@@ -68,7 +69,7 @@ def main(_) -> None:
   print(f"Task name: {task.name}\n")
   runtime_preprocessors = (
       # TODO(b/311543848): Fully remove FeatureConverter.
-      airio.feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
+      feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
           {"inputs": 30, "targets": 5}
       )
   )

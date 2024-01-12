@@ -20,6 +20,7 @@ import airio
 # Import "preprocessors" as "preprocessors_lib" to prevent naming conflicts with
 # "preprocessors" attrs in this file.
 from airio import preprocessors as preprocessors_lib
+from airio.grain import dataset_iterators
 from clu.data import dataset_iterator as clu_dataset_iterator
 import grain.python as grain
 import jax.random
@@ -143,7 +144,7 @@ class GrainTask(airio.dataset_providers.Task):
           shard_info=shard_info,
           num_epochs=num_epochs,
       )
-      return airio.dataset_iterators.PyGrainDatasetIteratorWrapper(
+      return dataset_iterators.PyGrainDatasetIteratorWrapper(
           data_loader=ds
       )
     if shard_info is None:
@@ -208,7 +209,7 @@ class GrainTask(airio.dataset_providers.Task):
         operations=ops,
     )
 
-    return airio.dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader=ds)
+    return dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader=ds)
 
   def get_dataset_by_step(
       self,
@@ -406,7 +407,7 @@ class GrainMixture(airio.dataset_providers.Mixture):
         shard_info=shard_info,
         num_epochs=num_epochs,
     )
-    return airio.dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader=ds)
+    return dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader=ds)
 
 
 class GrainTaskBuilder(airio.dataset_providers.TaskBuilder):

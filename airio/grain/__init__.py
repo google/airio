@@ -17,4 +17,6 @@
 # pylint:disable=wildcard-import,g-bad-import-order,g-importing-member
 
 from airio.grain.data_sources import *
+from airio.grain.dataset_iterators import *
 from airio.grain.dataset_providers import *
+from airio.grain.feature_converters import *
