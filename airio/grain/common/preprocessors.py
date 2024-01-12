@@ -16,7 +16,7 @@
 
 from typing import Any, Dict
 from airio import preprocessors as preprocessors_lib
-from airio.common import constants
+from airio.grain.common import constants
 import numpy as np
 
 SKIP_FEATURE = constants.SKIP_FEATURE

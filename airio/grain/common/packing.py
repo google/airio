@@ -20,7 +20,7 @@ import dataclasses
 import math
 from typing import Any, Callable, Sequence, TypeVar
 from airio import preprocessors as preprocessors_lib
-from airio.common import constants
+from airio.grain.common import constants
 import grain.python as grain
 import jax
 from jaxtyping import PyTree  # pylint: disable=g-importing-member
