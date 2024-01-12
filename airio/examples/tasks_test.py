@@ -19,6 +19,7 @@ import os
 from absl.testing import absltest
 import airio
 from airio import examples
+from airio.grain import feature_converters
 from seqio import vocabularies
 import tensorflow_datasets as tfds
 
@@ -52,7 +53,7 @@ class TasksTest(absltest.TestCase):
         "targets": _SOURCE_SEQUENCE_LENGTH,
     }
     runtime_preprocessors = (
-        airio.feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
+        feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
             sequence_lengths
         )
     )
@@ -358,7 +359,7 @@ class TasksTest(absltest.TestCase):
         "targets": _SOURCE_SEQUENCE_LENGTH,
     }
     runtime_preprocessors = (
-        airio.feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
+        feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
             sequence_lengths
         )
     )

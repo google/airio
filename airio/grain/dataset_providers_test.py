@@ -27,6 +27,7 @@ from airio import preprocessors as preprocessors_lib
 from airio import test_utils
 from airio.grain import data_sources
 from airio.grain import dataset_providers
+from airio.grain import feature_converters
 import grain.python as grain
 import jax
 import numpy as np
@@ -86,10 +87,8 @@ def _create_runtime_preprocessors(
     feature_lengths: Dict[str, int] | None = None,
 ) -> Sequence[preprocessors_lib.AirIOPreprocessor]:
   # TODO(b/311543848): Fully remove FeatureConverter.
-  return (
-      airio.feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
-          task_feature_lengths=feature_lengths
-      )
+  return feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
+      task_feature_lengths=feature_lengths
   )
 
 

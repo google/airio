@@ -18,9 +18,11 @@
 from airio.dataset_providers import *
 from airio.data_sources import *
 from airio.tokenizer import *
-from airio.feature_converters import *
 from airio.dataset_iterators import *
 from airio.preprocessors import *
+
+# TODO(b/318886642): Remove after the t5x.utils reference has been updated.
+from airio.grain.feature_converters import get_pygrain_feature_converter
 
 # Version number.
 from airio.version import __version__

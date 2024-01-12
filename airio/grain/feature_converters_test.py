@@ -20,11 +20,11 @@ from unittest import mock
 
 from absl.testing import absltest
 from airio import data_sources
-from airio import feature_converters
 from airio import preprocessors
 from airio import test_utils
 from airio import tokenizer
 from airio.grain import dataset_providers as grain_dataset_providers
+from airio.grain import feature_converters
 import numpy as np
 import seqio
 from seqio import vocabularies
@@ -74,7 +74,7 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
       return final_example
 
     test_data_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "test_data"
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "test_data"
     )
     sentencepiece_vocab = vocabularies.SentencePieceVocabulary(
         os.path.join(test_data_dir, "sentencepiece", "sentencepiece.model")

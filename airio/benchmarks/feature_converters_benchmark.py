@@ -19,6 +19,7 @@ from typing import Dict
 
 import airio
 from airio.grain import dataset_providers
+from airio.grain import feature_converters
 import google_benchmark
 from seqio import vocabularies
 import tensorflow_datasets as tfds
@@ -37,9 +38,9 @@ _TOKENIZER_CONFIG = airio.tokenizer.TokenizerConfig(vocab=_SENTENCEPIECE_VOCAB)
 
 
 def _create_feature_converter() -> (
-    airio.feature_converters.PyGrainEncDecFeatureConverter
+    feature_converters.PyGrainEncDecFeatureConverter
 ):
-  return airio.feature_converters.PyGrainEncDecFeatureConverter(
+  return feature_converters.PyGrainEncDecFeatureConverter(
       bos_id=1,
       pack=False,
   )
