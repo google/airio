@@ -23,6 +23,7 @@ from airio.preprocessors import *
 
 # TODO(b/318886642): Remove after the t5x.utils reference has been updated.
 from airio.grain.feature_converters import get_pygrain_feature_converter
+from airio.grain.preprocessors import *
 
 # Version number.
 from airio.version import __version__

@@ -20,6 +20,7 @@ from absl import app
 import airio
 from airio.grain import dataset_providers as grain_dataset_providers
 from airio.grain import feature_converters
+from airio.grain import preprocessors as grain_preprocessors_lib
 from seqio import vocabularies
 
 
@@ -47,8 +48,8 @@ def create_task() -> grain_dataset_providers.GrainTask:
           tfds_name="imdb_reviews/plain_text:1.0.0", splits=["train"]
       ),
       preprocessors=[
-          airio.preprocessors.MapFnTransform(_imdb_preprocessor),
-          airio.preprocessors.MapFnTransform(
+          grain_preprocessors_lib.MapFnTransform(_imdb_preprocessor),
+          grain_preprocessors_lib.MapFnTransform(
               airio.tokenizer.Tokenizer(
                   tokenizer_configs={
                       "inputs": airio.tokenizer.TokenizerConfig(
