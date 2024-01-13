@@ -24,6 +24,7 @@ import airio
 from airio import preprocessors as preprocessors_lib
 from airio import test_utils
 from airio.grain import dataset_providers
+from airio.grain import preprocessors as grain_preprocessors_lib
 import grain.python as grain
 import numpy as np
 from seqio import vocabularies
@@ -65,8 +66,8 @@ def _create_tokenizer_config() -> airio.tokenizer.TokenizerConfig:
 def _create_preprocessors() -> Sequence[dataset_providers.AirIOPreprocessor]:
   tokenizer_config = _create_tokenizer_config()
   return [
-      preprocessors_lib.MapFnTransform(_imdb_preprocessor),
-      preprocessors_lib.MapFnTransform(
+      grain_preprocessors_lib.MapFnTransform(_imdb_preprocessor),
+      grain_preprocessors_lib.MapFnTransform(
           airio.tokenizer.Tokenizer(
               tokenizer_configs={
                   "inputs": tokenizer_config,
@@ -79,7 +80,7 @@ def _create_preprocessors() -> Sequence[dataset_providers.AirIOPreprocessor]:
 
 def _create_runtime_preprocessors(
     feature_lengths: Dict[str, int] | None = None,
-) -> Sequence[preprocessors_lib.AirIOPreprocessor]:
+) -> Sequence[grain_preprocessors_lib.AirIOPreprocessor]:
   # TODO(b/311543848): Fully remove FeatureConverter.
   return (
       airio.feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
@@ -211,10 +212,10 @@ class TaskTest(absltest.TestCase):
           "targets": np.array([ex + 1] * rargs.sequence_lengths["targets"]),
       }
 
-    self._map_transform_idx_1 = preprocessors_lib.MapFnTransform(
+    self._map_transform_idx_1 = grain_preprocessors_lib.MapFnTransform(
         functools.partial(test_map_fn, idx=1)
     )
-    self._simple_to_imdb_prep = preprocessors_lib.MapFnTransform(
+    self._simple_to_imdb_prep = grain_preprocessors_lib.MapFnTransform(
         simple_to_imdb_map_fn
     )
 
@@ -273,11 +274,11 @@ class TaskTest(absltest.TestCase):
       args.sequence_lengths.update({"another_val": 7})
       return args
 
-    prep_1 = preprocessors_lib.MapFnTransform(
+    prep_1 = grain_preprocessors_lib.MapFnTransform(
         lambda x: x,
         update_runtime_args=update_runtime_args_1,
     )
-    prep_2 = preprocessors_lib.MapFnTransform(
+    prep_2 = grain_preprocessors_lib.MapFnTransform(
         lambda x: x,
         update_runtime_args=update_runtime_args_2,
     )
@@ -348,7 +349,9 @@ class TaskBuilderTest(absltest.TestCase):
         preprocessors=_create_preprocessors(),
         task_name=task_name,
     )
-    new_preprocessors = [preprocessors_lib.MapFnTransform(_imdb_preprocessor)]
+    new_preprocessors = [
+        grain_preprocessors_lib.MapFnTransform(_imdb_preprocessor)
+    ]
     task_builder.set_preprocessors(new_preprocessors)
     new_task = task_builder.build()
     self.assertEqual(new_task.get_preprocessors(), new_preprocessors)
@@ -425,13 +428,13 @@ class MixtureTest(absltest.TestCase):
         splits=_SOURCE_SPLITS,
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
-    self._map_transform_idx_1 = preprocessors_lib.MapFnTransform(
+    self._map_transform_idx_1 = grain_preprocessors_lib.MapFnTransform(
         functools.partial(test_map_fn, idx=1)
     )
-    self._map_transform_idx_2 = preprocessors_lib.MapFnTransform(
+    self._map_transform_idx_2 = grain_preprocessors_lib.MapFnTransform(
         functools.partial(test_map_fn, idx=2)
     )
-    self._simple_to_imdb_prep = preprocessors_lib.MapFnTransform(
+    self._simple_to_imdb_prep = grain_preprocessors_lib.MapFnTransform(
         simple_to_imdb_map_fn
     )
     self._simple_task_1 = _create_task(
@@ -450,7 +453,7 @@ class MixtureTest(absltest.TestCase):
     self._simple_to_imdb_task = (
         airio.dataset_providers.TaskBuilder.from_task(self._simple_task_1)
         .set_preprocessors([
-            preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn),
+            grain_preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn),
         ])
         .build()
     )
@@ -688,7 +691,9 @@ class DatasetProvidersTest(absltest.TestCase):
     )
     task = _create_task(
         source=source,
-        preprocessors=[preprocessors_lib.MapFnTransform(_imdb_preprocessor)],
+        preprocessors=[
+            grain_preprocessors_lib.MapFnTransform(_imdb_preprocessor)
+        ],
     )
     vocabs_map = airio.dataset_providers.get_vocabularies(task)
     self.assertEmpty(vocabs_map)
