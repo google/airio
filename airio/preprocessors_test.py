@@ -14,6 +14,7 @@
 
 """Preprocessors tests."""
 
+import inspect
 from unittest import mock
 
 from absl.testing import absltest
@@ -23,6 +24,7 @@ from airio.grain import dataset_providers as grain_dataset_providers
 import grain.python as grain
 import jax.random
 import numpy as np
+
 
 lazy_dataset = grain.experimental.lazy_dataset
 
@@ -161,7 +163,6 @@ class PreprocessorsTest(absltest.TestCase):
     self.assertListEqual(list(ds), [5, 4, 5, 12, 13])
 
   def test_random_map_lazydataset_transform_disallowed(self):
-
     class TestRandomMap(grain.RandomMapTransform):
 
       def random_map(self, element, rng: np.random.Generator):
@@ -196,6 +197,7 @@ class PreprocessorsTest(absltest.TestCase):
     self.assertListEqual([t.tolist() for t in list(ds)], [[0, 1], [2, 3], [4]])
 
 
+
 class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
 
   def setUp(self):
@@ -222,6 +224,43 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     updated = run_args.clone()
     updated.sequence_lengths = new_seq_lens
     return updated
+
+  def test_create_runtime_args_succeeds(self):
+    runtime_args = preprocessors.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"val": 3},
+        split="train",
+    )
+    self.assertIsInstance(runtime_args, preprocessors.AirIOInjectedRuntimeArgs)
+
+  def test_inject_runtime_args_to_fn_injects_args(self):
+    def test_map_fn(ex, args: preprocessors.AirIOInjectedRuntimeArgs):
+      del args
+      return ex + 1
+
+    runtime_args = preprocessors.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"val": 3},
+        split="train",
+    )
+    result = preprocessors.inject_runtime_args_to_fn(test_map_fn, runtime_args)
+    inspect_result = inspect.signature(result).parameters
+    result_args = inspect_result["args"]
+    expected_injected_args = (
+        "AirIOInjectedRuntimeArgs(sequence_lengths={'val': 3}, split='train')"
+    )
+    self.assertTrue(str(result_args).endswith(expected_injected_args))
+
+  def test_inject_runtime_args_to_fn_without_runtime_args_returns_same(self):
+    def test_map_fn(ex):
+      return ex + 1
+
+    expected_parameters = test_map_fn.__code__.co_varnames
+    runtime_args = preprocessors.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"val": 3},
+        split="train",
+    )
+    result = preprocessors.inject_runtime_args_to_fn(test_map_fn, runtime_args)
+    result_parameters = result.__code__.co_varnames
+    self.assertEqual(result_parameters, expected_parameters)
 
   def test_map_fn_preprocessor(self):
     def test_map_fn(ex, run_args: preprocessors.AirIOInjectedRuntimeArgs):
@@ -599,6 +638,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         update_runtime_args=self._update_runtime_args,
     )
     self.assertFalse(preprocessors.produces_none_elements(prep))
+
 
 
 if __name__ == "__main__":
