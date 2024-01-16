@@ -20,11 +20,11 @@ from unittest import mock
 
 from absl.testing import absltest
 from airio import data_sources
-from airio import preprocessors
 from airio import test_utils
 from airio import tokenizer
 from airio.grain import dataset_providers as grain_dataset_providers
 from airio.grain import feature_converters
+from airio.grain import preprocessors as grain_preprocessors_lib
 import numpy as np
 import seqio
 from seqio import vocabularies
@@ -84,8 +84,8 @@ class PyGrainEncDecFeatureConverterTest(absltest.TestCase):
         name=task_name,
         source=source,
         preprocessors=[
-            preprocessors.MapFnTransform(_imdb_preprocessor),
-            preprocessors.MapFnTransform(
+            grain_preprocessors_lib.MapFnTransform(_imdb_preprocessor),
+            grain_preprocessors_lib.MapFnTransform(
                 tokenizer.Tokenizer(
                     tokenizer_configs={
                         "inputs": tokenizer_config,

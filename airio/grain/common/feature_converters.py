@@ -18,6 +18,7 @@ from collections.abc import Sequence
 import dataclasses
 import functools
 from airio import preprocessors as preprocessors_lib
+from airio.grain import preprocessors as grain_preprocessors_lib
 from airio.grain.common import packing
 from airio.grain.common import preprocessors
 import numpy as np
@@ -164,6 +165,7 @@ def convert_to_t5x_enc_dec_features(
   Returns:
     a converted example.
   """
+
   def _get_non_padding_positions(
       feature_value: np.ndarray, pad_id: int
   ) -> np.ndarray:
@@ -215,7 +217,7 @@ def update_runtime_args_for_t5x_enc_dec_features(
       pad_id=0,
       bos_id=0,
   )
-  prep = preprocessors_lib.MapFnTransform(
+  prep = grain_preprocessors_lib.MapFnTransform(
       convert_features,
       update_runtime_args=update_runtime_args,
   )
@@ -281,7 +283,9 @@ class T5XEncDecFeatureConverter:
   pad_id: int
   bos_id: int
 
-  def get_preprocessors(self) -> Sequence[preprocessors_lib.AirIOPreprocessor]:
+  def get_preprocessors(
+      self,
+  ) -> Sequence[grain_preprocessors_lib.AirIOPreprocessor]:
     """Returns AirIO preprocessors corresponding to seqio.EncDecFeatureConverter."""
 
     update_runtime_args = functools.partial(
@@ -298,9 +302,9 @@ class T5XEncDecFeatureConverter:
     )
     pad = functools.partial(preprocessors.pad, pad_id=self.pad_id)
     preps = [
-        preprocessors_lib.MapFnTransform(preprocessors.trim),
-        preprocessors_lib.MapFnTransform(pad),
-        preprocessors_lib.MapFnTransform(
+        grain_preprocessors_lib.MapFnTransform(preprocessors.trim),
+        grain_preprocessors_lib.MapFnTransform(pad),
+        grain_preprocessors_lib.MapFnTransform(
             convert_features,
             update_runtime_args=update_runtime_args,
         ),
@@ -311,7 +315,7 @@ class T5XEncDecFeatureConverter:
           if self.use_multi_bin_packing
           else packing.SingleBinTruePackIterPreprocessor
       )
-      packer_prep = preprocessors_lib.LazyIterTransform(
+      packer_prep = grain_preprocessors_lib.LazyIterTransform(
           packer, update_runtime_args=packer.update_runtime_args
       )
       preps = [packer_prep] + preps

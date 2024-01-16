@@ -24,12 +24,13 @@ from airio import data_sources
 # "preprocessors" attrs in this file.
 from airio import preprocessors as preprocessors_lib
 from airio import tokenizer
+from airio.grain import preprocessors as grain_preprocessors_lib
 from clu.data import dataset_iterator as clu_dataset_iterator
 from seqio import vocabularies
 import tensorflow_datasets as tfds
 
 
-AirIOPreprocessor = preprocessors_lib.AirIOPreprocessor
+AirIOPreprocessor = grain_preprocessors_lib.AirIOPreprocessor
 
 
 @dataclasses.dataclass(frozen=True)
@@ -104,7 +105,7 @@ class Task(DatasetProviderBase, Protocol):
     if runtime_preprocessors:
       preps.extend(runtime_preprocessors)
     for prep in preps:
-      transform = preprocessors_lib.LazyDatasetTransform(prep)
+      transform = grain_preprocessors_lib.LazyDatasetTransform(prep)
       runtime_args = transform.get_updated_runtime_args(runtime_args)
     return runtime_args
 
@@ -115,7 +116,7 @@ class Task(DatasetProviderBase, Protocol):
     """
     preps = self._preprocessors
     for prep in preps:
-      if preprocessors_lib.produces_none_elements(prep):
+      if grain_preprocessors_lib.produces_none_elements(prep):
         return True
     return False
 
@@ -314,9 +315,9 @@ def get_vocabularies(
 
   vocabulary_map = {}
   for preproc in task.get_preprocessors():
-    if isinstance(preproc, preprocessors_lib.MapFnTransform) and isinstance(
-        preproc.map_fn, tokenizer.Tokenizer
-    ):
+    if isinstance(
+        preproc, grain_preprocessors_lib.MapFnTransform
+    ) and isinstance(preproc.map_fn, tokenizer.Tokenizer):
       tokenizer_configs = preproc.map_fn.tokenizer_configs
       for feature_name, tokenizer_config in tokenizer_configs.items():
         vocabulary_map[feature_name] = tokenizer_config.vocab
