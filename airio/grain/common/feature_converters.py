@@ -18,8 +18,8 @@ from collections.abc import Sequence
 import dataclasses
 import functools
 from airio import preprocessors as preprocessors_lib
-from airio.common import packing
-from airio.common import preprocessors
+from airio.grain.common import packing
+from airio.grain.common import preprocessors
 import numpy as np
 
 

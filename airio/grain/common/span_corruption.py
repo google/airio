@@ -19,7 +19,7 @@ from typing import Optional, Sequence
 
 from airio import lazy_dataset_transforms
 from airio import preprocessors as preprocessors_lib
-from airio.common import packing
+from airio.grain.common import packing
 import grain.python as grain
 import jax
 from t5.data import preprocessors as t5_preps

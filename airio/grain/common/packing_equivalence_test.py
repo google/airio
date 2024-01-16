@@ -17,7 +17,7 @@
 import functools
 from absl.testing import absltest
 import airio
-import airio.common
+import airio.grain.common
 import grain.python as grain
 import numpy as np
 import seqio

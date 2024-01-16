@@ -18,8 +18,8 @@ import functools
 from absl.testing import absltest
 from absl.testing import parameterized
 from airio import preprocessors as preprocessors_lib
-from airio.common import packing
-from airio.common import preprocessors
+from airio.grain.common import packing
+from airio.grain.common import preprocessors
 import grain.python as grain
 import numpy as np
 

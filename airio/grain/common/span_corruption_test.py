@@ -21,8 +21,8 @@ from typing import Any, Callable
 from absl.testing import absltest
 from airio import lazy_dataset_transforms
 from airio import preprocessors as preprocessors_lib
-from airio.common import packing
-from airio.common import span_corruption as asc
+from airio.grain.common import packing
+from airio.grain.common import span_corruption as asc
 import grain.python as grain
 import numpy as np
 import seqio
@@ -122,7 +122,7 @@ class SpanCorruptionTest(absltest.TestCase):
     # Step 1: Create a data source over the tokenized c4 test data.
     test_data_dir = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        "../test_data/span_corruption",
+        "../../test_data/span_corruption",
     )
     src_filename = os.path.join(
         test_data_dir, "c4_tokenized_t5_default_vocab_500_examples.tfrecord*"
@@ -200,7 +200,7 @@ class SpanCorruptionTest(absltest.TestCase):
     # Step 1: Load tokenized test data.
     test_data_dir = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        "../test_data/span_corruption",
+        "../../test_data/span_corruption",
     )
     src_filename = os.path.join(
         test_data_dir, "c4_tokenized_t5_default_vocab_500_examples.tfrecord*"
@@ -269,7 +269,7 @@ class SpanCorruptionTest(absltest.TestCase):
     # Step 1: Load tokenized test data.
     test_data_dir = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        "../test_data/span_corruption",
+        "../../test_data/span_corruption",
     )
     src_filename = os.path.join(
         test_data_dir, "c4_tokenized_t5_default_vocab_500_examples.tfrecord*"

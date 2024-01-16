@@ -16,7 +16,7 @@
 
 from absl.testing import absltest
 from airio import preprocessors as preprocessors_lib
-from airio.common import feature_converters
+from airio.grain.common import feature_converters
 import grain.python as grain
 import numpy as np
 
