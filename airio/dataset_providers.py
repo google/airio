@@ -279,7 +279,7 @@ class TaskBuilder(Protocol):
 
 
 def get_dataset(
-    mixture_or_task: Task,
+    mixture_or_task: Task | Mixture,
     sequence_lengths: Mapping[str, int] | None = None,
     split: str = "train",
     runtime_preprocessors: Sequence[AirIOPreprocessor] | None = None,

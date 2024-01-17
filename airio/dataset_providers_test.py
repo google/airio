@@ -577,7 +577,7 @@ class MixturePropertiesTest(absltest.TestCase):
 
 class DatasetProvidersTest(absltest.TestCase):
 
-  def test_get_dataset(self):
+  def test_get_dataset_with_task(self):
     source = _create_source(
         source_name=_SOURCE_NAME,
         num_examples=_SOURCE_NUM_EXAMPLES,
@@ -665,6 +665,39 @@ class DatasetProvidersTest(absltest.TestCase):
             "targets_pretokenized": "positive",
             "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
         },
+    ]
+    test_utils.assert_datasets_equal(ds, expected)
+
+  def test_get_dataset_with_mixture(self):
+    def test_map_fn(ex, idx: int):
+      return {"task_index": idx, "val": ex}
+
+    tasks = []
+    for i in range(2):
+      tasks.append(
+          airio.grain.dataset_providers.GrainTask(
+              name=f"test_task_{i}",
+              source=_create_fn_src(num_elements=3),
+              preprocessors=[
+                  airio.preprocessors_lib.MapFnTransform(
+                      functools.partial(test_map_fn, idx=i)
+                  )
+              ],
+          )
+      )
+    mixture = dataset_providers.GrainMixture(
+        name="test_mix",
+        tasks=tasks,
+        proportions=[1.0, 1.0],
+    )
+    ds = airio.dataset_providers.get_dataset(mixture, seed=0)
+    expected = [
+        {"task_index": 0, "val": 0},  # task 1, ex 0
+        {"task_index": 1, "val": 0},  # task 2, ex 0
+        {"task_index": 0, "val": 1},  # task 1, ex 1
+        {"task_index": 1, "val": 1},  # task 2, ex 1
+        {"task_index": 0, "val": 2},  # task 1, ex 2
+        {"task_index": 1, "val": 2},  # task 2, ex 2
     ]
     test_utils.assert_datasets_equal(ds, expected)
 
