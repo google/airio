@@ -21,9 +21,9 @@ from typing import Dict
 from unittest import mock
 
 from absl.testing import absltest
+from airio import preprocessors
 from airio import tokenizer
 from airio.grain import dataset_iterators
-from airio.grain import preprocessors as grain_preprocessors_lib
 from clu.data import dataset_iterator as clu_dataset_iterator
 import grain.python as grain
 import numpy as np
@@ -69,8 +69,8 @@ class DatasetIteratorsWithDataLoaderTest(absltest.TestCase):
             num_records=5, shard_options=grain.NoSharding()
         ),
         operations=[
-            grain_preprocessors_lib.MapFnTransform(_parse_and_preprocess),
-            grain_preprocessors_lib.MapFnTransform(
+            preprocessors.MapFnTransform(_parse_and_preprocess),
+            preprocessors.MapFnTransform(
                 tokenizer.Tokenizer(
                     tokenizer_configs={
                         "inputs": self.tokenizer_config,
@@ -227,9 +227,9 @@ class DatasetIteratorsWithLazyMapDatasetTest(absltest.TestCase):
             os.path.join(test_data_path, "classification.array_record@2")
         )
     )
-    ds = ds.map(grain_preprocessors_lib.MapFnTransform(_parse_and_preprocess))
+    ds = ds.map(preprocessors.MapFnTransform(_parse_and_preprocess))
     ds = ds.map(
-        grain_preprocessors_lib.MapFnTransform(
+        preprocessors.MapFnTransform(
             tokenizer.Tokenizer(
                 tokenizer_configs={
                     "inputs": self.tokenizer_config,
@@ -364,9 +364,9 @@ class DatasetIteratorsWithLazyIterDatasetTest(absltest.TestCase):
             os.path.join(test_data_path, "classification.array_record@2")
         )
     )
-    ds = ds.map(grain_preprocessors_lib.MapFnTransform(_parse_and_preprocess))
+    ds = ds.map(preprocessors.MapFnTransform(_parse_and_preprocess))
     ds = ds.map(
-        grain_preprocessors_lib.MapFnTransform(
+        preprocessors.MapFnTransform(
             tokenizer.Tokenizer(
                 tokenizer_configs={
                     "inputs": self.tokenizer_config,

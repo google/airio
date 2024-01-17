@@ -16,7 +16,6 @@
 
 from absl.testing import absltest
 from airio import preprocessors as preprocessors_lib
-from airio.grain import preprocessors as grain_preprocessors_lib
 from airio.grain.common import feature_converters
 import grain.python as grain
 import numpy as np
@@ -146,11 +145,11 @@ class EncDecFeatureConverterTest(absltest.TestCase):
   def _apply_preprocessors(
       self,
       ds: lazy_dataset.LazyMapDataset,
-      preprocessors: grain_preprocessors_lib.AirIOPreprocessor,
+      preprocessors: preprocessors_lib.AirIOPreprocessor,
       runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
   ):
     for preprocessor in preprocessors:
-      prep = grain_preprocessors_lib.LazyDatasetTransform(preprocessor)
+      prep = preprocessors_lib.LazyDatasetTransform(preprocessor)
       ds = prep(ds, runtime_args=runtime_args)
       runtime_args = prep.get_updated_runtime_args(runtime_args)
 

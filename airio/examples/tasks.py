@@ -21,7 +21,6 @@ from typing import Dict
 from absl import logging
 import airio
 from airio.grain import dataset_providers
-from airio.grain import preprocessors as grain_preprocessors_lib
 import babel
 from seqio import vocabularies
 import tensorflow_datasets as tfds
@@ -55,14 +54,14 @@ def get_wmt_19_ende_v003_task(
           tfds_name=tfds_name, splits=["train", "validation"]
       ),
       preprocessors=[
-          grain_preprocessors_lib.MapFnTransform(
+          airio.preprocessors.MapFnTransform(
               functools.partial(
                   translate,
                   source_language=builder_config.language_pair[1],
                   target_language=builder_config.language_pair[0],
               )
           ),
-          grain_preprocessors_lib.MapFnTransform(
+          airio.preprocessors.MapFnTransform(
               airio.tokenizer.Tokenizer(
                   tokenizer_configs=tokenizer_configs,
               )
@@ -93,8 +92,8 @@ def get_nqo_v001_task(
           tfds_name=tfds_name, splits=["train", "validation"]
       ),
       preprocessors=[
-          grain_preprocessors_lib.MapFnTransform(question),
-          grain_preprocessors_lib.MapFnTransform(
+          airio.preprocessors.MapFnTransform(question),
+          airio.preprocessors.MapFnTransform(
               airio.tokenizer.Tokenizer(
                   tokenizer_configs=tokenizer_configs,
                   copy_pretokenized=False,

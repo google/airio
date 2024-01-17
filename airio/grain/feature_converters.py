@@ -18,7 +18,7 @@ import functools
 import typing
 from typing import List, Mapping, Protocol
 
-from airio.grain import preprocessors
+from airio import preprocessors
 import grain.python as grain
 import numpy as np
 import seqio

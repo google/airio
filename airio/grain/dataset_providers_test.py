@@ -20,16 +20,13 @@ from typing import Dict, Sequence
 from unittest import mock
 
 from absl.testing import absltest
-from airio import data_sources
-from airio import dataset_providers as airio_dataset_providers
+import airio
 # Import "preprocessors" as "preprocessors_lib" to prevent naming conflicts with
 # "preprocessors" attrs in this file.
 from airio import preprocessors as preprocessors_lib
 from airio import test_utils
-from airio import tokenizer
 from airio.grain import dataset_providers
 from airio.grain import feature_converters
-from airio.grain import preprocessors as grain_preprocessors_lib
 import grain.python as grain
 import jax
 import numpy as np
@@ -66,18 +63,16 @@ def _create_sentencepiece_vocab() -> vocabularies.SentencePieceVocabulary:
   return sentencepiece_vocab
 
 
-def _create_tokenizer_config() -> tokenizer.TokenizerConfig:
-  return tokenizer.TokenizerConfig(vocab=_create_sentencepiece_vocab())
+def _create_tokenizer_config() -> airio.tokenizer.TokenizerConfig:
+  return airio.tokenizer.TokenizerConfig(vocab=_create_sentencepiece_vocab())
 
 
-def _create_preprocessors() -> (
-    Sequence[grain_preprocessors_lib.AirIOPreprocessor]
-):
+def _create_preprocessors() -> Sequence[dataset_providers.AirIOPreprocessor]:
   tokenizer_config = _create_tokenizer_config()
   return [
-      grain_preprocessors_lib.MapFnTransform(_imdb_preprocessor),
-      grain_preprocessors_lib.MapFnTransform(
-          tokenizer.Tokenizer(
+      preprocessors_lib.MapFnTransform(_imdb_preprocessor),
+      preprocessors_lib.MapFnTransform(
+          airio.tokenizer.Tokenizer(
               tokenizer_configs={
                   "inputs": tokenizer_config,
                   "targets": tokenizer_config,
@@ -89,7 +84,7 @@ def _create_preprocessors() -> (
 
 def _create_runtime_preprocessors(
     feature_lengths: Dict[str, int] | None = None,
-) -> Sequence[grain_preprocessors_lib.AirIOPreprocessor]:
+) -> Sequence[preprocessors_lib.AirIOPreprocessor]:
   # TODO(b/311543848): Fully remove FeatureConverter.
   return feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
       task_feature_lengths=feature_lengths
@@ -100,12 +95,14 @@ def _create_source(
     source_name: str = _SOURCE_NAME,
     splits: Sequence[str] | None = None,
     num_examples: int = _SOURCE_NUM_EXAMPLES,
-) -> data_sources.TfdsDataSource:
+) -> airio.data_sources.TfdsDataSource:
   """Creates a basic TfdsDataSource."""
   if splits is None:
     splits = _SOURCE_SPLITS
   with tfds.testing.mock_data(num_examples):
-    return data_sources.TfdsDataSource(tfds_name=source_name, splits=splits)
+    return airio.data_sources.TfdsDataSource(
+        tfds_name=source_name, splits=splits
+    )
 
 
 def _create_fn_src(num_elements=5):
@@ -113,16 +110,14 @@ def _create_fn_src(num_elements=5):
     del split
     return np.arange(num_elements)
 
-  return data_sources.FunctionDataSource(
+  return airio.data_sources.FunctionDataSource(
       dataset_fn=_dataset_fn, splits=["train"]
   )
 
 
 def _create_task(
-    source: data_sources.DataSource | None,
-    preprocessors: (
-        Sequence[grain_preprocessors_lib.AirIOPreprocessor] | None
-    ) = None,
+    source: airio.data_sources.DataSource | None,
+    preprocessors: Sequence[dataset_providers.AirIOPreprocessor] | None = None,
     task_name: str = "dummy_airio_task",
 ) -> dataset_providers.GrainTask:
   """Create example AirIO task."""
@@ -134,10 +129,8 @@ def _create_task(
 
 
 def _create_task_builder(
-    source: data_sources.DataSource | None,
-    preprocessors: (
-        Sequence[grain_preprocessors_lib.AirIOPreprocessor] | None
-    ) = None,
+    source: airio.data_sources.DataSource | None,
+    preprocessors: Sequence[dataset_providers.AirIOPreprocessor] | None = None,
     task_name: str = "dummy_airio_task",
 ) -> dataset_providers.GrainTaskBuilder:
   return dataset_providers.GrainTaskBuilder(
@@ -195,10 +188,10 @@ class TestFilterLazyIterDataset(lazy_dataset.LazyIterDataset):
 class DatasetProviderBaseTest(absltest.TestCase):
 
   @mock.patch.multiple(
-      airio_dataset_providers.DatasetProviderBase, __abstractmethods__=set()
+      airio.dataset_providers.DatasetProviderBase, __abstractmethods__=set()
   )
   def test_protocol(self):
-    base = airio_dataset_providers.DatasetProviderBase
+    base = airio.dataset_providers.DatasetProviderBase
     self.assertIsNone(base.get_dataset(self, split=""))
     self.assertIsNone(base.num_input_examples(self, split=""))
 
@@ -221,23 +214,23 @@ class TaskTest(absltest.TestCase):
           "targets": np.array([ex + 1] * rargs.sequence_lengths["targets"]),
       }
 
-    self._map_transform_idx_1 = grain_preprocessors_lib.MapFnTransform(
+    self._map_transform_idx_1 = preprocessors_lib.MapFnTransform(
         functools.partial(test_map_fn, idx=1)
     )
-    self._simple_to_imdb_prep = grain_preprocessors_lib.MapFnTransform(
+    self._simple_to_imdb_prep = preprocessors_lib.MapFnTransform(
         simple_to_imdb_map_fn
     )
 
   def test_create_task_with_source_only_succeeds(self):
     task = _create_task(source=_create_source(), preprocessors=None)
-    self.assertIsInstance(task.source, data_sources.DataSource)
-    self.assertIsInstance(task.source, data_sources.TfdsDataSource)
+    self.assertIsInstance(task.source, airio.data_sources.DataSource)
+    self.assertIsInstance(task.source, airio.data_sources.TfdsDataSource)
     self.assertEmpty(task.get_preprocessors())
 
   def test_create_task_with_source_and_empty_preprocessors_succeeds(self):
     task = _create_task(source=_create_source(), preprocessors=[])
-    self.assertIsInstance(task.source, data_sources.DataSource)
-    self.assertIsInstance(task.source, data_sources.TfdsDataSource)
+    self.assertIsInstance(task.source, airio.data_sources.DataSource)
+    self.assertIsInstance(task.source, airio.data_sources.TfdsDataSource)
     self.assertEmpty(task.get_preprocessors())
 
   def test_create_task(self):
@@ -247,8 +240,8 @@ class TaskTest(absltest.TestCase):
         preprocessors=_create_preprocessors(),
         task_name="dummy_airio_task",
     )
-    self.assertIsInstance(task.source, data_sources.DataSource)
-    self.assertIsInstance(task.source, data_sources.TfdsDataSource)
+    self.assertIsInstance(task.source, airio.data_sources.DataSource)
+    self.assertIsInstance(task.source, airio.data_sources.TfdsDataSource)
     self.assertEqual(task.name, "dummy_airio_task")
     self.assertEqual(task.splits, _SOURCE_SPLITS)
 
@@ -259,7 +252,9 @@ class TaskTest(absltest.TestCase):
 
   def test_none_splits(self):
     with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
-      source = data_sources.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=None)
+      source = airio.data_sources.TfdsDataSource(
+          tfds_name=_SOURCE_NAME, splits=None
+      )
     task = _create_task(source=source, preprocessors=_create_preprocessors())
     self.assertEmpty(task.splits)
 
@@ -562,7 +557,7 @@ class TaskTest(absltest.TestCase):
     source = _create_source(num_examples=_SOURCE_NUM_EXAMPLES)
     task = _create_task(source=source, preprocessors=_create_preprocessors())
     ds = task.get_dataset(
-        shard_info=airio_dataset_providers.ShardInfo(index=0, num_shards=1)
+        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=1)
     )
     num_examples = 0
     for _ in ds:
@@ -579,7 +574,7 @@ class TaskTest(absltest.TestCase):
     task_with_iter = _create_task(
         source=_create_fn_src(num_elements=10),
         preprocessors=[
-            grain_preprocessors_lib.LazyIterTransform(
+            preprocessors_lib.LazyIterTransform(
                 lambda ds, _: TestFilterLazyIterDataset(ds, threshold=4),
                 update_runtime_args=lambda x: x,
             ),
@@ -603,7 +598,7 @@ class TaskTest(absltest.TestCase):
     task_with_iter = _create_task(
         source=_create_fn_src(num_elements=10),
         preprocessors=[
-            grain_preprocessors_lib.LazyIterTransform(
+            preprocessors_lib.LazyIterTransform(
                 lambda ds, _: TestFilterLazyIterDataset(ds, threshold=4),
                 update_runtime_args=lambda x: x,
             ),
@@ -647,7 +642,7 @@ class TaskTest(absltest.TestCase):
     task_with_none = _create_task(
         source=_create_fn_src(num_elements=10),
         preprocessors=[
-            grain_preprocessors_lib.FilterFnTransform(lambda x: x > 4),
+            preprocessors_lib.FilterFnTransform(lambda x: x > 4),
             self._map_transform_idx_1,
         ],
         task_name="test_task_with_none",
@@ -668,7 +663,7 @@ class TaskTest(absltest.TestCase):
     task_with_iter = _create_task(
         source=_create_fn_src(num_elements=10),
         preprocessors=[
-            grain_preprocessors_lib.FilterFnTransform(lambda x: x > 4),
+            preprocessors_lib.FilterFnTransform(lambda x: x > 4),
             self._simple_to_imdb_prep,
         ],
         task_name="test_task_with_none",
@@ -941,11 +936,11 @@ class TaskTest(absltest.TestCase):
       args.sequence_lengths.update({"another_val": 7})
       return args
 
-    prep_1 = grain_preprocessors_lib.MapFnTransform(
+    prep_1 = preprocessors_lib.MapFnTransform(
         lambda x: x,
         update_runtime_args=update_runtime_args_1,
     )
-    prep_2 = grain_preprocessors_lib.MapFnTransform(
+    prep_2 = preprocessors_lib.MapFnTransform(
         lambda x: x,
         update_runtime_args=update_runtime_args_2,
     )
@@ -978,9 +973,7 @@ class TaskTest(absltest.TestCase):
     simple_task = _create_task(
         task_name="test_task1",
         source=_create_fn_src(),
-        preprocessors=[
-            grain_preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn)
-        ],
+        preprocessors=[preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn)],
     )
     ds = simple_task.get_dataset(
         sequence_lengths={"inputs": 20, "targets": 10}, shuffle=False
@@ -1033,9 +1026,7 @@ class TaskTest(absltest.TestCase):
     simple_task = _create_task(
         task_name="test_task1",
         source=_create_fn_src(),
-        preprocessors=[
-            grain_preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn)
-        ],
+        preprocessors=[preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn)],
     )
     ds = simple_task.get_dataset_by_step(
         sequence_lengths={"inputs": 20, "targets": 10}, shuffle=False
@@ -1074,7 +1065,7 @@ class TaskTest(absltest.TestCase):
       return ds
 
     preprocessors = _create_preprocessors() + [
-        grain_preprocessors_lib.LazyMapTransform(
+        preprocessors_lib.LazyMapTransform(
             lazy_id_fn,
             update_runtime_args=lambda rargs: rargs,
             has_none_elements=False,
@@ -1220,9 +1211,7 @@ class TaskBuilderTest(absltest.TestCase):
         preprocessors=_create_preprocessors(),
         task_name=task_name,
     )
-    new_preprocessors = [
-        grain_preprocessors_lib.MapFnTransform(_imdb_preprocessor)
-    ]
+    new_preprocessors = [preprocessors_lib.MapFnTransform(_imdb_preprocessor)]
     task_builder.set_preprocessors(new_preprocessors)
     new_task = task_builder.build()
     self.assertEqual(new_task.get_preprocessors(), new_preprocessors)
@@ -1299,13 +1288,13 @@ class MixtureTest(absltest.TestCase):
         splits=_SOURCE_SPLITS,
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
-    self._map_transform_idx_1 = grain_preprocessors_lib.MapFnTransform(
+    self._map_transform_idx_1 = preprocessors_lib.MapFnTransform(
         functools.partial(test_map_fn, idx=1)
     )
-    self._map_transform_idx_2 = grain_preprocessors_lib.MapFnTransform(
+    self._map_transform_idx_2 = preprocessors_lib.MapFnTransform(
         functools.partial(test_map_fn, idx=2)
     )
-    self._simple_to_imdb_prep = grain_preprocessors_lib.MapFnTransform(
+    self._simple_to_imdb_prep = preprocessors_lib.MapFnTransform(
         simple_to_imdb_map_fn
     )
     self._simple_task_1 = _create_task(
@@ -1324,7 +1313,7 @@ class MixtureTest(absltest.TestCase):
     self._simple_to_imdb_task = (
         dataset_providers.GrainTaskBuilder.from_task(self._simple_task_1)
         .set_preprocessors([
-            grain_preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn),
+            preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn),
         ])
         .build()
     )
@@ -1340,7 +1329,7 @@ class MixtureTest(absltest.TestCase):
         .set_preprocessors(
             self._imdb_task._preprocessors
             + [
-                grain_preprocessors_lib.MapFnTransform(
+                preprocessors_lib.MapFnTransform(
                     lambda x: x, update_runtime_args=update_runtime_args_fn
                 ),
             ]
@@ -1355,7 +1344,7 @@ class MixtureTest(absltest.TestCase):
     ds = mix.get_dataset(
         sequence_lengths={"xyz": 5, "abc": 7},  # will be updated
         shuffle=False,
-        shard_info=airio_dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
         runtime_preprocessors=_create_runtime_preprocessors(),
     )
@@ -1467,7 +1456,7 @@ class MixtureTest(absltest.TestCase):
     )
     ds = mix.get_dataset(
         shuffle=False,
-        shard_info=airio_dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
     )
     self.assertListEqual(
         list(ds),
@@ -1489,7 +1478,7 @@ class MixtureTest(absltest.TestCase):
     ds = mix.get_dataset(
         shuffle=True,
         seed=42,
-        shard_info=airio_dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
     )
     self.assertListEqual(
         list(ds),
@@ -1542,7 +1531,7 @@ class MixtureTest(absltest.TestCase):
     ds = mix.get_dataset(
         shuffle=True,
         seed=42,
-        shard_info=airio_dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=2,
     )
     self.assertListEqual(
@@ -1576,7 +1565,7 @@ class MixtureTest(absltest.TestCase):
         dataset_providers.GrainTaskBuilder.from_task(self._simple_task_1)
         .set_preprocessors([
             self._map_transform_idx_1,
-            grain_preprocessors_lib.RandomMapFnTransform(test_random_map_fn),
+            preprocessors_lib.RandomMapFnTransform(test_random_map_fn),
         ])
         .build()
     )
@@ -1584,7 +1573,7 @@ class MixtureTest(absltest.TestCase):
         dataset_providers.GrainTaskBuilder.from_task(self._simple_task_2)
         .set_preprocessors([
             self._map_transform_idx_2,
-            grain_preprocessors_lib.RandomMapFnTransform(test_random_map_fn),
+            preprocessors_lib.RandomMapFnTransform(test_random_map_fn),
         ])
         .build()
     )
@@ -1596,7 +1585,7 @@ class MixtureTest(absltest.TestCase):
         "train",
         shuffle=True,
         seed=42,
-        shard_info=airio_dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=2,
     )
     self.assertListEqual(
@@ -1624,7 +1613,7 @@ class MixtureTest(absltest.TestCase):
     )
     ds = mix.get_dataset(
         shuffle=False,
-        shard_info=airio_dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=None,
     )
     self.assertListEqual(
@@ -1655,7 +1644,7 @@ class MixtureTest(absltest.TestCase):
     ds = mix.get_dataset(
         sequence_lengths={"inputs": 20, "targets": 10},
         shuffle=False,
-        shard_info=airio_dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
     )
     expected = [
@@ -1735,7 +1724,7 @@ class MixtureTest(absltest.TestCase):
     )
     ds = mix.get_dataset(
         shuffle=False,
-        shard_info=airio_dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
         batch_size=2,
     )
@@ -1756,7 +1745,7 @@ class MixtureTest(absltest.TestCase):
     ds = mix.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
-        shard_info=airio_dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
         runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
     )
@@ -1841,7 +1830,7 @@ class MixtureTest(absltest.TestCase):
     ds = mix.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
-        shard_info=airio_dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
         runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
         batch_size=2,
@@ -1899,7 +1888,7 @@ class MixtureTest(absltest.TestCase):
     ds = mix.get_dataset(
         sequence_lengths={"inputs": 20, "targets": 10},
         shuffle=False,
-        shard_info=airio_dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
         runtime_preprocessors=None,
         batch_size=2,
@@ -1915,7 +1904,7 @@ class MixtureTest(absltest.TestCase):
     task_with_none = _create_task(
         source=_create_fn_src(num_elements=10),
         preprocessors=[
-            grain_preprocessors_lib.FilterFnTransform(lambda x: x > 4),
+            preprocessors_lib.FilterFnTransform(lambda x: x > 4),
             self._map_transform_idx_1,
         ],
         task_name="test_task_with_none",
@@ -1955,7 +1944,7 @@ class MixtureTest(absltest.TestCase):
     task_with_none = _create_task(
         source=_create_fn_src(num_elements=10),
         preprocessors=[
-            grain_preprocessors_lib.FilterFnTransform(lambda x: x > 4),
+            preprocessors_lib.FilterFnTransform(lambda x: x > 4),
             self._simple_to_imdb_prep,
         ],
         task_name="test_task_with_none",
@@ -2015,7 +2004,7 @@ class MixtureTest(absltest.TestCase):
     task_with_iter = _create_task(
         source=_create_fn_src(num_elements=10),
         preprocessors=[
-            grain_preprocessors_lib.LazyIterTransform(
+            preprocessors_lib.LazyIterTransform(
                 lambda ds, _: TestFilterLazyIterDataset(ds, threshold=4),
                 update_runtime_args=lambda x: x,
             ),
@@ -2060,7 +2049,7 @@ class MixtureTest(absltest.TestCase):
     task_with_none = _create_task(
         source=_create_fn_src(num_elements=10),
         preprocessors=[
-            grain_preprocessors_lib.LazyIterTransform(
+            preprocessors_lib.LazyIterTransform(
                 lambda ds, _: TestFilterLazyIterDataset(ds, threshold=4),
                 update_runtime_args=lambda x: x,
             ),
@@ -2283,7 +2272,7 @@ class DatasetProvidersTest(absltest.TestCase):
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
     task = _create_task(source=source, preprocessors=_create_preprocessors())
-    ds = airio_dataset_providers.get_dataset(task)
+    ds = airio.dataset_providers.get_dataset(task)
     expected = [
         {
             "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
@@ -2370,7 +2359,7 @@ class DatasetProvidersTest(absltest.TestCase):
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
     task = _create_task(source=source, preprocessors=_create_preprocessors())
-    vocabs_map = airio_dataset_providers.get_vocabularies(task)
+    vocabs_map = airio.dataset_providers.get_vocabularies(task)
     expected = {
         "inputs": _create_sentencepiece_vocab(),
         "targets": _create_sentencepiece_vocab(),
@@ -2384,11 +2373,9 @@ class DatasetProvidersTest(absltest.TestCase):
     )
     task = _create_task(
         source=source,
-        preprocessors=[
-            grain_preprocessors_lib.MapFnTransform(_imdb_preprocessor)
-        ],
+        preprocessors=[preprocessors_lib.MapFnTransform(_imdb_preprocessor)],
     )
-    vocabs_map = airio_dataset_providers.get_vocabularies(task)
+    vocabs_map = airio.dataset_providers.get_vocabularies(task)
     self.assertEmpty(vocabs_map)
 
 
