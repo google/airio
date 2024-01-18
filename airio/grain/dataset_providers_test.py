@@ -1404,6 +1404,20 @@ class MixtureTest(absltest.TestCase):
     ]
     test_utils.assert_datasets_equal(ds, expected)
 
+  def test_mixture_with_non_grain_tasks_fails_on_get_dataset(self):
+    non_grain_task = airio.dataset_providers.TaskBuilder.from_task(
+        self._simple_task_1
+    ).build()
+    with self.assertRaisesRegex(
+        ValueError,
+        f"Task '{non_grain_task.name}' is not a GrainTask or GrainMixture.",
+    ):
+      dataset_providers.GrainMixture(
+          name="test_mix",
+          tasks=[non_grain_task],
+          proportions=[1.0],
+      )
+
   def test_simple_mixture(self):
     mix = dataset_providers.GrainMixture(
         name="test_mix",

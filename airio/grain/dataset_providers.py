@@ -144,9 +144,7 @@ class GrainTask(airio.dataset_providers.Task):
           shard_info=shard_info,
           num_epochs=num_epochs,
       )
-      return dataset_iterators.PyGrainDatasetIteratorWrapper(
-          data_loader=ds
-      )
+      return dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader=ds)
     if shard_info is None:
       shard_options = grain.NoSharding()
     else:
@@ -294,6 +292,24 @@ class GrainTask(airio.dataset_providers.Task):
 class GrainMixture(airio.dataset_providers.Mixture):
   """A class for mixture of Tasks."""
 
+  def __init__(
+      self,
+      name: str,
+      tasks: Sequence[
+          airio.dataset_providers.Task | airio.dataset_providers.Mixture
+      ],
+      proportions: Sequence[float],
+  ):
+    for task in tasks:
+      if not isinstance(task, (GrainTask, GrainMixture)):
+        raise ValueError(
+            f"Task '{task.name}' is not a GrainTask or GrainMixture."
+        )
+
+    super(GrainMixture, self).__init__(
+        name=name, tasks=tasks, proportions=proportions
+    )
+
   def get_lazy_dataset(
       self,
       sequence_lengths: Mapping[str, int] | None = None,
@@ -314,7 +330,7 @@ class GrainMixture(airio.dataset_providers.Mixture):
     proportions = []
     for task in self.leaf_tasks:
       if not isinstance(task, GrainTask):
-        continue
+        raise ValueError(f"Task {task} is not a GrainTask.")
       datasets.append(
           task.get_lazy_dataset(
               sequence_lengths=sequence_lengths,
