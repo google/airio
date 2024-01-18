@@ -26,7 +26,7 @@ import airio
 from airio import preprocessors as preprocessors_lib
 from airio import test_utils
 from airio.grain import dataset_providers
-from airio.grain import feature_converters
+from airio.grain.common import feature_converters
 import grain.python as grain
 import jax
 import numpy as np
@@ -82,13 +82,16 @@ def _create_preprocessors() -> Sequence[dataset_providers.AirIOPreprocessor]:
   ]
 
 
-def _create_runtime_preprocessors(
-    feature_lengths: Dict[str, int] | None = None,
-) -> Sequence[preprocessors_lib.AirIOPreprocessor]:
-  # TODO(b/311543848): Fully remove FeatureConverter.
-  return feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
-      task_feature_lengths=feature_lengths
-  )
+def _create_runtime_preprocessors() -> (
+    Sequence[preprocessors_lib.AirIOPreprocessor]
+):
+  return feature_converters.T5XEncDecFeatureConverter(
+      pack=False,
+      use_multi_bin_packing=False,
+      passthrough_feature_keys=[],
+      pad_id=0,
+      bos_id=0,
+  ).get_preprocessors()
 
 
 def _create_source(
@@ -390,7 +393,7 @@ class TaskTest(absltest.TestCase):
                 4,
             ],
             "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
-            "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+            "decoder_input_tokens": [0, 3, 15, 7, 6, 8, 24, 8, 25],
             "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1],
         },
         {
@@ -417,7 +420,7 @@ class TaskTest(absltest.TestCase):
                 2,
             ],
             "decoder_target_tokens": [3, 22, 4, 2, 18, 8, 25, 4],
-            "decoder_input_tokens": [3, 22, 4, 2, 18, 8, 25, 4],
+            "decoder_input_tokens": [0, 3, 22, 4, 2, 18, 8, 25],
             "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1],
         },
         {
@@ -441,7 +444,7 @@ class TaskTest(absltest.TestCase):
                 2,
             ],
             "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
-            "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+            "decoder_input_tokens": [0, 3, 15, 7, 6, 8, 24, 8, 25],
             "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1],
         },
     ]
@@ -458,7 +461,7 @@ class TaskTest(absltest.TestCase):
     ds = task.get_dataset(
         sequence_lengths=sequence_lengths,
         split="train",
-        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
+        runtime_preprocessors=_create_runtime_preprocessors(),
         batch_size=2,
         shuffle=False,
     )
@@ -515,8 +518,8 @@ class TaskTest(absltest.TestCase):
                 [3, 22, 4, 2, 18, 8, 25, 4, 0, 0],
             ],
             "decoder_input_tokens": [
-                [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
-                [3, 22, 4, 2, 18, 8, 25, 4, 0, 0],
+                [0, 3, 15, 7, 6, 8, 24, 8, 25, 4],
+                [0, 3, 22, 4, 2, 18, 8, 25, 4, 0],
             ],
             "decoder_loss_weights": [
                 [1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
@@ -547,7 +550,7 @@ class TaskTest(absltest.TestCase):
                 0,
             ]],
             "decoder_target_tokens": [[3, 15, 7, 6, 8, 24, 8, 25, 4, 0]],
-            "decoder_input_tokens": [[3, 15, 7, 6, 8, 24, 8, 25, 4, 0]],
+            "decoder_input_tokens": [[0, 3, 15, 7, 6, 8, 24, 8, 25, 4]],
             "decoder_loss_weights": [[1, 1, 1, 1, 1, 1, 1, 1, 1, 0]],
         },
     ]
@@ -610,18 +613,18 @@ class TaskTest(absltest.TestCase):
     ds = task_with_iter.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
-        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
+        runtime_preprocessors=_create_runtime_preprocessors(),
         batch_size=4,
     )
     expected_dataset = [
         {
-            "decoder_input_tokens": [[6], [7], [8], [9]],
+            "decoder_input_tokens": [[0], [0], [0], [0]],
             "decoder_loss_weights": [[1], [1], [1], [1]],
             "decoder_target_tokens": [[6], [7], [8], [9]],
             "encoder_input_tokens": [[5, 5], [6, 6], [7, 7], [8, 8]],
         },
         {
-            "decoder_input_tokens": [[10]],
+            "decoder_input_tokens": [[0]],
             "decoder_loss_weights": [[1]],
             "decoder_target_tokens": [[10]],
             "encoder_input_tokens": [[9, 9]],
@@ -672,18 +675,18 @@ class TaskTest(absltest.TestCase):
     ds = task_with_iter.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
-        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
+        runtime_preprocessors=_create_runtime_preprocessors(),
         batch_size=4,
     )
     expected_dataset = [
         {
-            "decoder_input_tokens": [[6], [7], [8], [9]],
+            "decoder_input_tokens": [[0], [0], [0], [0]],
             "decoder_loss_weights": [[1], [1], [1], [1]],
             "decoder_target_tokens": [[6], [7], [8], [9]],
             "encoder_input_tokens": [[5, 5], [6, 6], [7, 7], [8, 8]],
         },
         {
-            "decoder_input_tokens": [[10]],
+            "decoder_input_tokens": [[0]],
             "decoder_loss_weights": [[1]],
             "decoder_target_tokens": [[10]],
             "encoder_input_tokens": [[9, 9]],
@@ -746,12 +749,11 @@ class TaskTest(absltest.TestCase):
     source = _create_source()
     task = _create_task(source=source, preprocessors=_create_preprocessors())
     sequence_lengths = {"inputs": 20, "targets": 10}
-    runtime_preprocessors = _create_runtime_preprocessors(sequence_lengths)
     ds_by_step = task.get_dataset_by_step(
         num_records=1,
         sequence_lengths=sequence_lengths,
         batch_size=2,
-        runtime_preprocessors=runtime_preprocessors,
+        runtime_preprocessors=_create_runtime_preprocessors(),
         shuffle=False,
     )
     expected = [
@@ -785,8 +787,9 @@ class TaskTest(absltest.TestCase):
             "targets_pretokenized": "positive",
             "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
         }],
-        # Keep features specified in sequence_lengths only.
+        # Trim.
         [{
+            "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
             "inputs": [
                 3,
                 8,
@@ -807,11 +810,12 @@ class TaskTest(absltest.TestCase):
                 2,
                 4,
             ],
+            "targets_pretokenized": "positive",
             "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
-        }],
-        # Convert to model features.
+        }],  # Pad.
         [{
-            "encoder_input_tokens": [
+            "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
+            "inputs": [
                 3,
                 8,
                 14,
@@ -830,12 +834,13 @@ class TaskTest(absltest.TestCase):
                 20,
                 2,
                 4,
+                0,
+                0,
             ],
-            "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
-            "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
-            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            "targets_pretokenized": "positive",
+            "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
         }],
-        # Trim/Pad Operation.
+        # Convert to model features.
         [{
             "encoder_input_tokens": [
                 3,
@@ -860,12 +865,12 @@ class TaskTest(absltest.TestCase):
                 0,
             ],
             "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
-            "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
+            "decoder_input_tokens": [0, 3, 15, 7, 6, 8, 24, 8, 25, 4],
             "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
         }],
         # Batching.
         [{
-            "decoder_input_tokens": [[3, 15, 7, 6, 8, 24, 8, 25, 4, 0]],
+            "decoder_input_tokens": [[0, 3, 15, 7, 6, 8, 24, 8, 25, 4]],
             "decoder_loss_weights": [[1, 1, 1, 1, 1, 1, 1, 1, 1, 0]],
             "decoder_target_tokens": [[3, 15, 7, 6, 8, 24, 8, 25, 4, 0]],
             "encoder_input_tokens": [[
@@ -1369,10 +1374,12 @@ class MixtureTest(absltest.TestCase):
                 20,
                 2,
                 4,
+                0,
+                0,
             ],
-            "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
-            "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
-            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
+            "decoder_input_tokens": [0, 3, 15, 7, 6, 8, 24, 8, 25, 4],
+            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
         },
         {
             "encoder_input_tokens": [
@@ -1397,9 +1404,9 @@ class MixtureTest(absltest.TestCase):
                 21,
                 2,
             ],
-            "decoder_target_tokens": [3, 22, 4, 2, 18, 8, 25, 4],
-            "decoder_input_tokens": [3, 22, 4, 2, 18, 8, 25, 4],
-            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1],
+            "decoder_target_tokens": [3, 22, 4, 2, 18, 8, 25, 4, 0, 0],
+            "decoder_input_tokens": [0, 3, 22, 4, 2, 18, 8, 25, 4, 0],
+            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
         },
     ]
     test_utils.assert_datasets_equal(ds, expected)
@@ -1761,7 +1768,7 @@ class MixtureTest(absltest.TestCase):
         shuffle=False,
         shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
-        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
+        runtime_preprocessors=_create_runtime_preprocessors(),
     )
     expected = [
         {  # imdb task
@@ -1788,13 +1795,13 @@ class MixtureTest(absltest.TestCase):
                 0,
             ],
             "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
-            "decoder_input_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
+            "decoder_input_tokens": [0, 3, 15, 7, 6, 8, 24, 8, 25, 4],
             "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
         },
         {  # simple task
             "encoder_input_tokens": [0] * 20,
             "decoder_target_tokens": [1] * 10,
-            "decoder_input_tokens": [1] * 10,
+            "decoder_input_tokens": [0, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             "decoder_loss_weights": [1] * 10,
         },
         {  # imdb task
@@ -1821,13 +1828,13 @@ class MixtureTest(absltest.TestCase):
                 2,
             ],
             "decoder_target_tokens": [3, 22, 4, 2, 18, 8, 25, 4, 0, 0],
-            "decoder_input_tokens": [3, 22, 4, 2, 18, 8, 25, 4, 0, 0],
+            "decoder_input_tokens": [0, 3, 22, 4, 2, 18, 8, 25, 4, 0],
             "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
         },
         {  # simple task
             "encoder_input_tokens": [1] * 20,
             "decoder_target_tokens": [2] * 10,
-            "decoder_input_tokens": [2] * 10,
+            "decoder_input_tokens": [0, 2, 2, 2, 2, 2, 2, 2, 2, 2],
             "decoder_loss_weights": [1] * 10,
         },
         # imdb task now empty
@@ -1846,13 +1853,13 @@ class MixtureTest(absltest.TestCase):
         shuffle=False,
         shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
-        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
+        runtime_preprocessors=_create_runtime_preprocessors(),
         batch_size=2,
     )
     expected_first_batch = {
         "decoder_input_tokens": [
-            [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],  # imdb task
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],  # simple task
+            [0, 3, 15, 7, 6, 8, 24, 8, 25, 4],  # imdb task
+            [0, 1, 1, 1, 1, 1, 1, 1, 1, 1],  # simple task
         ],
         "decoder_loss_weights": [
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 0],  # imdb task
@@ -1979,24 +1986,24 @@ class MixtureTest(absltest.TestCase):
     ds = mix.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
-        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
+        runtime_preprocessors=_create_runtime_preprocessors(),
         batch_size=4,
     )
     expected_dataset = [
         {  # task 2 ex 1, task 1 ex 6, task 2 ex 2, task 1 ex 7
-            "decoder_input_tokens": [[1], [6], [2], [7]],
+            "decoder_input_tokens": [[0], [0], [0], [0]],
             "decoder_loss_weights": [[1], [1], [1], [1]],
             "decoder_target_tokens": [[1], [6], [2], [7]],
             "encoder_input_tokens": [[0, 0], [5, 5], [1, 1], [6, 6]],
         },
         {  # task 2 ex 3, task 1 ex 8, task 2 ex 4, task 1 ex 9
-            "decoder_input_tokens": [[3], [8], [4], [9]],
+            "decoder_input_tokens": [[0], [0], [0], [0]],
             "decoder_loss_weights": [[1], [1], [1], [1]],
             "decoder_target_tokens": [[3], [8], [4], [9]],
             "encoder_input_tokens": [[2, 2], [7, 7], [3, 3], [8, 8]],
         },
         {  # task 2 ex 5, task 1 ex 10 (last example), task 2 ex 6
-            "decoder_input_tokens": [[5], [10], [6]],
+            "decoder_input_tokens": [[0], [0], [0]],
             "decoder_loss_weights": [[1], [1], [1]],
             "decoder_target_tokens": [[5], [10], [6]],
             "encoder_input_tokens": [[4, 4], [9, 9], [5, 5]],
@@ -2087,24 +2094,24 @@ class MixtureTest(absltest.TestCase):
     ds = mix.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
-        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
+        runtime_preprocessors=_create_runtime_preprocessors(),
         batch_size=4,
     )
     expected_dataset = [
         {  # task 2 ex 1, task 1 ex 6, task 2 ex 2, task 1 ex 7
-            "decoder_input_tokens": [[1], [6], [2], [7]],
+            "decoder_input_tokens": [[0], [0], [0], [0]],
             "decoder_loss_weights": [[1], [1], [1], [1]],
             "decoder_target_tokens": [[1], [6], [2], [7]],
             "encoder_input_tokens": [[0, 0], [5, 5], [1, 1], [6, 6]],
         },
         {  # task 2 ex 3, task 1 ex 8, task 2 ex 4, task 1 ex 9
-            "decoder_input_tokens": [[3], [8], [4], [9]],
+            "decoder_input_tokens": [[0], [0], [0], [0]],
             "decoder_loss_weights": [[1], [1], [1], [1]],
             "decoder_target_tokens": [[3], [8], [4], [9]],
             "encoder_input_tokens": [[2, 2], [7, 7], [3, 3], [8, 8]],
         },
         {  # task 2 ex 5, task 1 ex 10 (last example), task 2 ex 6
-            "decoder_input_tokens": [[5], [10], [6]],
+            "decoder_input_tokens": [[0], [0], [0]],
             "decoder_loss_weights": [[1], [1], [1]],
             "decoder_target_tokens": [[5], [10], [6]],
             "encoder_input_tokens": [[4, 4], [9, 9], [5, 5]],

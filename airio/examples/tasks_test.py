@@ -19,7 +19,7 @@ import os
 from absl.testing import absltest
 import airio
 from airio import examples
-from airio.grain import feature_converters
+from airio.grain.common import feature_converters
 from seqio import vocabularies
 import tensorflow_datasets as tfds
 
@@ -42,6 +42,13 @@ class TasksTest(absltest.TestCase):
         "inputs": airio.tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),
         "targets": airio.tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),
     }
+    self.runtime_preprocessors = feature_converters.T5XEncDecFeatureConverter(
+        pack=False,
+        use_multi_bin_packing=False,
+        passthrough_feature_keys=[],
+        pad_id=0,
+        bos_id=0,
+    ).get_preprocessors()
 
   def test_wmt_task(self):
     with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
@@ -52,21 +59,17 @@ class TasksTest(absltest.TestCase):
         "inputs": _SOURCE_SEQUENCE_LENGTH,
         "targets": _SOURCE_SEQUENCE_LENGTH,
     }
-    runtime_preprocessors = (
-        feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
-            sequence_lengths
-        )
-    )
     ds = wmt_task.get_dataset(
         sequence_lengths,
         "train",
         shuffle=False,
-        runtime_preprocessors=runtime_preprocessors,
+        runtime_preprocessors=self.runtime_preprocessors,
         batch_size=2,
     )
     expected_first_batch = {
         "decoder_input_tokens": [
             [
+                0,
                 3,
                 2,
                 4,
@@ -82,7 +85,6 @@ class TasksTest(absltest.TestCase):
                 2,
                 4,
                 2,
-                0,
                 0,
                 0,
                 0,
@@ -101,6 +103,7 @@ class TasksTest(absltest.TestCase):
                 0,
             ],
             [
+                0,
                 3,
                 4,
                 20,
@@ -115,7 +118,6 @@ class TasksTest(absltest.TestCase):
                 13,
                 8,
                 2,
-                0,
                 0,
                 0,
                 0,
@@ -358,21 +360,17 @@ class TasksTest(absltest.TestCase):
         "inputs": _SOURCE_SEQUENCE_LENGTH,
         "targets": _SOURCE_SEQUENCE_LENGTH,
     }
-    runtime_preprocessors = (
-        feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
-            sequence_lengths
-        )
-    )
     ds = nqo_task.get_dataset(
         sequence_lengths,
         "train",
         shuffle=False,
-        runtime_preprocessors=runtime_preprocessors,
+        runtime_preprocessors=self.runtime_preprocessors,
         batch_size=2,
     )
     expected_first_batch = {
         "decoder_input_tokens": [
             [
+                0,
                 3,
                 4,
                 2,
@@ -404,9 +402,9 @@ class TasksTest(absltest.TestCase):
                 3,
                 8,
                 2,
-                3,
             ],
             [
+                0,
                 3,
                 20,
                 2,
@@ -437,7 +435,6 @@ class TasksTest(absltest.TestCase):
                 21,
                 2,
                 3,
-                21,
                 21,
             ],
         ],

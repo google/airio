@@ -19,7 +19,7 @@ from typing import Dict
 from absl import app
 import airio
 from airio.grain import dataset_providers as grain_dataset_providers
-from airio.grain import feature_converters
+from airio.grain.common import feature_converters
 from seqio import vocabularies
 
 
@@ -67,12 +67,13 @@ def create_task() -> grain_dataset_providers.GrainTask:
 def main(_) -> None:
   task = create_task()
   print(f"Task name: {task.name}\n")
-  runtime_preprocessors = (
-      # TODO(b/311543848): Fully remove FeatureConverter.
-      feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
-          {"inputs": 30, "targets": 5}
-      )
-  )
+  runtime_preprocessors = feature_converters.T5XEncDecFeatureConverter(
+      pack=False,
+      use_multi_bin_packing=False,
+      passthrough_feature_keys=[],
+      pad_id=0,
+      bos_id=0,
+  ).get_preprocessors()
   ds = task.get_dataset(
       sequence_lengths={"inputs": 30, "targets": 5},
       split="train",

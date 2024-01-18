@@ -21,7 +21,7 @@ from typing import Dict, Sequence
 import airio
 from airio import preprocessors as preprocessors_lib
 from airio.grain import dataset_providers
-from airio.grain import feature_converters
+from airio.grain.common import feature_converters
 import google_benchmark
 import grain.python as grain
 import jax
@@ -72,13 +72,16 @@ def _create_preprocessors() -> (
   ]
 
 
-def _create_runtime_preprocessors(
-    feature_lengths: Dict[str, int] | None = None,
-) -> Sequence[preprocessors_lib.AirIOPreprocessor]:
-  # TODO(b/311543848): Fully remove FeatureConverter.
-  return feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
-      task_feature_lengths=feature_lengths
-  )
+def _create_runtime_preprocessors() -> (
+    Sequence[preprocessors_lib.AirIOPreprocessor]
+):
+  return feature_converters.T5XEncDecFeatureConverter(
+      pack=False,
+      use_multi_bin_packing=False,
+      passthrough_feature_keys=["inputs", "targets"],
+      pad_id=0,
+      bos_id=0,
+  ).get_preprocessors()
 
 
 def _create_source(
@@ -260,7 +263,7 @@ def task_get_dataset_batched_with_sequence_lengths(state):
       source=_create_source(), preprocessors=_create_preprocessors()
   )
   sequence_lengths = {"inputs": 20, "targets": 10}
-  runtime_preprocessors = _create_runtime_preprocessors(sequence_lengths)
+  runtime_preprocessors = _create_runtime_preprocessors()
   while state:
     _ = task.get_dataset(
         sequence_lengths=sequence_lengths,
@@ -339,7 +342,7 @@ def task_get_dataset_with_lazy_iter_prep_with_runtime_preps_and_batching(state):
     _ = task_with_iter.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
-        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
+        runtime_preprocessors=_create_runtime_preprocessors(),
         batch_size=4,
     )
 
@@ -390,7 +393,7 @@ def task_get_dataset_with_none_elements_with_runtime_preps_and_batching(state):
       task_name="test_task_with_none",
   )
   sequence_lengths = {"inputs": 2, "targets": 1}
-  runtime_preprocessors = _create_runtime_preprocessors(sequence_lengths)
+  runtime_preprocessors = _create_runtime_preprocessors()
   while state:
     _ = task_with_iter.get_dataset(
         sequence_lengths=sequence_lengths,
@@ -415,7 +418,7 @@ def task_get_dataset_by_step_with_runtime_preps(state):
       source=_create_source(), preprocessors=_create_preprocessors()
   )
   sequence_lengths = {"inputs": 20, "targets": 10}
-  runtime_preprocessors = _create_runtime_preprocessors(sequence_lengths)
+  runtime_preprocessors = _create_runtime_preprocessors()
   while state:
     _ = task.get_dataset_by_step(
         num_records=1,
@@ -775,7 +778,7 @@ def mixture_with_runtime_preps(state):
         shuffle=False,
         shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
-        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
+        runtime_preprocessors=_create_runtime_preprocessors(),
     )
 
 
@@ -813,7 +816,7 @@ def mixture_with_runtime_preps_and_batching(state):
         shuffle=False,
         shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
-        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
+        runtime_preprocessors=_create_runtime_preprocessors(),
         batch_size=2,
     )
 
@@ -908,7 +911,7 @@ def mixing_with_iter_test_with_runtime_preps_and_batching(state):
     _ = mix.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
-        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
+        runtime_preprocessors=_create_runtime_preprocessors(),
         batch_size=4,
     )
 
@@ -995,7 +998,7 @@ def mixing_with_lazy_iter_preprocessor_with_runtime_preps_and_batching(state):
     _ = mix.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
-        runtime_preprocessors=_create_runtime_preprocessors(sequence_lengths),
+        runtime_preprocessors=_create_runtime_preprocessors(),
         batch_size=4,
     )
 
