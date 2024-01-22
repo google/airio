@@ -1,4 +1,4 @@
-# Copyright 2023 The AirIO Authors.
+# Copyright 2024 The AirIO Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -79,9 +79,7 @@ class MultiBinPackingMapTest(parameterized.TestCase):
     packer = packing.MultiBinPacker(
         feature_lengths={"inputs": 4}, num_partial_examples=10
     )
-    ds = packing.PackLazyMapDataset(
-        ds, pool_size=10, packer=packer
-    )
+    ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
     ds_iter = iter(ds)
 
     expected_elements = [
@@ -361,7 +359,8 @@ class MultiBinPackingMapTest(parameterized.TestCase):
     transform = packing.AirIOPackDatasetMapPreprocessor(
         pool_size=10, packer=packer
     )
-    ds = transform(ds, runtime_args)
+    unused_rng = None
+    ds = transform(ds, runtime_args, unused_rng)
     updated_runtime_args = transform.update_runtime_args(runtime_args)
     ds_iter = iter(ds)
 
@@ -490,7 +489,8 @@ class MultiBinPackingMapTest(parameterized.TestCase):
     packing_preprocessor = packing.AirIOPackDatasetMapPreprocessor(
         pool_size=10, packer=packer
     )
-    ds = packing_preprocessor(ds, runtime_args)
+    unused_rng = None
+    ds = packing_preprocessor(ds, runtime_args, unused_rng)
     updated_runtime_args = packing_preprocessor.update_runtime_args(
         runtime_args
     )
@@ -537,9 +537,7 @@ class MultiBinPackingMapTest(parameterized.TestCase):
     packer = packing.MultiBinPacker(
         feature_lengths={"inputs": 4}, num_partial_examples=10
     )
-    with self.assertRaisesRegex(
-        ValueError, "No packed examples.*"
-    ):
+    with self.assertRaisesRegex(ValueError, "No packed examples.*"):
       packer.get_packed_example()
 
 
@@ -560,7 +558,7 @@ class NoamPackingMapTest(parameterized.TestCase):
         # Second and third (partial) element packed together.
         [5, 6, 11, 12],
         # Third (remainder) and fourth element packed together.
-        [13, 14, 7]
+        [13, 14, 7],
     ]
     for actual, expected in zip(ds_iter, expected_elements, strict=True):
       # Elements are tuples with (inputs, inputs_segment_ids, inputs_positions).
@@ -575,12 +573,8 @@ class NoamPackingMapTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    packer = packing.NoamPacker(
-        feature_lengths={"inputs": 4}
-    )
-    ds = packing.PackLazyMapDataset(
-        ds, pool_size=10, packer=packer
-    )
+    packer = packing.NoamPacker(feature_lengths={"inputs": 4})
+    ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
     ds_iter = iter(ds)
 
     expected_elements = [
@@ -613,12 +607,8 @@ class NoamPackingMapTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    packer = packing.NoamPacker(
-        feature_lengths={"inputs": 2}
-    )
-    ds = packing.PackLazyMapDataset(
-        ds, pool_size=10, packer=packer
-    )
+    packer = packing.NoamPacker(feature_lengths={"inputs": 2})
+    ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
     ds_iter = iter(ds)
 
     expected_elements = [
@@ -659,9 +649,7 @@ class NoamPackingMapTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    packer = packing.NoamPacker(
-        feature_lengths={"inputs": 4, "targets": 4}
-    )
+    packer = packing.NoamPacker(feature_lengths={"inputs": 4, "targets": 4})
     ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
     ds_iter = iter(ds)
 
@@ -714,9 +702,7 @@ class NoamPackingMapTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    packer = packing.NoamPacker(
-        feature_lengths={"inputs": 6, "targets": 3}
-    )
+    packer = packing.NoamPacker(feature_lengths={"inputs": 6, "targets": 3})
     ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
     ds_iter = iter(ds)
 
@@ -828,7 +814,8 @@ class NoamPackingMapTest(parameterized.TestCase):
     transform = packing.AirIOPackDatasetMapPreprocessor(
         pool_size=10, packer=packer
     )
-    ds = transform(ds, runtime_args)
+    unused_rng = None
+    ds = transform(ds, runtime_args, unused_rng)
     updated_runtime_args = transform.update_runtime_args(runtime_args)
     ds_iter = iter(ds)
 
@@ -875,7 +862,8 @@ class NoamPackingMapTest(parameterized.TestCase):
     packing_preprocessor = packing.AirIOPackDatasetMapPreprocessor(
         pool_size=10, packer=packer
     )
-    ds = packing_preprocessor(ds, runtime_args)
+    unused_rng = None
+    ds = packing_preprocessor(ds, runtime_args, unused_rng)
     updated_runtime_args = packing_preprocessor.update_runtime_args(
         runtime_args
     )
@@ -952,9 +940,7 @@ class NoamPackingMapTest(parameterized.TestCase):
 
   def test_noam_packer_no_packed_example(self):
     packer = packing.NoamPacker(feature_lengths={"inputs": 4})
-    with self.assertRaisesRegex(
-        ValueError, "No packed examples.*"
-    ):
+    with self.assertRaisesRegex(ValueError, "No packed examples.*"):
       packer.get_packed_example()
 
 
@@ -1279,10 +1265,9 @@ class MultiBinPackingIterTest(parameterized.TestCase):
         num_partial_examples=10,
         # feature_lengths unset, will be set before packing.
     )
-    transform = packing.AirIOPackDatasetIterPreprocessor(
-        packer=packer
-    )
-    ds = transform(ds, runtime_args)
+    transform = packing.AirIOPackDatasetIterPreprocessor(packer=packer)
+    unused_rng = None
+    ds = transform(ds, runtime_args, unused_rng)
     updated_runtime_args = transform.update_runtime_args(runtime_args)
 
     # Verify updated runtime args
@@ -1348,7 +1333,8 @@ class MultiBinPackingIterTest(parameterized.TestCase):
     packing_preprocessor = packing.AirIOPackDatasetIterPreprocessor(
         packer=packer
     )
-    ds = packing_preprocessor(ds, runtime_args)
+    unused_rng = None
+    ds = packing_preprocessor(ds, runtime_args, unused_rng)
     updated_runtime_args = packing_preprocessor.update_runtime_args(
         runtime_args
     )
@@ -1675,10 +1661,9 @@ class NoamPackingIterTest(parameterized.TestCase):
     )
     packer = packing.NoamPacker()  # feature_lengths will be set before packing.
     transform = packing.AirIOPackDatasetIterPreprocessor(packer=packer)
-    ds = transform(ds, runtime_args)
-    updated_runtime_args = transform.update_runtime_args(
-        runtime_args
-    )
+    unused_rng = None
+    ds = transform(ds, runtime_args, unused_rng)
+    updated_runtime_args = transform.update_runtime_args(runtime_args)
 
     # Verify updated runtime args
     expected_updated_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
@@ -1724,7 +1709,8 @@ class NoamPackingIterTest(parameterized.TestCase):
     packing_preprocessor = packing.AirIOPackDatasetIterPreprocessor(
         packer=packer
     )
-    ds = packing_preprocessor(ds, runtime_args)
+    unused_rng = None
+    ds = packing_preprocessor(ds, runtime_args, unused_rng)
     updated_runtime_args = packing_preprocessor.update_runtime_args(
         runtime_args
     )
@@ -1816,7 +1802,8 @@ class CommonPackersTest(absltest.TestCase):
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 4}, split="unused"
     )
-    ds = packing.NoamPackMapPreprocessor(ds, runtime_args)
+    unused_rng = None
+    ds = packing.NoamPackMapPreprocessor(ds, runtime_args, unused_rng)
     updated_runtime_args = packing.NoamPackMapPreprocessor.update_runtime_args(
         runtime_args
     )
@@ -1846,9 +1833,8 @@ class CommonPackersTest(absltest.TestCase):
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 4}, split="unused"
     )
-    ds = packing.SingleBinTruePackMapPreprocessor(
-        ds, runtime_args
-    )
+    unused_rng = None
+    ds = packing.SingleBinTruePackMapPreprocessor(ds, runtime_args, unused_rng)
     updated_runtime_args = (
         packing.SingleBinTruePackMapPreprocessor.update_runtime_args(
             runtime_args
@@ -1906,9 +1892,8 @@ class CommonPackersTest(absltest.TestCase):
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 4}, split="unused"
     )
-    ds = packing.MultiBinTruePackMapPreprocessor(
-        ds, runtime_args
-    )
+    unused_rng = None
+    ds = packing.MultiBinTruePackMapPreprocessor(ds, runtime_args, unused_rng)
     updated_runtime_args = (
         packing.MultiBinTruePackMapPreprocessor.update_runtime_args(
             runtime_args
@@ -1965,13 +1950,10 @@ class CommonPackersTest(absltest.TestCase):
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 4}, split="unused"
     )
-    ds = packing.NoamPackIterPreprocessor(
-        ds, runtime_args
-    )
-    updated_runtime_args = (
-        packing.NoamPackIterPreprocessor.update_runtime_args(
-            runtime_args
-        )
+    unused_rng = None
+    ds = packing.NoamPackIterPreprocessor(ds, runtime_args, unused_rng)
+    updated_runtime_args = packing.NoamPackIterPreprocessor.update_runtime_args(
+        runtime_args
     )
 
     expected_elements = [
@@ -1998,9 +1980,8 @@ class CommonPackersTest(absltest.TestCase):
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 4}, split="unused"
     )
-    ds = packing.SingleBinTruePackIterPreprocessor(
-        ds, runtime_args
-    )
+    unused_rng = None
+    ds = packing.SingleBinTruePackIterPreprocessor(ds, runtime_args, unused_rng)
     updated_runtime_args = (
         packing.SingleBinTruePackIterPreprocessor.update_runtime_args(
             runtime_args
@@ -2057,9 +2038,8 @@ class CommonPackersTest(absltest.TestCase):
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 4}, split="unused"
     )
-    ds = packing.MultiBinTruePackIterPreprocessor(
-        ds, runtime_args
-    )
+    unused_rng = None
+    ds = packing.MultiBinTruePackIterPreprocessor(ds, runtime_args, unused_rng)
     updated_runtime_args = (
         packing.MultiBinTruePackIterPreprocessor.update_runtime_args(
             runtime_args

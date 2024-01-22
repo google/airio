@@ -1,4 +1,4 @@
-# Copyright 2023 The AirIO Authors.
+# Copyright 2024 The AirIO Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Microbenchmarks for AirIO dataset_providers functions."""
+
 
 import functools
 import os
@@ -299,7 +300,7 @@ def task_get_dataset_with_lazy_iter_prep(state):
       source=_create_fn_src(num_elements=10),
       preprocessors=[
           preprocessors_lib.LazyIterTransform(
-              lambda ds, _: TestFilterLazyIterDataset(ds, threshold=4),
+              lambda ds, *_: TestFilterLazyIterDataset(ds, threshold=4),
               update_runtime_args=lambda x: x,
           ),
           map_transform_idx_1,
@@ -330,7 +331,7 @@ def task_get_dataset_with_lazy_iter_prep_with_runtime_preps_and_batching(state):
       source=_create_fn_src(num_elements=10),
       preprocessors=[
           preprocessors_lib.LazyIterTransform(
-              lambda ds, _: TestFilterLazyIterDataset(ds, threshold=4),
+              lambda ds, *_: TestFilterLazyIterDataset(ds, threshold=4),
               update_runtime_args=lambda x: x,
           ),
           simple_to_imdb_prep,
@@ -935,7 +936,7 @@ def mixing_with_lazy_iter_preprocessor(state):
       source=_create_fn_src(num_elements=10),
       preprocessors=[
           preprocessors_lib.LazyIterTransform(
-              lambda ds, _: TestFilterLazyIterDataset(ds, threshold=4),
+              lambda ds, *_: TestFilterLazyIterDataset(ds, threshold=4),
               update_runtime_args=lambda x: x,
           ),
           map_transform_idx_1,
@@ -976,7 +977,7 @@ def mixing_with_lazy_iter_preprocessor_with_runtime_preps_and_batching(state):
       source=_create_fn_src(num_elements=10),
       preprocessors=[
           preprocessors_lib.LazyIterTransform(
-              lambda ds, _: TestFilterLazyIterDataset(ds, threshold=4),
+              lambda ds, *_: TestFilterLazyIterDataset(ds, threshold=4),
               update_runtime_args=lambda x: x,
           ),
           simple_to_imdb_prep,

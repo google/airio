@@ -1,4 +1,4 @@
-# Copyright 2023 The AirIO Authors.
+# Copyright 2024 The AirIO Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -153,7 +153,7 @@ class LazyMapTransform:
   """
 
   transform: Callable[
-      [lazy_dataset.LazyMapDataset, AirIOInjectedRuntimeArgs],
+      [lazy_dataset.LazyMapDataset, AirIOInjectedRuntimeArgs, JaxRng | None],
       lazy_dataset.LazyMapDataset,
   ]
   update_runtime_args: UpdateRuntimeArgsCallable
@@ -163,13 +163,14 @@ class LazyMapTransform:
       self,
       ds: lazy_dataset.LazyMapDataset,
       runtime_args: AirIOInjectedRuntimeArgs,
+      rng: JaxRng | None,
   ) -> lazy_dataset.LazyMapDataset:
     if not isinstance(ds, lazy_dataset.LazyMapDataset):
       raise ValueError(
           f"Cannot apply LazyMapDataset transform: {str(self.transform)} to"
           f" non-LazyMapDataset dataset: {str(ds)}"
       )
-    return self.transform(ds, runtime_args)
+    return self.transform(ds, runtime_args, rng)
 
 
 @dataclasses.dataclass
@@ -177,8 +178,8 @@ class LazyIterTransform:
   """AirIO preprocessor class for LazyIterDataset transformations.
 
   Avoid using this Transform class if possible. It is important for users to set
-  the `update_runtime_args` and `produces_sparse_datasets` attributes correctly
-  because it is not possible to verify correctness at runtime.
+  the `update_runtime_args` attribute correctly because it is not possible to
+  verify correctness at runtime.
 
   Attributes:
     transform: A `Callable` that preprocesses `lazy_dataset.LazyIterDataset`
@@ -191,7 +192,7 @@ class LazyIterTransform:
   """
 
   transform: Callable[
-      [lazy_dataset.LazyIterDataset, AirIOInjectedRuntimeArgs],
+      [lazy_dataset.LazyIterDataset, AirIOInjectedRuntimeArgs, JaxRng | None],
       lazy_dataset.LazyIterDataset,
   ]
   update_runtime_args: UpdateRuntimeArgsCallable
@@ -200,6 +201,7 @@ class LazyIterTransform:
       self,
       ds: lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset,
       runtime_args: AirIOInjectedRuntimeArgs,
+      rng: JaxRng | None,
   ) -> lazy_dataset.LazyIterDataset:
     if isinstance(ds, lazy_dataset.LazyMapDataset):
       ds = ds.to_iter_dataset()
@@ -208,7 +210,7 @@ class LazyIterTransform:
           f"Cannot apply LazyIterDataset transform: {str(self.transform)} to"
           f" non-LazyIterDataset dataset: {str(ds)}"
       )
-    return self.transform(ds, runtime_args)
+    return self.transform(ds, runtime_args, rng)
 
 
 FnTransforms = MapFnTransform | RandomMapFnTransform | FilterFnTransform
@@ -217,9 +219,7 @@ LazyTransforms = LazyMapTransform | LazyIterTransform
 AirIOPreprocessor = grain.Transformation | LazyTransforms
 
 
-def produces_none_elements(
-    preprocessor: AirIOPreprocessor,
-) -> bool:
+def produces_none_elements(preprocessor: AirIOPreprocessor) -> bool:
   """Returns True if preprocessor produces None elements, e.g. filters and LazyMap transforms.
 
   This is a best-effort check and may be wrong, e.g. a grain.MapTransform impl
@@ -306,9 +306,9 @@ class LazyDatasetTransform:
             drop_remainder=self.transform.drop_remainder,
         )
       case LazyMapTransform():
-        return self.transform(ds, runtime_args)
+        return self.transform(ds, runtime_args, rng)
       case LazyIterTransform():
-        return self.transform(ds, runtime_args)
+        return self.transform(ds, runtime_args, rng)
       case _:
         # Should be taken care of by post init validation.
         raise ValueError("%s is not supported" % str(self.transform))

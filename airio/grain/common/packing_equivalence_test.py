@@ -1,4 +1,4 @@
-# Copyright 2023 The AirIO Authors.
+# Copyright 2024 The AirIO Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -88,8 +88,9 @@ class PackingEquivalenceTest(absltest.TestCase):
     runtime_args = airio.preprocessors.AirIOInjectedRuntimeArgs(
         sequence_lengths={"targets": 1024}, split="unused"
     )
-    packed_airio_ds, _ = airio.common.packing.NoamPackMapPreprocessor(
-        packed_airio_ds, runtime_args
+    unused_rng = None
+    packed_airio_ds = airio.grain.common.packing.NoamPackMapPreprocessor(
+        packed_airio_ds, runtime_args, unused_rng
     )
     packed_airio_ds_iter = iter(packed_airio_ds)
 
@@ -163,13 +164,15 @@ class PackingEquivalenceTest(absltest.TestCase):
     runtime_args = airio.preprocessors.AirIOInjectedRuntimeArgs(
         sequence_lengths=feature_lengths, split="unused"
     )
-    packed_airio_ds, updated_runtime_args = (
-        airio.common.packing.SingleBinTruePackMapPreprocessor(
-            packed_airio_ds, runtime_args
+    unused_rng = None
+    pack_prep = airio.grain.common.packing.SingleBinTruePackMapPreprocessor
+    packed_airio_ds = pack_prep(packed_airio_ds, runtime_args, unused_rng)
+    updated_runtime_args = pack_prep.update_runtime_args(runtime_args)
+    packed_airio_ds = packed_airio_ds.map(
+        functools.partial(
+            airio.grain.common.pad, runtime_args=updated_runtime_args
         )
     )
-    packed_airio_ds = packed_airio_ds.map(
-        functools.partial(airio.common.pad, runtime_args=updated_runtime_args))
     packed_airio_ds_iter = iter(packed_airio_ds)
 
     # Step 4: Verify that they are exactly the same.
@@ -258,13 +261,16 @@ class PackingEquivalenceTest(absltest.TestCase):
     runtime_args = airio.preprocessors.AirIOInjectedRuntimeArgs(
         sequence_lengths=feature_lengths, split="unused"
     )
-    packed_airio_ds, updated_runtime_args = (
-        airio.common.packing.MultiBinTruePackMapPreprocessor(
-            packed_airio_ds, runtime_args
+    unused_rng = None
+    pack_prep = airio.grain.common.packing.MultiBinTruePackMapPreprocessor
+    packed_airio_ds = pack_prep(packed_airio_ds, runtime_args, unused_rng)
+    updated_runtime_args = pack_prep.update_runtime_args(runtime_args)
+
+    packed_airio_ds = packed_airio_ds.map(
+        functools.partial(
+            airio.grain.common.pad, runtime_args=updated_runtime_args
         )
     )
-    packed_airio_ds = packed_airio_ds.map(
-        functools.partial(airio.common.pad, runtime_args=updated_runtime_args))
     packed_airio_ds = list(iter(packed_airio_ds))
 
     # Step 4: Verify that examples are exactly the same, but possibly reordered.

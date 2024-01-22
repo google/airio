@@ -1,4 +1,4 @@
-# Copyright 2023 The AirIO Authors.
+# Copyright 2024 The AirIO Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -114,6 +114,7 @@ class AirIOPackDatasetMapPreprocessor:
       self,
       ds: lazy_dataset.LazyMapDataset,
       runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
+      unused_rng: jax.Array,
   ) -> lazy_dataset.LazyMapDataset:
     self.packer.feature_lengths = runtime_args.sequence_lengths
     if not isinstance(self.pool_size, int):
@@ -152,6 +153,7 @@ class AirIOPackDatasetIterPreprocessor:
       self,
       ds: lazy_dataset.LazyIterDataset,
       runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
+      unused_rng: jax.Array,
   ) -> lazy_dataset.LazyIterDataset:
     self.packer.feature_lengths = runtime_args.sequence_lengths
     return PackLazyIterDataset(ds, packer=self.packer)

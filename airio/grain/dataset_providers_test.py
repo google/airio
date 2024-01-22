@@ -1,4 +1,4 @@
-# Copyright 2023 The AirIO Authors.
+# Copyright 2024 The AirIO Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -578,7 +578,9 @@ class TaskTest(absltest.TestCase):
         source=_create_fn_src(num_elements=10),
         preprocessors=[
             preprocessors_lib.LazyIterTransform(
-                lambda ds, _: TestFilterLazyIterDataset(ds, threshold=4),
+                lambda ds, unused_args, unused_rng: TestFilterLazyIterDataset(
+                    ds, threshold=4
+                ),
                 update_runtime_args=lambda x: x,
             ),
             self._map_transform_idx_1,
@@ -602,7 +604,9 @@ class TaskTest(absltest.TestCase):
         source=_create_fn_src(num_elements=10),
         preprocessors=[
             preprocessors_lib.LazyIterTransform(
-                lambda ds, _: TestFilterLazyIterDataset(ds, threshold=4),
+                lambda ds, unused_args, unused_rng: TestFilterLazyIterDataset(
+                    ds, threshold=4
+                ),
                 update_runtime_args=lambda x: x,
             ),
             self._simple_to_imdb_prep,
@@ -1065,8 +1069,9 @@ class TaskTest(absltest.TestCase):
     def lazy_id_fn(
         ds: lazy_dataset.LazyMapDataset,
         rargs: preprocessors_lib.AirIOInjectedRuntimeArgs,
+        rng: jax.Array,
     ):
-      del rargs
+      del rargs, rng
       return ds
 
     preprocessors = _create_preprocessors() + [
@@ -2026,7 +2031,9 @@ class MixtureTest(absltest.TestCase):
         source=_create_fn_src(num_elements=10),
         preprocessors=[
             preprocessors_lib.LazyIterTransform(
-                lambda ds, _: TestFilterLazyIterDataset(ds, threshold=4),
+                lambda ds, unused_args, unused_rng: TestFilterLazyIterDataset(
+                    ds, threshold=4
+                ),
                 update_runtime_args=lambda x: x,
             ),
             self._map_transform_idx_1,
@@ -2071,7 +2078,9 @@ class MixtureTest(absltest.TestCase):
         source=_create_fn_src(num_elements=10),
         preprocessors=[
             preprocessors_lib.LazyIterTransform(
-                lambda ds, _: TestFilterLazyIterDataset(ds, threshold=4),
+                lambda ds, unused_args, unused_rng: TestFilterLazyIterDataset(
+                    ds, threshold=4
+                ),
                 update_runtime_args=lambda x: x,
             ),
             self._simple_to_imdb_prep,

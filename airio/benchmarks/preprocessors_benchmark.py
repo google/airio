@@ -1,4 +1,4 @@
-# Copyright 2023 The AirIO Authors.
+# Copyright 2024 The AirIO Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Microbenchmarks for AirIO preprocessors functions."""
+
 
 import os
 
@@ -40,6 +41,7 @@ _TOKENIZER_CONFIG = airio.tokenizer.TokenizerConfig(vocab=_SENTENCEPIECE_VOCAB)
 def _lazy_map_fn(
     ds: lazy_dataset.LazyMapDataset,
     run_args: airio.preprocessors.AirIOInjectedRuntimeArgs,
+    unused_rng: jax.Array
 ):
   return ds.map(lambda x: x + run_args.sequence_lengths["val"])
 
@@ -47,6 +49,7 @@ def _lazy_map_fn(
 def _lazy_iter_fn(
     ds: lazy_dataset.LazyIterDataset,
     run_args: airio.preprocessors.AirIOInjectedRuntimeArgs,
+    unused_rng: jax.Array
 ):
   return ds.map(lambda x: x + run_args.sequence_lengths["val"])
 
@@ -416,7 +419,8 @@ def lazy_map_transform_with_runtime_args(state):
   )
   ds = lazy_dataset.SourceLazyMapDataset(range(10))
   while state:
-    _ = transform(ds, runtime_args)
+    unused_rng = None
+    _ = transform(ds, runtime_args, unused_rng)
 
 
 @google_benchmark.register
@@ -439,7 +443,7 @@ def lazy_map_transform_with_none_elements_and_runtime_args(state):
         return self._parent[index]
       return None
 
-  def lazy_map_fn_with_nones(ds, runtime_args):
+  def lazy_map_fn_with_nones(ds, runtime_args, unused_rng):
     return MyLazyMapDataset(ds, threshold=runtime_args.sequence_lengths["val"])
 
   runtime_args = _get_runtime_args()
@@ -450,7 +454,8 @@ def lazy_map_transform_with_none_elements_and_runtime_args(state):
   )
   ds = lazy_dataset.SourceLazyMapDataset(range(10))
   while state:
-    _ = transform(ds, runtime_args)
+    unused_rng = None
+    _ = transform(ds, runtime_args, unused_rng)
 
 
 @google_benchmark.register
@@ -464,7 +469,8 @@ def lazy_iter_transform_with_runtime_args(state):
   ds = lazy_dataset.SourceLazyMapDataset(range(10))
   ds = ds.to_iter_dataset()
   while state:
-    _ = transform(ds, runtime_args)
+    unused_rng = None
+    _ = transform(ds, runtime_args, unused_rng)
 
 
 @google_benchmark.register
@@ -477,7 +483,8 @@ def lazy_iter_transform_on_map_dataset_with_runtime_args(state):
   )
   ds = lazy_dataset.SourceLazyMapDataset(range(10))
   while state:
-    _ = transform(ds, runtime_args)
+    unused_rng = None
+    _ = transform(ds, runtime_args, unused_rng)
 
 
 @google_benchmark.register
@@ -531,7 +538,8 @@ def lazy_iter_transform_on_iter_dataset_with_runtime_args(state):
   ds = lazy_dataset.SourceLazyMapDataset(range(10))
   ds = ds.to_iter_dataset()
   while state:
-    _ = transform(ds, runtime_args)
+    unused_rng = None
+    _ = transform(ds, runtime_args, unused_rng)
 
 
 if __name__ == "__main__":
