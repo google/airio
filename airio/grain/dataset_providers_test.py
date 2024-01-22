@@ -1169,6 +1169,80 @@ class TaskTest(absltest.TestCase):
     ]
     test_utils.assert_datasets_equal(ds, expected)
 
+  def test_task_lazy_dataset_batch_across_epochs(self):
+    # Create a Task with 3 elements.
+    test_task = _create_task(
+        source=_create_fn_src(num_elements=3),
+        preprocessors=[],
+    )
+    # Repeat for two epochs and batch with size 2
+    test_task._switch_to_lazy_dataset = mock.Mock(return_value=True)
+    ds = test_task.get_dataset(shuffle=False, num_epochs=2, batch_size=2)
+    ds = list(ds)
+    # In the 2nd batched example, the first element is from the first epoch, and
+    # the second element is from the second epoch
+    expected_ds = [[0, 1], [2, 0], [1, 2]]
+    for actual, expected in zip(ds, expected_ds, strict=True):
+      np.testing.assert_array_equal(actual, expected)
+
+  def test_task_lazy_dataset_batch_after_shuffle(self):
+    test_task = _create_task(
+        source=_create_fn_src(num_elements=10),
+        preprocessors=[],
+    )
+    test_task._switch_to_lazy_dataset = mock.Mock(return_value=True)
+    ds = test_task.get_dataset(shuffle=True, seed=94043, batch_size=5)
+    ds = list(ds)
+    expected_ds = [[5, 3, 7, 4, 2], [8, 6, 0, 1, 9]]
+    for actual, expected in zip(ds, expected_ds, strict=True):
+      np.testing.assert_array_equal(actual, expected)
+
+  def test_task_lazy_dataset_runtime_preprocessors_after_shuffle(self):
+    class ElemAndIdMapDataset(lazy_dataset.LazyMapDataset):
+      """Returns a pair of the element and its index."""
+
+      def __len__(self):
+        return len(self._parent)
+
+      def __getitem__(self, index):
+        if isinstance(index, slice):
+          return self.slice(index)
+        return (self._parent[index], index)
+
+    def prep_fn(ds, runtime_args, rng):
+      del runtime_args, rng
+      return ElemAndIdMapDataset(ds)
+
+    runtime_prep = preprocessors_lib.LazyMapTransform(
+        prep_fn,
+        update_runtime_args=lambda rargs: rargs,
+        has_none_elements=False,
+    )
+    test_task = _create_task(
+        source=_create_fn_src(num_elements=10),
+        preprocessors=[]
+    )
+    test_task._switch_to_lazy_dataset = mock.Mock(return_value=True)
+    ds = test_task.get_dataset(
+        shuffle=True, seed=94043, runtime_preprocessors=[runtime_prep]
+    )
+    ds = list(ds)
+
+    expected_ds = [
+        (5, 0),  # 6th elem is at 1st position after shuffle.
+        (3, 1),  # 3rd elem is at 2nd position after shuffle.
+        (7, 2),  # and so on.
+        (4, 3),
+        (2, 4),  # Note: the ids are not shuffled, only the examples, meaning
+        (8, 5),  # that the shuffling ran before the runtime preprocessor.
+        (6, 6),
+        (0, 7),
+        (1, 8),
+        (9, 9),
+    ]
+    for actual, expected in zip(ds, expected_ds, strict=True):
+      np.testing.assert_array_equal(actual, expected)
+
 
 class TaskBuilderTest(absltest.TestCase):
 

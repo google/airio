@@ -34,6 +34,7 @@ lazy_dataset = grain.experimental.lazy_dataset
 # TODO(sahildua): Expose these data sources as AirIO data sources?
 GrainDataSource = grain.RandomAccessDataSource
 AirIOPreprocessor = preprocessors_lib.AirIOPreprocessor
+JaxRng = jax.Array
 
 
 class GrainTask(airio.dataset_providers.Task):
@@ -55,6 +56,21 @@ class GrainTask(airio.dataset_providers.Task):
       if not isinstance(preprocessor, grain.Transformation):
         return True
     return False
+
+  def _apply_preprocessors_to_lazy_dataset(
+      self,
+      ds,
+      preps: Sequence[AirIOPreprocessor],
+      runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
+      base_rng: JaxRng,
+  ):
+    prep_rng = base_rng
+    for prep in preps:
+      transform = preprocessors_lib.LazyDatasetTransform(prep)
+      ds = transform(ds, prep_rng, runtime_args)
+      runtime_args = transform.get_updated_runtime_args(runtime_args)
+      prep_rng, _ = jax.random.split(prep_rng)
+    return ds, runtime_args
 
   def get_lazy_dataset(
       self,
@@ -89,33 +105,45 @@ class GrainTask(airio.dataset_providers.Task):
 
     # Step 3: Run preprocessors and shuffle each epoch (if needed)
     preps = self._preprocessors
-    if runtime_preprocessors:
-      preps.extend(runtime_preprocessors)
-    if batch_size:
-      preps.append(grain.Batch(batch_size=batch_size, drop_remainder=False))
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths=sequence_lengths, split=split
     )
     preprocessed_dss = []
+    updated_runtime_args = runtime_args
     next_epoch_rng = jax.random.PRNGKey(seed)
     for ds in dss:
+      ds_runtime_args = runtime_args.clone()
       next_epoch_rng, prep_rng = jax.random.split(next_epoch_rng)
       prep_rng, shuffle_rng = jax.random.split(prep_rng)
-      for prep in preps:
-        transform = preprocessors_lib.LazyDatasetTransform(prep)
-        ds = transform(ds, prep_rng, runtime_args)
-        runtime_args = transform.get_updated_runtime_args(runtime_args)
-        prep_rng, _ = jax.random.split(prep_rng)
+      ds, updated_runtime_args = self._apply_preprocessors_to_lazy_dataset(
+          ds, preps, ds_runtime_args, prep_rng
+      )
       if shuffle:
         shuffle_seed = int(jax.random.randint(shuffle_rng, [], 0, 2**16 - 1))
         ds = lazy_dataset.ShuffleLazyMapDataset(ds, seed=shuffle_seed)
       preprocessed_dss.append(ds)
+    runtime_args = updated_runtime_args
     # pylint:enable=protected-access
 
     # Step 4: Combine epochs if needed
     if len(preprocessed_dss) == 1:
-      return preprocessed_dss[0]
-    return airio.lazy_dataset_transforms.ConcatLazyMapDataset(preprocessed_dss)
+      ds = preprocessed_dss[0]
+    else:
+      ds = airio.lazy_dataset_transforms.ConcatLazyMapDataset(preprocessed_dss)
+
+    # Step 5: Apply runtime preprocessors and batching, if needed
+    runtime_preps = []
+    if runtime_preprocessors:
+      runtime_preps.extend(runtime_preprocessors)
+    if batch_size:
+      runtime_preps.append(
+          grain.Batch(batch_size=batch_size, drop_remainder=False)
+      )
+    unused_next_epoch_rng, prep_rng = jax.random.split(next_epoch_rng)
+    ds, _ = self._apply_preprocessors_to_lazy_dataset(
+        ds, runtime_preps, runtime_args, prep_rng
+    )
+    return ds
 
   # TODO(sahildua): Add logging.
   def get_dataset(
