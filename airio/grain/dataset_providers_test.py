@@ -1079,7 +1079,8 @@ class TaskTest(absltest.TestCase):
         preprocessors_lib.LazyMapTransform(
             lazy_id_fn,
             update_runtime_args=lambda rargs: rargs,
-            has_none_elements=False,
+            produces_none_elements=False,
+            requires_non_none_elements=False,
         )
     ]
     source = _create_source(
@@ -1217,7 +1218,8 @@ class TaskTest(absltest.TestCase):
     runtime_prep = preprocessors_lib.LazyMapTransform(
         prep_fn,
         update_runtime_args=lambda rargs: rargs,
-        has_none_elements=False,
+        produces_none_elements=False,
+        requires_non_none_elements=False,
     )
     test_task = _create_task(
         source=_create_fn_src(num_elements=10), preprocessors=[]
@@ -1239,6 +1241,131 @@ class TaskTest(absltest.TestCase):
         (0, 7),
         (1, 8),
         (9, 9),
+    ]
+    for actual, expected in zip(ds, expected_ds, strict=True):
+      np.testing.assert_array_equal(actual, expected)
+
+  def test_task_requires_non_none_prep_raises_error(self):
+    produces_none_prep = preprocessors_lib.LazyMapTransform(
+        lambda ds, *_: ds,
+        update_runtime_args=lambda args: args,
+        produces_none_elements=True,
+        requires_non_none_elements=False,
+    )
+    requires_non_none_prep = preprocessors_lib.LazyMapTransform(
+        lambda ds, *_: ds,
+        update_runtime_args=lambda args: args,
+        produces_none_elements=True,
+        requires_non_none_elements=True,
+    )
+    test_task = _create_task(
+        source=_create_fn_src(num_elements=10),
+        preprocessors=[produces_none_prep, requires_non_none_prep],
+    )
+    test_task._switch_to_lazy_dataset = mock.Mock(return_value=True)
+    with self.assertRaisesRegex(
+        ValueError,
+        "There are preprocessors in this Task that produce none elements.*",
+    ):
+      _ = test_task.get_dataset()
+
+  def test_task_requires_non_none_prep_converts_ds_to_iter(self):
+    class FilterMapDataset(lazy_dataset.LazyMapDataset):
+      """Filters out the 3rd element."""
+
+      def __len__(self):
+        return len(self._parent)
+
+      def __getitem__(self, index):
+        if isinstance(index, slice):
+          return self.slice(index)
+        if index > 2 and index < 4:
+          return None
+        return self._parent[index]
+
+    def prep_fn(ds, runtime_args, rng):
+      del runtime_args, rng
+      return FilterMapDataset(ds)
+
+    make_dict_prep = preprocessors_lib.MapFnTransform(lambda x: {"val": x})
+    filter_prep = preprocessors_lib.LazyMapTransform(
+        prep_fn,
+        update_runtime_args=lambda rargs: rargs,
+        produces_none_elements=True,
+        requires_non_none_elements=False,
+    )
+    test_task = _create_task(
+        source=_create_fn_src(num_elements=10),
+        preprocessors=[make_dict_prep, filter_prep],
+    )
+    test_task._switch_to_lazy_dataset = mock.Mock(return_value=True)
+    ds = test_task.get_dataset(
+        shuffle=False, batch_size=2
+    )
+    ds = list(ds)
+    # The none element between '2' and '4' is removed when the dataset is
+    # converted to an iterator because requires_non_none_elements is True
+    # for batching.
+    expected_ds = [
+        {"val": [0, 1]},
+        {"val": [2, 4]},
+        {"val": [5, 6]},
+        {"val": [7, 8]},
+        {"val": [9]},
+    ]
+    for actual, expected in zip(ds, expected_ds, strict=True):
+      np.testing.assert_array_equal(actual["val"], expected["val"])
+
+  def test_task_initial_ds_has_non_none_elems(self):
+    requires_non_none_prep = preprocessors_lib.LazyMapTransform(
+        lambda ds, *_: ds,
+        update_runtime_args=lambda args: args,
+        produces_none_elements=True,
+        requires_non_none_elements=True,
+    )
+    test_task = _create_task(
+        source=_create_fn_src(num_elements=10),
+        preprocessors=[requires_non_none_prep],
+    )
+    test_task._switch_to_lazy_dataset = mock.Mock(return_value=True)
+    ds = test_task.get_dataset(
+        shuffle=False, batch_size=2
+    )
+    ds = list(ds)
+    expected_ds = [
+        [0, 1],
+        [2, 3],
+        [4, 5],
+        [6, 7],
+        [8, 9],
+    ]
+    for actual, expected in zip(ds, expected_ds, strict=True):
+      np.testing.assert_array_equal(actual, expected)
+
+  def test_task_no_preps_has_non_none_elems(self):
+    requires_non_none_prep = preprocessors_lib.LazyMapTransform(
+        lambda ds, *_: ds,
+        update_runtime_args=lambda args: args,
+        produces_none_elements=True,
+        requires_non_none_elements=True,
+    )
+    test_task = _create_task(
+        source=_create_fn_src(num_elements=10),
+        preprocessors=[],
+    )
+    test_task._switch_to_lazy_dataset = mock.Mock(return_value=True)
+    ds = test_task.get_dataset(
+        shuffle=False,
+        runtime_preprocessors=[requires_non_none_prep],
+        batch_size=2,
+    )
+    ds = list(ds)
+    expected_ds = [
+        [0, 1],
+        [2, 3],
+        [4, 5],
+        [6, 7],
+        [8, 9],
     ]
     for actual, expected in zip(ds, expected_ds, strict=True):
       np.testing.assert_array_equal(actual, expected)

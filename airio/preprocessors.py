@@ -137,7 +137,7 @@ class LazyMapTransform:
   """AirIO preprocessor class for LazyMapDataset transformations.
 
   Avoid using this Transform class if possible. It is important for users to set
-  the `update_runtime_args` and `produces_sparse_datasets` attributes correctly
+  the `update_runtime_args` and `produces_none_elements` attributes correctly
   because it is not possible to verify correctness at runtime.
 
   Attributes:
@@ -148,8 +148,11 @@ class LazyMapTransform:
       `AirIOInjectedRuntimeArgs` for use by subsequent transforms if this
       transform modifies or adds new features (e.g. segment ids after packing).
       Pass `lambda x: x` if runtime args aren't updated.
-    has_none_elements: A bool to indicate whether the transform removes examples
-      from the original dataset, e.g. filtering, packing, etc.
+    produces_none_elements: A bool to indicate whether the transform removes
+      examples from the original dataset, e.g. filtering, packing, etc.
+    requires_non_none_elements: A bool to indicate whether the transform
+      requires strictly non-None elements in the original dataset, e.g.
+      batching, mixing, etc.
   """
 
   transform: Callable[
@@ -157,7 +160,8 @@ class LazyMapTransform:
       lazy_dataset.LazyMapDataset,
   ]
   update_runtime_args: UpdateRuntimeArgsCallable
-  has_none_elements: bool
+  produces_none_elements: bool
+  requires_non_none_elements: bool
 
   def __call__(
       self,
@@ -213,27 +217,12 @@ class LazyIterTransform:
     return self.transform(ds, runtime_args, rng)
 
 
+# These may be extended; update LazyDatasetTransform properties when adding new
+# preprocessor types, specifically `produces_none_elements`,
+# `can_process_iter_dataset`, and `requires_non_none_elements`.
 FnTransforms = MapFnTransform | RandomMapFnTransform | FilterFnTransform
 LazyTransforms = LazyMapTransform | LazyIterTransform
-# This may be extended as needed.
 AirIOPreprocessor = grain.Transformation | LazyTransforms
-
-
-def produces_none_elements(preprocessor: AirIOPreprocessor) -> bool:
-  """Returns True if preprocessor produces None elements, e.g. filters and LazyMap transforms.
-
-  This is a best-effort check and may be wrong, e.g. a grain.MapTransform impl
-  could produce None elements, a LazyMapTransform `has_none_elements` attr could
-  be misconfigured, etc.
-
-  Args:
-    preprocessor: An `AirIOPreprocessor` to check.
-  """
-  if isinstance(preprocessor, grain.FilterTransform):
-    return True
-  if isinstance(preprocessor, LazyMapTransform):
-    return preprocessor.has_none_elements
-  return False
 
 
 @dataclasses.dataclass
@@ -268,6 +257,30 @@ class LazyDatasetTransform:
       return self.transform.update_runtime_args(runtime_args)
     return runtime_args
     # pytype:enable=attribute-error
+
+  @property
+  def produces_none_elements(self) -> bool:
+    """Returns True if the transform produces None elements, e.g. filters and LazyMap transforms.
+
+    This is a best-effort check and may be wrong, e.g. a grain.MapTransform impl
+    could produce None elements, a LazyMapTransform `produces_none_elements`
+    attr could be misconfigured, etc.
+    """
+    if isinstance(self.transform, grain.FilterTransform):
+      return True
+    if isinstance(self.transform, LazyMapTransform):
+      return self.transform.produces_none_elements
+    return False
+
+  @property
+  def requires_non_none_elements(self)  -> bool:
+    if isinstance(self.transform, LazyMapTransform):
+      return self.transform.requires_non_none_elements
+    return isinstance(self.transform, grain.Batch)
+
+  @property
+  def can_process_iter_dataset(self) -> bool:
+    return not isinstance(self.transform, LazyMapTransform)
 
   def __call__(
       self,

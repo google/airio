@@ -14,7 +14,8 @@
 
 """Classes for AirIO data loading with Grain."""
 
-from typing import Any, Iterable, Mapping, Sequence
+import functools
+from typing import cast, Any, Iterable, Mapping, Sequence, Union
 
 import airio
 # Import "preprocessors" as "preprocessors_lib" to prevent naming conflicts with
@@ -65,14 +66,32 @@ class GrainTask(airio.dataset_providers.Task):
       preps: Sequence[AirIOPreprocessor],
       runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
       base_rng: JaxRng,
+      has_none_elems: bool,
   ):
+    print("_apply_preprocessors_to_lazy_dataset", has_none_elems, preps)
     prep_rng = base_rng
     for prep in preps:
       transform = preprocessors_lib.LazyDatasetTransform(prep)
+      if (
+          has_none_elems
+          and transform.requires_non_none_elements
+          and isinstance(ds, lazy_dataset.LazyMapDataset)
+      ):
+        if not transform.can_process_iter_dataset:
+          raise ValueError(
+              "There are preprocessors in this Task that produce none elements"
+              " and a preprocessor which requires a non-none dataset. Consider"
+              " replacing this with a preprocessor that can either handle none"
+              " elements, or process a LazyIterDataset. Task name:"
+              f" {self.name}, preprocessor: {prep}"
+          )
+        ds = ds.to_iter_dataset()
+      if transform.produces_none_elements:
+        has_none_elems = True
       ds = transform(ds, prep_rng, runtime_args)
       runtime_args = transform.get_updated_runtime_args(runtime_args)
       prep_rng, _ = jax.random.split(prep_rng)
-    return ds, runtime_args
+    return ds, runtime_args, has_none_elems
 
   def get_lazy_dataset(
       self,
@@ -112,13 +131,16 @@ class GrainTask(airio.dataset_providers.Task):
     )
     preprocessed_dss = []
     updated_runtime_args = runtime_args
+    has_none_elems = False
     next_epoch_rng = jax.random.PRNGKey(seed)
     for ds in dss:
       ds_runtime_args = runtime_args.clone()
       next_epoch_rng, prep_rng = jax.random.split(next_epoch_rng)
       prep_rng, shuffle_rng = jax.random.split(prep_rng)
-      ds, updated_runtime_args = self._apply_preprocessors_to_lazy_dataset(
-          ds, preps, ds_runtime_args, prep_rng
+      ds, updated_runtime_args, has_none_elems = (
+          self._apply_preprocessors_to_lazy_dataset(
+              ds, preps, ds_runtime_args, prep_rng, has_none_elems
+          )
       )
       if shuffle:
         shuffle_seed = int(jax.random.randint(shuffle_rng, [], 0, 2**16 - 1))
@@ -142,8 +164,8 @@ class GrainTask(airio.dataset_providers.Task):
           grain.Batch(batch_size=batch_size, drop_remainder=False)
       )
     unused_next_epoch_rng, prep_rng = jax.random.split(next_epoch_rng)
-    ds, _ = self._apply_preprocessors_to_lazy_dataset(
-        ds, runtime_preps, runtime_args, prep_rng
+    ds, _, _ = self._apply_preprocessors_to_lazy_dataset(
+        ds, runtime_preps, runtime_args, prep_rng, has_none_elems
     )
     return ds
 
@@ -318,6 +340,17 @@ class GrainTask(airio.dataset_providers.Task):
 
     return accumulated_result
 
+  @functools.cached_property
+  def produces_none_elements(self) -> bool:
+    """Returns True if any preprocessor returns none elements, excluding runtime preprocessors and batching.
+
+    This is a best-effort check and may be wrong.
+    """
+    return any([
+        preprocessors_lib.LazyDatasetTransform(prep).produces_none_elements
+        for prep in self._preprocessors
+    ])
+
 
 class GrainMixture(airio.dataset_providers.Mixture):
   """A class for mixture of Tasks."""
@@ -325,9 +358,7 @@ class GrainMixture(airio.dataset_providers.Mixture):
   def __init__(
       self,
       name: str,
-      tasks: Sequence[
-          airio.dataset_providers.Task | airio.dataset_providers.Mixture
-      ],
+      tasks: Sequence[Union[GrainTask, "GrainMixture"]],
       proportions: Sequence[float],
   ):
     for task in tasks:
@@ -388,9 +419,9 @@ class GrainMixture(airio.dataset_providers.Mixture):
     # If any Task dataset produces None elements, mixing it with a LazyMap impl
     # will deviate from desired proportions because None elements will be
     # sampled. A LazyIter impl for mixing must be used for correct behavior.
-    use_mix_iter = use_mix_iter or any(
-        [task.produces_none_elements() for task in self.leaf_tasks]
-    )
+    use_mix_iter = use_mix_iter or any([
+        cast(GrainTask, task).produces_none_elements for task in self.leaf_tasks
+    ])
 
     if use_mix_iter:
       # Convert any LazyMapDatasets datasets to LazyIterDatasets.

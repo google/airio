@@ -563,7 +563,7 @@ def task_get_dataset_by_step_with_runtime_args(state):
 #       preprocessors_lib.LazyMapTransform(
 #           lazy_id_fn,
 #           update_runtime_args=lambda rargs: rargs,
-#           has_none_elements=False,
+#           produces_none_elements=False,
 #       ),
 #   ]
 #   task = _create_task(source=_create_source(), preprocessors=preprocessors)
