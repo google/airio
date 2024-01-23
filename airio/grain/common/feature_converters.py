@@ -101,6 +101,12 @@ def make_autoregressive_inputs(
   return inputs
 
 
+def _get_non_padding_positions(
+    feature_value: np.ndarray, pad_id: int
+) -> np.ndarray:
+  return feature_value != pad_id
+
+
 def convert_to_t5x_enc_dec_features(
     ex: dict[str, np.ndarray],
     pack: bool,
@@ -164,10 +170,6 @@ def convert_to_t5x_enc_dec_features(
   Returns:
     a converted example.
   """
-  def _get_non_padding_positions(
-      feature_value: np.ndarray, pad_id: int
-  ) -> np.ndarray:
-    return feature_value != pad_id
 
   # targets_segment_id is present only for a packed dataset.
   decoder_input_tokens = make_autoregressive_inputs(
@@ -318,5 +320,172 @@ class T5XEncDecFeatureConverter:
     return preps
 
 
-# TODO(b/311543848): Implement LM and PrefixLM feature converters from
+def convert_to_t5x_lm_features(
+    ex: dict[str, np.ndarray], packed: bool, bos_id: int, pad_id: int
+) -> dict[str, np.ndarray]:
+  """Feature converter for a T5X language model (decoder-only) architecture.
+
+  The input dataset must have "targets" field only.
+
+  One common usecase is to pre-train a decoder-only model with the standard
+  language modeling objective (i.e., predict the next token given the previous
+  ones) on a unlabeled text corpus which only has "targets". Then the
+  pre-trained model can be fine-tuned on a supervised task, e.g., machine
+  translation by concatenating "inputs" and "targets". For this use case,
+  pre-train with LMFeatureConverter and fine-tune with PrefixLMFeatureConverter.
+
+  Example: a packed dataset.
+
+    ds = [{"targets": [3, 9, 1]}, {"targets": [4, 1]}]
+
+    input_lengths = {"targets": 6}
+
+    converted_ds = {
+        "decoder_target_tokens": [3, 9, 1, 4, 1, 0],
+         "decoder_input_tokens": [0, 3, 9, 0, 4, 0],
+         "decoder_loss_weights": [1, 1, 1, 1, 1, 0],
+            "decoder_positions": [0, 1, 2, 0, 1, 0],
+          "decoder_segment_ids": [1, 1, 1, 2, 2, 0]
+    }
+  Note that two examples are packed together into one example.
+
+  Args:
+    ex: dict[str, np.ndarray] - the example to convert.
+    packed: bool - whether the input example is packed.
+    bos_id: int - token value to use to indicate beginning of sequence in
+      decoder input tokens. 0 is commonly used.
+    pad_id: int - token value to use for padding. 0 is commonly used.
+
+  Returns:
+    a converted example.
+  """
+  # targets_segment_id is present only for a packed dataset.
+  decoder_input_tokens = make_autoregressive_inputs(
+      ex["targets"],
+      sequence_ids=ex.get("targets_segment_ids", None),
+      bos_id=bos_id,
+  )
+
+  d = {
+      "decoder_target_tokens": ex["targets"],
+      "decoder_input_tokens": decoder_input_tokens,
+      "decoder_loss_weights": _get_non_padding_positions(ex["targets"], pad_id),
+  }
+
+  if packed:
+    d["decoder_segment_ids"] = ex["targets_segment_ids"]
+    d["decoder_positions"] = ex["targets_positions"]
+
+  return d
+
+
+def update_runtime_args_for_t5x_lm_features(
+    runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
+    packed: bool,
+):
+  """Updates runtime args after applying convert_to_t5x_lm_features.
+
+  Replaces "input" and "targets" with features produced by
+  `convert_to_t5x_lm_features`, for use by downstream preprocessors. Both
+  functions should be used together as an airio preprocessor, e.g.
+  update_runtime_args = functools.partial(
+      update_runtime_args_for_t5x_lm_features,
+      packed=true,
+  )
+  convert_features = functools.partial(
+      convert_to_t5x_lm_features,
+      packed=True,
+      pad_id=0,
+      bos_id=0,
+  )
+  prep = preprocessors_lib.MapFnTransform(
+      convert_features,
+      update_runtime_args=update_runtime_args,
+  )
+
+  Args:
+    runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs - args injected by
+      airio at runtime.
+    packed: bool - whether the input examples are packed.
+
+  Returns:
+    updated preprocessors_lib.AirIOInjectedRuntimeArgs.
+  """
+  task_feature_lengths = runtime_args.sequence_lengths
+  decoder_length = task_feature_lengths["targets"]
+  model_feature_lengths = {
+      "decoder_target_tokens": decoder_length,
+      "decoder_input_tokens": decoder_length,
+      "decoder_loss_weights": decoder_length,
+  }
+  if packed:
+    model_feature_lengths["decoder_segment_ids"] = decoder_length
+    model_feature_lengths["decoder_positions"] = decoder_length
+  updated = runtime_args.clone()
+  updated.sequence_lengths = model_feature_lengths
+  return updated
+
+
+@dataclasses.dataclass
+class T5XLMFeatureConverter:
+  """Helper class to get AirIO preprocessors corresponding to seqio.LMFeatureConverter.
+
+  Applies packing (optional), trimming, padding and
+  `convert_to_t5x_lm_features` in order. See
+  `convert_to_t5x_lm_features` docstring for details on feature conversion.
+
+  Attrs:
+    pack: bool - indicates whether the dataset should be packed. The multi-bin
+      packing in airio.common.packing is functionaly equivalent to the impl in
+      SeqIO, and is used here.
+    use_multi_bin_packing: bool - Whether to use multi-bin or single-bin
+      packing. Seting this to True is equivalent to setting
+      `use_custom_packing_ops` to True in seqio.EncDecFeatureConverter. Ignored
+      if `pack` is False.
+    pad_id: int - token value to use for padding. 0 is commonly used.
+    bos_id: int - token value to use to indicate beginning of sequence in
+      decoder input tokens. 0 is commonly used.
+  """
+
+  pack: bool
+  use_multi_bin_packing: bool
+  pad_id: int
+  bos_id: int
+
+  def get_preprocessors(self) -> Sequence[preprocessors_lib.AirIOPreprocessor]:
+    """Returns AirIO preprocessors corresponding to seqio.LMFeatureConverter."""
+
+    update_runtime_args = functools.partial(
+        update_runtime_args_for_t5x_lm_features,
+        packed=self.pack,
+    )
+    convert_features = functools.partial(
+        convert_to_t5x_lm_features,
+        packed=self.pack,
+        pad_id=self.pad_id,
+        bos_id=self.bos_id,
+    )
+    pad = functools.partial(preprocessors.pad, pad_id=self.pad_id)
+    preps = [
+        preprocessors_lib.MapFnTransform(preprocessors.trim),
+        preprocessors_lib.MapFnTransform(pad),
+        preprocessors_lib.MapFnTransform(
+            convert_features,
+            update_runtime_args=update_runtime_args,
+        ),
+    ]
+    if self.pack:
+      packer = (
+          packing.MultiBinTruePackIterPreprocessor
+          if self.use_multi_bin_packing
+          else packing.SingleBinTruePackIterPreprocessor
+      )
+      packer_prep = preprocessors_lib.LazyIterTransform(
+          packer, update_runtime_args=packer.update_runtime_args
+      )
+      preps = [packer_prep] + preps
+    return preps
+
+
+# TODO(b/311543848): Implement PrefixLM feature converter from
 # seqio/feature_converters.py.

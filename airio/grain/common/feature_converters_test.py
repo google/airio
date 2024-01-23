@@ -121,6 +121,19 @@ class AutoregressiveInputsTest(absltest.TestCase):
     self.assertEqual(actual.dtype, np.float32)
 
 
+def _apply_preprocessors(
+    ds: lazy_dataset.LazyMapDataset,
+    preprocessors: preprocessors_lib.AirIOPreprocessor,
+    runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
+):
+  for preprocessor in preprocessors:
+    prep = preprocessors_lib.LazyDatasetTransform(preprocessor)
+    ds = prep(ds, runtime_args=runtime_args)
+    runtime_args = prep.get_updated_runtime_args(runtime_args)
+
+  return ds, runtime_args
+
+
 class EncDecFeatureConverterTest(absltest.TestCase):
 
   def setUp(self):
@@ -510,6 +523,252 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         "decoder_loss_weights": [1, 1, 1, 1, 1, 0, 0],
         "decoder_segment_ids": [1, 1, 1, 2, 2, 0, 0],
         "decoder_positions": [0, 1, 2, 0, 1, 0, 0],
+    }
+    self.assertLen(ds, 1)
+    actual = ds[0]
+    self.assertSequenceEqual(
+        sorted(actual.keys()), sorted(self._expected_packed_keys)
+    )
+    for k in self._expected_packed_keys:
+      np.testing.assert_array_equal(actual[k], expected[k])
+
+
+class LMFeatureConverter(absltest.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    self._expected_unpacked_keys = [
+        "decoder_target_tokens",
+        "decoder_input_tokens",
+        "decoder_loss_weights",
+    ]
+    self._expected_packed_keys = [
+        "decoder_target_tokens",
+        "decoder_input_tokens",
+        "decoder_loss_weights",
+        "decoder_segment_ids",
+        "decoder_positions",
+    ]
+
+  def test_lm_unpacked(self):
+    x = [{"targets": [3, 9, 1]}]
+    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"targets": 5},
+        split="unused",
+    )
+
+    converter = feature_converters.T5XLMFeatureConverter(
+        pack=False, use_multi_bin_packing=False, pad_id=0, bos_id=0
+    )
+    ds, updated_runtime_args = _apply_preprocessors(
+        ds, converter.get_preprocessors(), runtime_args
+    )
+    ds = list(ds)
+
+    expected_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={
+            "decoder_target_tokens": 5,
+            "decoder_input_tokens": 5,
+            "decoder_loss_weights": 5,
+        },
+        split="unused",
+    )
+    self.assertEqual(updated_runtime_args, expected_runtime_args)
+
+    expected = {
+        "decoder_target_tokens": [3, 9, 1, 0, 0],
+        "decoder_input_tokens": [0, 3, 9, 1, 0],
+        "decoder_loss_weights": [1, 1, 1, 0, 0],
+    }
+    self.assertLen(ds, 1)
+    actual = ds[0]
+    self.assertSequenceEqual(
+        sorted(actual.keys()), sorted(self._expected_unpacked_keys)
+    )
+    for k in self._expected_unpacked_keys:
+      np.testing.assert_array_equal(actual[k], expected[k])
+
+  def test_lm_only_packed(self):
+    x = [{"targets": [3, 9, 1]}, {"targets": [4, 1]}]
+    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"targets": 6},
+        split="unused",
+    )
+
+    converter = feature_converters.T5XLMFeatureConverter(
+        pack=True, use_multi_bin_packing=False, pad_id=0, bos_id=0
+    )
+    ds, updated_runtime_args = _apply_preprocessors(
+        ds, converter.get_preprocessors(), runtime_args
+    )
+    ds = list(ds)
+
+    expected_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={
+            "decoder_target_tokens": 6,
+            "decoder_input_tokens": 6,
+            "decoder_loss_weights": 6,
+            "decoder_segment_ids": 6,
+            "decoder_positions": 6,
+        },
+        split="unused",
+    )
+    self.assertEqual(updated_runtime_args, expected_runtime_args)
+
+    expected = {
+        "decoder_target_tokens": [3, 9, 1, 4, 1, 0],
+        "decoder_input_tokens": [0, 3, 9, 0, 4, 0],
+        "decoder_loss_weights": [1, 1, 1, 1, 1, 0],
+        "decoder_positions": [0, 1, 2, 0, 1, 0],
+        "decoder_segment_ids": [1, 1, 1, 2, 2, 0],
+    }
+    self.assertLen(ds, 1)
+    actual = ds[0]
+    self.assertSequenceEqual(
+        sorted(actual.keys()), sorted(self._expected_packed_keys)
+    )
+    for k in self._expected_packed_keys:
+      np.testing.assert_array_equal(actual[k], expected[k])
+
+  def test_lm_pack_long_sequences(self):
+    x = [{"targets": [3, 9, 4, 5, 1]}, {"targets": [4, 3, 2, 1]}]
+    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"targets": 5},
+        split="unused",
+    )
+
+    converter = feature_converters.T5XLMFeatureConverter(
+        pack=True, use_multi_bin_packing=False, bos_id=0, pad_id=0
+    )
+    ds, updated_runtime_args = _apply_preprocessors(
+        ds, converter.get_preprocessors(), runtime_args
+    )
+    ds = list(ds)
+
+    expected_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={
+            "decoder_target_tokens": 5,
+            "decoder_input_tokens": 5,
+            "decoder_loss_weights": 5,
+            "decoder_segment_ids": 5,
+            "decoder_positions": 5,
+        },
+        split="unused",
+    )
+    self.assertEqual(updated_runtime_args, expected_runtime_args)
+
+    expected_ds = [
+        {
+            "decoder_target_tokens": [3, 9, 4, 5, 1],
+            "decoder_input_tokens": [0, 3, 9, 4, 5],
+            "decoder_loss_weights": [1, 1, 1, 1, 1],
+            "decoder_positions": [0, 1, 2, 3, 4],
+            "decoder_segment_ids": [1, 1, 1, 1, 1],
+        },
+        {
+            "decoder_target_tokens": [4, 3, 2, 1, 0],
+            "decoder_input_tokens": [0, 4, 3, 2, 0],
+            "decoder_loss_weights": [1, 1, 1, 1, 0],
+            "decoder_positions": [0, 1, 2, 3, 0],
+            "decoder_segment_ids": [1, 1, 1, 1, 0],
+        },
+    ]
+    self.assertLen(ds, 2)
+    for actual, expected in zip(ds, expected_ds):
+      self.assertSequenceEqual(
+          sorted(actual.keys()), sorted(self._expected_packed_keys)
+      )
+      for k in self._expected_packed_keys:
+        np.testing.assert_array_equal(actual[k], expected[k])
+
+  def test_lm_plaintext_field(self):
+    x = [
+        {"targets": [3, 9, 1], "targets_plaintext": "abc"},
+        {"targets": [4, 1], "targets_plaintext": "abc"},
+    ]
+    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"targets": 6},
+        split="unused",
+    )
+
+    converter = feature_converters.T5XLMFeatureConverter(
+        pack=True, use_multi_bin_packing=False, bos_id=0, pad_id=0
+    )
+    ds, updated_runtime_args = _apply_preprocessors(
+        ds, converter.get_preprocessors(), runtime_args
+    )
+    ds = list(ds)
+
+    expected_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={
+            "decoder_target_tokens": 6,
+            "decoder_input_tokens": 6,
+            "decoder_loss_weights": 6,
+            "decoder_segment_ids": 6,
+            "decoder_positions": 6,
+        },
+        split="unused",
+    )
+    self.assertEqual(updated_runtime_args, expected_runtime_args)
+
+    expected = {
+        "decoder_target_tokens": [3, 9, 1, 4, 1, 0],
+        "decoder_input_tokens": [0, 3, 9, 0, 4, 0],
+        "decoder_loss_weights": [1, 1, 1, 1, 1, 0],
+        "decoder_segment_ids": [1, 1, 1, 2, 2, 0],
+        "decoder_positions": [0, 1, 2, 0, 1, 0],
+    }
+    self.assertLen(ds, 1)
+    actual = ds[0]
+    self.assertSequenceEqual(
+        sorted(actual.keys()), sorted(self._expected_packed_keys)
+    )
+    for k in self._expected_packed_keys:
+      np.testing.assert_array_equal(actual[k], expected[k])
+
+  def test_lm_only_packed_without_default_bos(self):
+    x = [{"targets": [3, 9, 1]}, {"targets": [4, 1]}]
+    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"targets": 6},
+        split="unused",
+    )
+
+    converter = feature_converters.T5XLMFeatureConverter(
+        pack=True, use_multi_bin_packing=False, bos_id=10, pad_id=0
+    )
+    ds, updated_runtime_args = _apply_preprocessors(
+        ds, converter.get_preprocessors(), runtime_args
+    )
+    ds = list(ds)
+
+    expected_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={
+            "decoder_target_tokens": 6,
+            "decoder_input_tokens": 6,
+            "decoder_loss_weights": 6,
+            "decoder_segment_ids": 6,
+            "decoder_positions": 6,
+        },
+        split="unused",
+    )
+    self.assertEqual(updated_runtime_args, expected_runtime_args)
+
+    expected = {
+        "decoder_target_tokens": [3, 9, 1, 4, 1, 0],
+        "decoder_input_tokens": [10, 3, 9, 10, 4, 10],
+        "decoder_loss_weights": [1, 1, 1, 1, 1, 0],
+        "decoder_positions": [0, 1, 2, 0, 1, 0],
+        "decoder_segment_ids": [1, 1, 1, 2, 2, 0],
     }
     self.assertLen(ds, 1)
     actual = ds[0]
