@@ -300,6 +300,7 @@ def get_dataset(
   )
 
 
+# TODO(b/321114997): Remove grain reference.
 def get_vocabularies(
     mixture_or_task: Union[Task, Mixture]
 ) -> Mapping[str, vocabularies.Vocabulary]:

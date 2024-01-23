@@ -480,7 +480,7 @@ def task_get_updated_runtime_args(state):
 def function_get_vocabularies(state):
   task = _create_task(source=_create_source(), preprocessors=[])
   while state:
-    _ = airio.dataset_providers.get_vocabularies(task)
+    _ = dataset_providers.get_vocabularies(task)
 
 
 @google_benchmark.register

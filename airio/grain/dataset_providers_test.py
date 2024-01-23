@@ -34,6 +34,7 @@ from seqio import vocabularies
 import tensorflow_datasets as tfds
 
 
+
 lazy_dataset = grain.experimental.lazy_dataset
 _SOURCE_NAME = "imdb_reviews"
 _SOURCE_NUM_EXAMPLES = 3
@@ -1219,8 +1220,7 @@ class TaskTest(absltest.TestCase):
         has_none_elements=False,
     )
     test_task = _create_task(
-        source=_create_fn_src(num_elements=10),
-        preprocessors=[]
+        source=_create_fn_src(num_elements=10), preprocessors=[]
     )
     test_task._switch_to_lazy_dataset = mock.Mock(return_value=True)
     ds = test_task.get_dataset(
@@ -1242,6 +1242,7 @@ class TaskTest(absltest.TestCase):
     ]
     for actual, expected in zip(ds, expected_ds, strict=True):
       np.testing.assert_array_equal(actual, expected)
+
 
 
 class TaskBuilderTest(absltest.TestCase):
@@ -1347,6 +1348,7 @@ class TaskBuilderTest(absltest.TestCase):
         "GrainTaskBuilder(task_name=dummy_airio_task,"
         " source=<airio.data_sources.TfdsDataSource",
     )
+
 
 
 class MixtureTest(absltest.TestCase):
@@ -2211,6 +2213,7 @@ class MixtureTest(absltest.TestCase):
         np.testing.assert_array_equal(actual[k], expected[k])
 
 
+
 class MixturePropertiesTest(absltest.TestCase):
 
   def setUp(self):
@@ -2463,7 +2466,33 @@ class DatasetProvidersTest(absltest.TestCase):
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
     task = _create_task(source=source, preprocessors=_create_preprocessors())
-    vocabs_map = airio.dataset_providers.get_vocabularies(task)
+    vocabs_map = dataset_providers.get_vocabularies(task)
+    expected = {
+        "inputs": _create_sentencepiece_vocab(),
+        "targets": _create_sentencepiece_vocab(),
+    }
+    self.assertEqual(vocabs_map, expected)
+
+  def test_get_vocabularies_mixture_returns_correct_vocabularies(self):
+    source = _create_source(
+        source_name=_SOURCE_NAME,
+        num_examples=_SOURCE_NUM_EXAMPLES,
+    )
+    tasks = []
+    for i in range(3):
+      tasks.append(
+          _create_task(
+              source=source,
+              preprocessors=_create_preprocessors(),
+              task_name=f"test_task_{i}",
+          )
+      )
+    mix = dataset_providers.GrainMixture(
+        name="test_mix",
+        tasks=tasks,
+        proportions=[1.0, 0.5, 2.0],
+    )
+    vocabs_map = dataset_providers.get_vocabularies(mix)
     expected = {
         "inputs": _create_sentencepiece_vocab(),
         "targets": _create_sentencepiece_vocab(),
@@ -2479,8 +2508,18 @@ class DatasetProvidersTest(absltest.TestCase):
         source=source,
         preprocessors=[preprocessors_lib.MapFnTransform(_imdb_preprocessor)],
     )
-    vocabs_map = airio.dataset_providers.get_vocabularies(task)
+    vocabs_map = dataset_providers.get_vocabularies(task)
     self.assertEmpty(vocabs_map)
+
+  def test_get_vocabularies_mixture_returns_returns_empty_when_no_tasks(self):
+    mix = dataset_providers.GrainMixture(
+        name="empty_mix",
+        tasks=[],
+        proportions=[],
+    )
+    vocabs_map = dataset_providers.get_vocabularies(mix)
+    self.assertEmpty(vocabs_map)
+
 
 
 if __name__ == "__main__":
