@@ -299,26 +299,3 @@ def get_dataset(
       seed=seed,
   )
 
-
-def get_vocabularies(
-    mixture_or_task: Union[Task, Mixture]
-) -> Mapping[str, vocabularies.Vocabulary]:
-  """Returns vocabularies for all features as configured in tokenizer."""
-  if isinstance(mixture_or_task, Mixture):
-    tasks = mixture_or_task.leaf_tasks
-    if not tasks:
-      return {}
-    task = tasks[0]
-  else:
-    task = mixture_or_task
-
-  vocabulary_map = {}
-  for preproc in task.get_preprocessors():
-    if isinstance(preproc, preprocessors_lib.MapFnTransform) and isinstance(
-        preproc.map_fn, tokenizer.Tokenizer
-    ):
-      tokenizer_configs = preproc.map_fn.tokenizer_configs
-      for feature_name, tokenizer_config in tokenizer_configs.items():
-        vocabulary_map[feature_name] = tokenizer_config.vocab
-
-  return vocabulary_map
