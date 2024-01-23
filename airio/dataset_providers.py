@@ -262,6 +262,7 @@ def get_dataset(
     shuffle: bool = False,
     num_epochs: int | None = 1,
     seed: int | None = None,
+    shard_info: ShardInfo | None = None,
 ) -> clu_dataset_iterator.DatasetIterator:
   """Returns the PyGrain dataset iterator."""
   return mixture_or_task.get_dataset(
@@ -272,6 +273,7 @@ def get_dataset(
       shuffle=shuffle,
       num_epochs=num_epochs,
       seed=seed,
+      shard_info=shard_info,
   )
 
 
