@@ -68,7 +68,6 @@ class GrainTask(airio.dataset_providers.Task):
       base_rng: JaxRng,
       has_none_elems: bool,
   ):
-    print("_apply_preprocessors_to_lazy_dataset", has_none_elems, preps)
     prep_rng = base_rng
     for prep in preps:
       transform = preprocessors_lib.LazyDatasetTransform(prep)
