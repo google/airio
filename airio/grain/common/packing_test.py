@@ -847,6 +847,56 @@ class NoamPackingMapTest(parameterized.TestCase):
       self.assertSequenceEqual(sorted(actual), sorted(expected))
       np.testing.assert_array_equal(actual["inputs"], expected["inputs"])
 
+  def test_max_fan_out(self):
+    input_elements = [
+        {"inputs": [1, 2, 3, 4]},
+        {"inputs": [5, 6]},
+        {"inputs": [11, 12, 13, 14]},
+        {"inputs": [7]},
+        {"inputs": [8]},
+    ]
+    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+        sequence_lengths={"inputs": 2}, split="unused"
+    )
+    packer = packing.NoamPacker()  # feature_lengths will be set before packing.
+    transform = packing.AirIOPackDatasetMapPreprocessor(
+        pool_size=5, packer=packer
+    )
+    unused_rng = None
+    ds = transform(ds, runtime_args, unused_rng)
+    ds_iter = iter(ds)
+
+    # Since pool_size (= max_fan_out) is 5, packing should produce no more than
+    # 5 examples.
+    expected_elements = [
+        # First element is distributed across 2 packed examples.
+        {
+            "inputs": [1, 2]
+        },
+        {
+            "inputs": [3, 4]
+        },
+        # Second element.
+        {
+            "inputs": [5, 6]
+        },
+        # Third element is distributed across 2 packed examples.
+        {
+            "inputs": [11, 12]
+        },
+        {
+            "inputs": [13, 14]
+        },
+        # Fourth and fifth elements are dropped.
+    ]
+
+    for actual, expected in zip(ds_iter, expected_elements, strict=True):
+      # Compare keys.
+      self.assertSequenceEqual(sorted(actual), sorted(expected))
+      np.testing.assert_array_equal(actual["inputs"], expected["inputs"])
+
   def test_pack_single_feature_with_padding(self):
     input_elements = [
         {"inputs": [1, 2, 3, 4]},

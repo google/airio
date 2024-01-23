@@ -280,11 +280,21 @@ class PackPoolFlatMap(grain.experimental.FlatMapTransform):
     # Do not use the shared copy because `flat_map` may be called on multiple
     # `example_pool`s in parallel.
     packer = copy.deepcopy(self.packer)
+    yielded = 0
     for ex in example_pool:
       packed_examples = packer.fit_example(ex)
       for packed_example in packed_examples:
+        if yielded >= self.max_fan_out:
+          # TODO(b/321990328): Raise an error here because it indicates that
+          # packed lengths are not properly configured, and let users explicitly
+          # override.
+          return
+        yielded += 1
         yield packed_example
     while packer.has_partially_packed_examples():
+      if yielded >= self.max_fan_out:
+        return
+      yielded += 1
       yield packer.get_packed_example()
 
 
