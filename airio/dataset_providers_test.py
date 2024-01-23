@@ -30,6 +30,7 @@ from seqio import vocabularies
 import tensorflow_datasets as tfds
 
 
+
 lazy_dataset = grain.experimental.lazy_dataset
 _SOURCE_NAME = "imdb_reviews"
 _SOURCE_NUM_EXAMPLES = 3
@@ -264,37 +265,6 @@ class TaskTest(absltest.TestCase):
     num_examples = task.num_input_examples(split="train")
     self.assertEqual(num_examples, _SOURCE_NUM_EXAMPLES)
 
-  def test_get_updated_runtime_args(self):
-    def update_runtime_args_1(args):
-      args.sequence_lengths.update({"new_val": 5})
-      return args
-
-    def update_runtime_args_2(args):
-      args.sequence_lengths.update({"another_val": 7})
-      return args
-
-    prep_1 = preprocessors_lib.MapFnTransform(
-        lambda x: x,
-        update_runtime_args=update_runtime_args_1,
-    )
-    prep_2 = preprocessors_lib.MapFnTransform(
-        lambda x: x,
-        update_runtime_args=update_runtime_args_2,
-    )
-    task = airio.dataset_providers.Task(
-        "test", source=_create_source(), preprocessors=[prep_1, prep_2]
-    )
-    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"val": 3}, split="train"
-    )
-    updated_runtime_args = task.get_updated_runtime_args(
-        runtime_args, runtime_preprocessors=None
-    )
-    expected_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"val": 3, "new_val": 5, "another_val": 7},
-        split="train",
-    )
-    self.assertEqual(updated_runtime_args, expected_runtime_args)
 
 
 class TaskBuilderTest(absltest.TestCase):
@@ -402,6 +372,7 @@ class TaskBuilderTest(absltest.TestCase):
     )
 
 
+
 class MixtureTest(absltest.TestCase):
 
   def setUp(self):
@@ -454,6 +425,7 @@ class MixtureTest(absltest.TestCase):
         ])
         .build()
     )
+
 
 
 class MixturePropertiesTest(absltest.TestCase):
@@ -725,6 +697,7 @@ class DatasetProvidersTest(absltest.TestCase):
     )
     vocabs_map = airio.dataset_providers.get_vocabularies(task)
     self.assertEmpty(vocabs_map)
+
 
 
 if __name__ == "__main__":

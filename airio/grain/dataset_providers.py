@@ -340,6 +340,20 @@ class GrainTask(airio.dataset_providers.Task):
 
     return accumulated_result
 
+  def get_updated_runtime_args(
+      self,
+      runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
+      runtime_preprocessors: Sequence[AirIOPreprocessor] | None,
+  ) -> preprocessors_lib.AirIOInjectedRuntimeArgs:
+    """Returns updated runtime args based on preprocessors and feature converter."""
+    preps = self._preprocessors
+    if runtime_preprocessors:
+      preps.extend(runtime_preprocessors)
+    for prep in preps:
+      transform = preprocessors_lib.LazyDatasetTransform(prep)
+      runtime_args = transform.get_updated_runtime_args(runtime_args)
+    return runtime_args
+
   @functools.cached_property
   def produces_none_elements(self) -> bool:
     """Returns True if any preprocessor returns none elements, excluding runtime preprocessors and batching.
@@ -448,9 +462,10 @@ class GrainMixture(airio.dataset_providers.Mixture):
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths=sequence_lengths, split=split
     )
-    runtime_args = self.leaf_tasks[0].get_updated_runtime_args(
-        runtime_args, runtime_preprocessors=None
-    )
+    if isinstance(self.leaf_tasks[0], GrainTask):
+      runtime_args = self.leaf_tasks[0].get_updated_runtime_args(
+          runtime_args, runtime_preprocessors=None
+      )
     if post_mix_preps:
       post_mix_transforms = [
           preprocessors_lib.LazyDatasetTransform(p) for p in post_mix_preps

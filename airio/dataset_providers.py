@@ -94,20 +94,6 @@ class Task(DatasetProviderBase, Protocol):
       raise ValueError("Source has not been set on this task object.")
     return self.source.num_input_examples(split=split)
 
-  def get_updated_runtime_args(
-      self,
-      runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
-      runtime_preprocessors: Sequence[AirIOPreprocessor] | None,
-  ) -> preprocessors_lib.AirIOInjectedRuntimeArgs:
-    """Returns updated runtime args based on preprocessors and feature converter."""
-    preps = self._preprocessors
-    if runtime_preprocessors:
-      preps.extend(runtime_preprocessors)
-    for prep in preps:
-      transform = preprocessors_lib.LazyDatasetTransform(prep)
-      runtime_args = transform.get_updated_runtime_args(runtime_args)
-    return runtime_args
-
 
 @typing.runtime_checkable
 class Mixture(DatasetProviderBase, Protocol):
