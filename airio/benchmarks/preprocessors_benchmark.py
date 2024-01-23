@@ -415,7 +415,8 @@ def lazy_map_transform_with_runtime_args(state):
   transform = airio.preprocessors.LazyMapTransform(
       _lazy_map_fn,
       update_runtime_args=_update_runtime_args,
-      has_none_elements=False,
+      produces_none_elements=False,
+      requires_non_none_elements=False,
   )
   ds = lazy_dataset.SourceLazyMapDataset(range(10))
   while state:
@@ -450,7 +451,8 @@ def lazy_map_transform_with_none_elements_and_runtime_args(state):
   transform = airio.preprocessors.LazyMapTransform(
       lazy_map_fn_with_nones,
       update_runtime_args=_update_runtime_args,
-      has_none_elements=True,
+      produces_none_elements=True,
+      requires_non_none_elements=False,
   )
   ds = lazy_dataset.SourceLazyMapDataset(range(10))
   while state:

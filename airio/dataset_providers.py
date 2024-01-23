@@ -108,17 +108,6 @@ class Task(DatasetProviderBase, Protocol):
       runtime_args = transform.get_updated_runtime_args(runtime_args)
     return runtime_args
 
-  def produces_none_elements(self) -> bool:
-    """Returns True if any preprocessor returns none elements.
-
-    This is a best-effort check and may be wrong.
-    """
-    preps = self._preprocessors
-    for prep in preps:
-      if preprocessors_lib.produces_none_elements(prep):
-        return True
-    return False
-
 
 @typing.runtime_checkable
 class Mixture(DatasetProviderBase, Protocol):
