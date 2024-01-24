@@ -22,14 +22,12 @@ from airio import dataset_providers as airio_dataset_providers
 # Import "preprocessors" as "preprocessors_lib" to prevent naming conflicts with
 # "preprocessors" attrs in this file.
 from airio import preprocessors as airio_preprocessors_lib
-from airio import tokenizer
 from airio.grain import dataset_iterators
 from airio.grain import lazy_dataset_transforms
 from airio.grain import preprocessors as grain_preprocessors_lib
 from clu.data import dataset_iterator as clu_dataset_iterator
 import grain.python as grain
 import jax.random
-from seqio import vocabularies
 import tensorflow_datasets as tfds
 
 SHUFFLE_BUFFER_SIZE = 1000
@@ -595,29 +593,3 @@ def _even_split(
     shard_start += min(shard_index, num_unused_examples)
     shard_end += min(shard_index + 1, num_unused_examples)
   return shard_start, shard_end
-
-
-def get_vocabularies(
-    mixture_or_task: (
-        airio_dataset_providers.Task | airio_dataset_providers.Mixture
-    ),
-) -> Mapping[str, vocabularies.Vocabulary]:
-  """Returns vocabularies for all features as configured in tokenizer."""
-  if isinstance(mixture_or_task, airio_dataset_providers.Mixture):
-    tasks = mixture_or_task.leaf_tasks
-    if not tasks:
-      return {}
-    task = tasks[0]
-  else:
-    task = mixture_or_task
-
-  vocabulary_map = {}
-  for preproc in task.get_preprocessors():
-    if isinstance(
-        preproc, airio_preprocessors_lib.MapFnTransform
-    ) and isinstance(preproc.map_fn, tokenizer.Tokenizer):
-      tokenizer_configs = preproc.map_fn.tokenizer_configs
-      for feature_name, tokenizer_config in tokenizer_configs.items():
-        vocabulary_map[feature_name] = tokenizer_config.vocab
-
-  return vocabulary_map

@@ -692,6 +692,32 @@ class DatasetProvidersTest(absltest.TestCase):
     }
     self.assertEqual(vocabs_map, expected)
 
+  def test_get_vocabularies_mixture_returns_correct_vocabularies(self):
+    source = _create_source(
+        source_name=_SOURCE_NAME,
+        num_examples=_SOURCE_NUM_EXAMPLES,
+    )
+    tasks = []
+    for i in range(3):
+      tasks.append(
+          dataset_providers.GrainTask(
+              name=f"test_task_{i}",
+              source=source,
+              preprocessors=_create_preprocessors(),
+          )
+      )
+    mix = dataset_providers.GrainMixture(
+        name="test_mix",
+        tasks=tasks,
+        proportions=[1.0, 0.5, 2.0],
+    )
+    vocabs_map = airio.dataset_providers.get_vocabularies(mix)
+    expected = {
+        "inputs": _create_sentencepiece_vocab(),
+        "targets": _create_sentencepiece_vocab(),
+    }
+    self.assertEqual(vocabs_map, expected)
+
   def test_get_vocabularies_returns_empty_map_when_no_tokenizer(self):
     source = _create_source(
         source_name=_SOURCE_NAME,
@@ -702,6 +728,15 @@ class DatasetProvidersTest(absltest.TestCase):
         preprocessors=[preprocessors_lib.MapFnTransform(_imdb_preprocessor)],
     )
     vocabs_map = airio.dataset_providers.get_vocabularies(task)
+    self.assertEmpty(vocabs_map)
+
+  def test_get_vocabularies_mixture_returns_returns_empty_when_no_tasks(self):
+    mix = dataset_providers.GrainMixture(
+        name="empty_mix",
+        tasks=[],
+        proportions=[],
+    )
+    vocabs_map = airio.dataset_providers.get_vocabularies(mix)
     self.assertEmpty(vocabs_map)
 
 

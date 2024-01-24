@@ -2592,66 +2592,6 @@ class DatasetProvidersTest(absltest.TestCase):
     ]
     test_utils.assert_datasets_equal(ds, expected)
 
-  def test_get_vocabularies_returns_correct_vocabularies(self):
-    source = _create_source(
-        source_name=_SOURCE_NAME,
-        num_examples=_SOURCE_NUM_EXAMPLES,
-    )
-    task = _create_task(source=source, preprocessors=_create_preprocessors())
-    vocabs_map = airio_dataset_providers.get_vocabularies(task)
-    expected = {
-        "inputs": _create_sentencepiece_vocab(),
-        "targets": _create_sentencepiece_vocab(),
-    }
-    self.assertEqual(vocabs_map, expected)
-
-  def test_get_vocabularies_mixture_returns_correct_vocabularies(self):
-    source = _create_source(
-        source_name=_SOURCE_NAME,
-        num_examples=_SOURCE_NUM_EXAMPLES,
-    )
-    tasks = []
-    for i in range(3):
-      tasks.append(
-          _create_task(
-              source=source,
-              preprocessors=_create_preprocessors(),
-              task_name=f"test_task_{i}",
-          )
-      )
-    mix = dataset_providers.GrainMixture(
-        name="test_mix",
-        tasks=tasks,
-        proportions=[1.0, 0.5, 2.0],
-    )
-    vocabs_map = airio_dataset_providers.get_vocabularies(mix)
-    expected = {
-        "inputs": _create_sentencepiece_vocab(),
-        "targets": _create_sentencepiece_vocab(),
-    }
-    self.assertEqual(vocabs_map, expected)
-
-  def test_get_vocabularies_returns_empty_map_when_no_tokenizer(self):
-    source = _create_source(
-        source_name=_SOURCE_NAME,
-        num_examples=_SOURCE_NUM_EXAMPLES,
-    )
-    task = _create_task(
-        source=source,
-        preprocessors=[preprocessors_lib.MapFnTransform(_imdb_preprocessor)],
-    )
-    vocabs_map = airio_dataset_providers.get_vocabularies(task)
-    self.assertEmpty(vocabs_map)
-
-  def test_get_vocabularies_mixture_returns_returns_empty_when_no_tasks(self):
-    mix = dataset_providers.GrainMixture(
-        name="empty_mix",
-        tasks=[],
-        proportions=[],
-    )
-    vocabs_map = dataset_providers.get_vocabularies(mix)
-    self.assertEmpty(vocabs_map)
-
 
 
 if __name__ == "__main__":
