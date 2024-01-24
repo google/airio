@@ -42,13 +42,15 @@ class TasksTest(absltest.TestCase):
         "inputs": airio.tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),
         "targets": airio.tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),
     }
-    self.runtime_preprocessors = feature_converters.T5XEncDecFeatureConverter(
-        pack=False,
-        use_multi_bin_packing=False,
-        passthrough_feature_keys=[],
-        pad_id=0,
-        bos_id=0,
-    ).get_preprocessors()
+    self.runtime_preprocessors = (
+        feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
+            pack=False,
+            use_multi_bin_packing=False,
+            passthrough_feature_keys=[],
+            pad_id=0,
+            bos_id=0,
+        )
+    )
 
   def test_wmt_task(self):
     with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):

@@ -21,7 +21,10 @@ from typing import Dict
 from absl import logging
 import airio
 from airio.grain import dataset_providers
+from airio.grain.common import preprocessors as ap
+from airio.grain.common import span_corruption as asc
 import babel
+from seqio import preprocessors as seqio_preprocessors
 from seqio import vocabularies
 import tensorflow_datasets as tfds
 
@@ -178,3 +181,46 @@ def question(ex: Dict[str, str]) -> Dict[str, str]:
       "targets": ", ".join(ex["answer"]),
   }
   return final_example
+
+
+def append_eos_after_trim(
+    ex,
+    runtime_args: airio.AirIOInjectedRuntimeArgs,
+    tokenizer_configs,
+):
+  """Wrapper over seqio append_eos_after_trim preprocessor."""
+  sequence_lengths = runtime_args.sequence_lengths
+  return seqio_preprocessors.append_eos_after_trim_impl(
+      ex, output_features=tokenizer_configs, sequence_length=sequence_lengths
+  )
+
+
+def get_c4_v220_span_corruption_task():
+  """AirIO Task for C4 span corruption."""
+  rekey_fn = functools.partial(
+      ap.rekey, key_map={"inputs": None, "targets": "text"}
+  )
+  vocab = _DEFAULT_VOCAB
+  tokenizer_configs = {
+      "inputs": airio.tokenizer.TokenizerConfig(vocab=vocab, add_eos=True),
+      "targets": airio.tokenizer.TokenizerConfig(vocab=vocab, add_eos=True),
+  }
+  append_eos_after_trim_fn = functools.partial(
+      append_eos_after_trim, tokenizer_configs=tokenizer_configs
+  )
+  return dataset_providers.GrainTask(
+      "c4_v220_span_corruption",
+      source=airio.data_sources.TfdsDataSource(
+          tfds_name="c4/en:2.2.0", splits=["train", "validation"]
+      ),
+      preprocessors=[
+          airio.MapFnTransform(rekey_fn),
+          airio.MapFnTransform(
+              airio.tokenizer.Tokenizer(
+                  tokenizer_configs=tokenizer_configs,
+              )
+          ),
+          asc.create_span_corruption_transform(tokenizer_configs),
+          airio.MapFnTransform(append_eos_after_trim_fn),
+      ],
+  )

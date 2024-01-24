@@ -91,13 +91,13 @@ def _create_preprocessors() -> (
 def _create_runtime_preprocessors() -> (
     Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor]
 ):
-  return feature_converters.T5XEncDecFeatureConverter(
+  return feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
       pack=False,
       use_multi_bin_packing=False,
       passthrough_feature_keys=[],
       pad_id=0,
       bos_id=0,
-  ).get_preprocessors()
+  )
 
 
 def _create_source(

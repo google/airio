@@ -20,6 +20,7 @@ import os
 from typing import Any, Callable
 from absl.testing import absltest
 from airio import preprocessors as preprocessors_lib
+from airio import tokenizer
 from airio.grain import lazy_dataset_transforms
 from airio.grain.common import packing
 from airio.grain.common import span_corruption as asc
@@ -140,13 +141,9 @@ class SpanCorruptionTest(absltest.TestCase):
 
     # Step 2: Apply span corruption preprocessor
     test_vocab = seqio.PassThroughVocabulary(size=32100)
-    output_features = {
-        "inputs": seqio.Feature(
-            vocabulary=test_vocab,
-            add_eos=True,
-            required=False,
-        ),
-        "targets": seqio.Feature(vocabulary=test_vocab, add_eos=True),
+    tokenizer_configs = {
+        "inputs": tokenizer.TokenizerConfig(vocab=test_vocab, add_eos=True),
+        "targets": tokenizer.TokenizerConfig(vocab=test_vocab, add_eos=True),
     }
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 1024, "targets": 1024}, split="unused"
@@ -157,7 +154,7 @@ class SpanCorruptionTest(absltest.TestCase):
     airio_ds = asc.span_corruption(
         airio_ds,
         seed=unused_seed,
-        output_features=output_features,
+        tokenizer_configs=tokenizer_configs,
         runtime_args=runtime_args,
     )
     airio_ds_iter = iter(airio_ds)
@@ -260,9 +257,7 @@ class SpanCorruptionTest(absltest.TestCase):
     # Step 5: Verify that they are exactly the same.
     seqio_ds_iter = seqio_ds.as_numpy_iterator()
     airio_ds_iter = iter(airio_ds)
-    for seqio_ex, airio_ex in zip(
-        seqio_ds_iter, airio_ds_iter, strict=True
-    ):
+    for seqio_ex, airio_ex in zip(seqio_ds_iter, airio_ds_iter, strict=True):
       np.testing.assert_array_equal(seqio_ex["targets"], airio_ex["targets"])
 
   def test_split_tokens_equivalence(self):
@@ -352,9 +347,7 @@ class SpanCorruptionTest(absltest.TestCase):
     # Step 5: Verify that they are exactly the same.
     seqio_ds_iter = seqio_ds.as_numpy_iterator()
     airio_ds_iter = iter(airio_ds)
-    for seqio_ex, airio_ex in zip(
-        seqio_ds_iter, airio_ds_iter, strict=True
-    ):
+    for seqio_ex, airio_ex in zip(seqio_ds_iter, airio_ds_iter, strict=True):
       np.testing.assert_array_equal(seqio_ex["targets"], airio_ex["targets"])
 
 

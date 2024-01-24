@@ -30,6 +30,10 @@ class TokenizerConfig:
   dtype: np.dtype = np.int_
   rank: int = 1
 
+  @property
+  def vocabulary(self) -> vocabularies.Vocabulary:
+    return self.vocab
+
 
 @dataclasses.dataclass(frozen=True)
 class Tokenizer:
