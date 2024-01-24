@@ -1726,7 +1726,7 @@ class MixtureTest(absltest.TestCase):
     )
 
   @mock.patch(
-      "airio.lazy_dataset_transforms.ConcatLazyMapDataset",
+      "airio.grain.lazy_dataset_transforms.ConcatLazyMapDataset",
       new_callable=mock.NonCallableMock,
   )
   def test_single_epoch_concat_not_called(self, unused_mock_concat_fn):

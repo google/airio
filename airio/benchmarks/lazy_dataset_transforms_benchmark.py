@@ -14,7 +14,7 @@
 
 """Microbenchmarks for AirIO lazy_dataset_transforms functions."""
 
-from airio import lazy_dataset_transforms
+from airio.grain import lazy_dataset_transforms
 import google_benchmark
 import grain.python as grain
 import jax.random

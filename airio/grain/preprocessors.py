@@ -18,8 +18,8 @@ import dataclasses
 import time
 from typing import Callable
 
-from airio import lazy_dataset_transforms
 from airio import preprocessors as preprocessors_lib
+from airio.grain import lazy_dataset_transforms
 import grain.python as grain
 import jax
 import numpy as np

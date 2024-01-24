@@ -19,9 +19,10 @@ from unittest import mock
 
 from absl.testing import absltest
 from absl.testing import parameterized
-from airio import lazy_dataset_transforms
+from airio.grain import lazy_dataset_transforms
 import grain.python as grain
 import jax.random
+
 
 lazy_dataset = grain.experimental.lazy_dataset
 
@@ -67,6 +68,7 @@ class ConcatLazyMapDatasetTest(parameterized.TestCase):
     self.assertSequenceEqual(actual, range(22))
 
 
+
 class RandomMapFnLazyMapDatasetTest(absltest.TestCase):
 
   def test_iter_reproducible(self):
@@ -102,6 +104,7 @@ class RandomMapFnLazyMapDatasetTest(absltest.TestCase):
         ds, random_map_fn, jax.random.PRNGKey(42)
     )
     self.assertLen(ds, 5)
+
 
 
 if __name__ == "__main__":

@@ -19,12 +19,12 @@ from typing import Any, Iterable, Mapping, Sequence, Union, cast
 
 from airio import data_sources
 from airio import dataset_providers as airio_dataset_providers
-from airio import lazy_dataset_transforms
 # Import "preprocessors" as "preprocessors_lib" to prevent naming conflicts with
 # "preprocessors" attrs in this file.
 from airio import preprocessors as airio_preprocessors_lib
 from airio import tokenizer
 from airio.grain import dataset_iterators
+from airio.grain import lazy_dataset_transforms
 from airio.grain import preprocessors as grain_preprocessors_lib
 from clu.data import dataset_iterator as clu_dataset_iterator
 import grain.python as grain

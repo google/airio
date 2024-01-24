@@ -17,8 +17,8 @@
 import functools
 from typing import Optional, Sequence
 
-from airio import lazy_dataset_transforms
 from airio import preprocessors as preprocessors_lib
+from airio.grain import lazy_dataset_transforms
 from airio.grain.common import packing
 import grain.python as grain
 import jax
