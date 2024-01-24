@@ -15,14 +15,17 @@
 """Classes for AirIO data loading with Grain."""
 
 import functools
-from typing import cast, Any, Iterable, Mapping, Sequence, Union
+from typing import Any, Iterable, Mapping, Sequence, Union, cast
 
-import airio
+from airio import data_sources
+from airio import dataset_providers as airio_dataset_providers
+from airio import lazy_dataset_transforms
 # Import "preprocessors" as "preprocessors_lib" to prevent naming conflicts with
 # "preprocessors" attrs in this file.
-from airio import preprocessors as preprocessors_lib
+from airio import preprocessors as airio_preprocessors_lib
 from airio import tokenizer
 from airio.grain import dataset_iterators
+from airio.grain import preprocessors as grain_preprocessors_lib
 from clu.data import dataset_iterator as clu_dataset_iterator
 import grain.python as grain
 import jax.random
@@ -36,15 +39,14 @@ MAX_NUM_RECORDS_TO_INSPECT = 1000
 lazy_dataset = grain.experimental.lazy_dataset
 # TODO(sahildua): Expose these data sources as AirIO data sources?
 GrainDataSource = grain.RandomAccessDataSource
-AirIOPreprocessor = preprocessors_lib.AirIOPreprocessor
 JaxRng = jax.Array
 
 
-class GrainTask(airio.dataset_providers.Task):
+class GrainTask(airio_dataset_providers.Task):
   """A class to manage a dataset and its related metrics."""
 
   name: str
-  source: airio.data_sources.DataSource
+  source: data_sources.DataSource
 
   def _get_data_source_for_split(self, split: str) -> GrainDataSource:
     if self.source is None:
@@ -63,14 +65,14 @@ class GrainTask(airio.dataset_providers.Task):
   def _apply_preprocessors_to_lazy_dataset(
       self,
       ds,
-      preps: Sequence[AirIOPreprocessor],
-      runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
+      preps: Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor],
+      runtime_args: airio_preprocessors_lib.AirIOInjectedRuntimeArgs,
       base_rng: JaxRng,
       has_none_elems: bool,
   ):
     prep_rng = base_rng
     for prep in preps:
-      transform = preprocessors_lib.LazyDatasetTransform(prep)
+      transform = grain_preprocessors_lib.LazyDatasetTransform(prep)
       if (
           has_none_elems
           and transform.requires_non_none_elements
@@ -96,11 +98,13 @@ class GrainTask(airio.dataset_providers.Task):
       self,
       sequence_lengths: Mapping[str, int] | None,
       split: str,
-      runtime_preprocessors: Sequence[AirIOPreprocessor] | None,
+      runtime_preprocessors: (
+          Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor] | None
+      ),
       batch_size: int | None,
       shuffle: bool,
       seed: int | None,
-      shard_info: airio.dataset_providers.ShardInfo | None,
+      shard_info: airio_dataset_providers.ShardInfo | None,
       num_epochs: int | None,
   ) -> lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset:
     """Returns a lazy dataset for Task source and preprocessors."""
@@ -125,7 +129,7 @@ class GrainTask(airio.dataset_providers.Task):
 
     # Step 3: Run preprocessors and shuffle each epoch (if needed)
     preps = self._preprocessors
-    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = airio_preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths=sequence_lengths, split=split
     )
     preprocessed_dss = []
@@ -152,7 +156,7 @@ class GrainTask(airio.dataset_providers.Task):
     if len(preprocessed_dss) == 1:
       ds = preprocessed_dss[0]
     else:
-      ds = airio.lazy_dataset_transforms.ConcatLazyMapDataset(preprocessed_dss)
+      ds = lazy_dataset_transforms.ConcatLazyMapDataset(preprocessed_dss)
 
     # Step 5: Apply runtime preprocessors and batching, if needed
     runtime_preps = []
@@ -173,11 +177,13 @@ class GrainTask(airio.dataset_providers.Task):
       self,
       sequence_lengths: Mapping[str, int] | None = None,
       split: str = tfds.Split.TRAIN,
-      runtime_preprocessors: Sequence[AirIOPreprocessor] | None = None,
+      runtime_preprocessors: (
+          Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor] | None
+      ) = None,
       batch_size: int | None = None,
       shuffle: bool = True,
       seed: int | None = 0,
-      shard_info: airio.dataset_providers.ShardInfo | None = None,
+      shard_info: airio_dataset_providers.ShardInfo | None = None,
       num_epochs: int | None = 1,
   ) -> clu_dataset_iterator.DatasetIterator:
     """Returns the dataset iterator as per the task configuration."""
@@ -221,11 +227,11 @@ class GrainTask(airio.dataset_providers.Task):
       ops.append(grain.Batch(batch_size=batch_size, drop_remainder=False))
 
     # Add runtime args
-    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = airio_preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths=sequence_lengths, split=split
     )
     for op in ops:
-      if isinstance(op, preprocessors_lib.FnTransforms):
+      if isinstance(op, grain_preprocessors_lib.FnTransforms):
         op.runtime_args = runtime_args
 
     return self._load_data(source=source, sampler=sampler, ops=ops)
@@ -245,10 +251,11 @@ class GrainTask(airio.dataset_providers.Task):
       sampler: a means of sampling from the source.
       ops: a list of transformations to apply. Only `grain.Transformation`s are
         allowed because these are passed to the operations field in
-        `grain.DataLoader`. Other types allowed by `AirIOPreprocessor` need to
-        be mapped to one or more `grain.Transformation`s or handled before this
-        call. Once the switch to lazy_dataset API is complete, this arg will be
-        removed and all transformations will be baked into the `source` arg.
+        `grain.DataLoader`. Other types allowed by
+        `grain_preprocessors_lib.PyGrainAirIOPreprocessor` need to be mapped to
+        one or more `grain.Transformation`s or handled before this call. Once
+        the switch to lazy_dataset API is complete, this arg will be removed and
+        all transformations will be baked into the `source` arg.
 
     Returns an iterator of records after applying `ops`.
     """
@@ -265,7 +272,9 @@ class GrainTask(airio.dataset_providers.Task):
       num_records: int = DEFAULT_NUM_RECORDS_TO_INSPECT,
       sequence_lengths: Mapping[str, int] | None = None,
       split: str = tfds.Split.TRAIN,
-      runtime_preprocessors: Sequence[AirIOPreprocessor] | None = None,
+      runtime_preprocessors: (
+          Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor] | None
+      ) = None,
       batch_size: int | None = None,
       shuffle: bool = True,
       seed: int | None = 0,
@@ -324,12 +333,12 @@ class GrainTask(airio.dataset_providers.Task):
       return accumulated_result
 
     # Apply all transformations, one by one.
-    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = airio_preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths=sequence_lengths, split=split
     )
     accumulated_ops = []
     for op in all_ops:
-      if isinstance(op, preprocessors_lib.FnTransforms):
+      if isinstance(op, grain_preprocessors_lib.FnTransforms):
         op.runtime_args = runtime_args
       accumulated_ops.append(op)
       records_next_step = self._load_data(
@@ -341,15 +350,17 @@ class GrainTask(airio.dataset_providers.Task):
 
   def get_updated_runtime_args(
       self,
-      runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
-      runtime_preprocessors: Sequence[AirIOPreprocessor] | None,
-  ) -> preprocessors_lib.AirIOInjectedRuntimeArgs:
+      runtime_args: airio_preprocessors_lib.AirIOInjectedRuntimeArgs,
+      runtime_preprocessors: (
+          Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor] | None
+      ),
+  ) -> airio_preprocessors_lib.AirIOInjectedRuntimeArgs:
     """Returns updated runtime args based on preprocessors and feature converter."""
     preps = self._preprocessors
     if runtime_preprocessors:
       preps.extend(runtime_preprocessors)
     for prep in preps:
-      transform = preprocessors_lib.LazyDatasetTransform(prep)
+      transform = grain_preprocessors_lib.LazyDatasetTransform(prep)
       runtime_args = transform.get_updated_runtime_args(runtime_args)
     return runtime_args
 
@@ -360,12 +371,14 @@ class GrainTask(airio.dataset_providers.Task):
     This is a best-effort check and may be wrong.
     """
     return any([
-        preprocessors_lib.LazyDatasetTransform(prep).produces_none_elements
+        grain_preprocessors_lib.LazyDatasetTransform(
+            prep
+        ).produces_none_elements
         for prep in self._preprocessors
     ])
 
 
-class GrainMixture(airio.dataset_providers.Mixture):
+class GrainMixture(airio_dataset_providers.Mixture):
   """A class for mixture of Tasks."""
 
   def __init__(
@@ -388,11 +401,13 @@ class GrainMixture(airio.dataset_providers.Mixture):
       self,
       sequence_lengths: Mapping[str, int] | None = None,
       split: str = tfds.Split.TRAIN,
-      runtime_preprocessors: Sequence[AirIOPreprocessor] | None = None,
+      runtime_preprocessors: (
+          Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor] | None
+      ) = None,
       batch_size: int | None = None,
       shuffle: bool = True,
       seed: int | None = 0,
-      shard_info: airio.dataset_providers.ShardInfo | None = None,
+      shard_info: airio_dataset_providers.ShardInfo | None = None,
       num_epochs: int | None = 1,
   ) -> lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset:
     """Returns a lazy dataset for the Mixture."""
@@ -458,7 +473,7 @@ class GrainMixture(airio.dataset_providers.Mixture):
     # Note: Use updated runtime args from the first Task. All updated runtime
     # args must match, or mixing won't work (compute all updated runtime args
     # and add a check here in the future if helpful).
-    runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = airio_preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths=sequence_lengths, split=split
     )
     if isinstance(self.leaf_tasks[0], GrainTask):
@@ -467,7 +482,8 @@ class GrainMixture(airio.dataset_providers.Mixture):
       )
     if post_mix_preps:
       post_mix_transforms = [
-          preprocessors_lib.LazyDatasetTransform(p) for p in post_mix_preps
+          grain_preprocessors_lib.LazyDatasetTransform(p)
+          for p in post_mix_preps
       ]
       for t in post_mix_transforms:
         ds = t(ds, runtime_args=runtime_args)
@@ -480,11 +496,13 @@ class GrainMixture(airio.dataset_providers.Mixture):
       self,
       sequence_lengths: Mapping[str, int] | None = None,
       split: str = tfds.Split.TRAIN,
-      runtime_preprocessors: Sequence[AirIOPreprocessor] | None = None,
+      runtime_preprocessors: (
+          Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor] | None
+      ) = None,
       batch_size: int | None = None,
       shuffle: bool = True,
       seed: int | None = 0,
-      shard_info: airio.dataset_providers.ShardInfo | None = None,
+      shard_info: airio_dataset_providers.ShardInfo | None = None,
       num_epochs: int | None = 1,
   ) -> clu_dataset_iterator.DatasetIterator:
     """Returns the dataset iterator."""
@@ -501,7 +519,7 @@ class GrainMixture(airio.dataset_providers.Mixture):
     return dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader=ds)
 
 
-class GrainTaskBuilder(airio.dataset_providers.TaskBuilder):
+class GrainTaskBuilder(airio_dataset_providers.TaskBuilder):
   """Builder class for building GrainTask object.
 
   In order to create a GrainTask object, build() method should be called on the
@@ -581,11 +599,11 @@ def _even_split(
 
 def get_vocabularies(
     mixture_or_task: (
-        airio.dataset_providers.Task | airio.dataset_providers.Mixture
+        airio_dataset_providers.Task | airio_dataset_providers.Mixture
     ),
 ) -> Mapping[str, vocabularies.Vocabulary]:
   """Returns vocabularies for all features as configured in tokenizer."""
-  if isinstance(mixture_or_task, airio.dataset_providers.Mixture):
+  if isinstance(mixture_or_task, airio_dataset_providers.Mixture):
     tasks = mixture_or_task.leaf_tasks
     if not tasks:
       return {}
@@ -595,9 +613,9 @@ def get_vocabularies(
 
   vocabulary_map = {}
   for preproc in task.get_preprocessors():
-    if isinstance(preproc, preprocessors_lib.MapFnTransform) and isinstance(
-        preproc.map_fn, tokenizer.Tokenizer
-    ):
+    if isinstance(
+        preproc, airio_preprocessors_lib.MapFnTransform
+    ) and isinstance(preproc.map_fn, tokenizer.Tokenizer):
       tokenizer_configs = preproc.map_fn.tokenizer_configs
       for feature_name, tokenizer_config in tokenizer_configs.items():
         vocabulary_map[feature_name] = tokenizer_config.vocab

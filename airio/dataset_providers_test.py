@@ -63,7 +63,9 @@ def _create_tokenizer_config() -> airio.tokenizer.TokenizerConfig:
   return airio.tokenizer.TokenizerConfig(vocab=_create_sentencepiece_vocab())
 
 
-def _create_preprocessors() -> Sequence[dataset_providers.AirIOPreprocessor]:
+def _create_preprocessors() -> (
+    Sequence[airio.dataset_providers.AirIOPreprocessor]
+):
   tokenizer_config = _create_tokenizer_config()
   return [
       preprocessors_lib.MapFnTransform(_imdb_preprocessor),
@@ -80,7 +82,7 @@ def _create_preprocessors() -> Sequence[dataset_providers.AirIOPreprocessor]:
 
 def _create_runtime_preprocessors(
     feature_lengths: Dict[str, int] | None = None,
-) -> Sequence[preprocessors_lib.AirIOPreprocessor]:
+) -> Sequence[airio.dataset_providers.AirIOPreprocessor]:
   # TODO(b/311543848): Fully remove FeatureConverter.
   return (
       airio.feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
@@ -115,7 +117,9 @@ def _create_fn_src(num_elements=5):
 
 def _create_task(
     source: airio.data_sources.DataSource | None,
-    preprocessors: Sequence[dataset_providers.AirIOPreprocessor] | None = None,
+    preprocessors: (
+        Sequence[airio.dataset_providers.AirIOPreprocessor] | None
+    ) = None,
     task_name: str = "dummy_airio_task",
 ) -> airio.dataset_providers.Task:
   """Create example AirIO task."""
@@ -128,7 +132,9 @@ def _create_task(
 
 def _create_task_builder(
     source: airio.data_sources.DataSource | None,
-    preprocessors: Sequence[dataset_providers.AirIOPreprocessor] | None = None,
+    preprocessors: (
+        Sequence[airio.dataset_providers.AirIOPreprocessor] | None
+    ) = None,
     task_name: str = "dummy_airio_task",
 ) -> airio.dataset_providers.TaskBuilder:
   return airio.dataset_providers.TaskBuilder(
@@ -647,11 +653,11 @@ class DatasetProvidersTest(absltest.TestCase):
     tasks = []
     for i in range(2):
       tasks.append(
-          airio.grain.dataset_providers.GrainTask(
+          dataset_providers.GrainTask(
               name=f"test_task_{i}",
               source=_create_fn_src(num_elements=3),
               preprocessors=[
-                  airio.preprocessors_lib.MapFnTransform(
+                  preprocessors_lib.MapFnTransform(
                       functools.partial(test_map_fn, idx=i)
                   )
               ],

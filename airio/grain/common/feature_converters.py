@@ -18,6 +18,7 @@ from collections.abc import Sequence
 import dataclasses
 import functools
 from airio import preprocessors as preprocessors_lib
+from airio.grain import preprocessors as grain_preprocessors_lib
 from airio.grain.common import packing
 from airio.grain.common import preprocessors
 import numpy as np
@@ -283,7 +284,9 @@ class T5XEncDecFeatureConverter:
   pad_id: int
   bos_id: int
 
-  def get_preprocessors(self) -> Sequence[preprocessors_lib.AirIOPreprocessor]:
+  def get_preprocessors(
+      self,
+  ) -> Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor]:
     """Returns AirIO preprocessors corresponding to seqio.EncDecFeatureConverter."""
 
     update_runtime_args = functools.partial(
@@ -313,7 +316,7 @@ class T5XEncDecFeatureConverter:
           if self.use_multi_bin_packing
           else packing.SingleBinTruePackIterPreprocessor
       )
-      packer_prep = preprocessors_lib.LazyIterTransform(
+      packer_prep = grain_preprocessors_lib.LazyIterTransform(
           packer, update_runtime_args=packer.update_runtime_args
       )
       preps = [packer_prep] + preps
@@ -452,7 +455,9 @@ class T5XLMFeatureConverter:
   pad_id: int
   bos_id: int
 
-  def get_preprocessors(self) -> Sequence[preprocessors_lib.AirIOPreprocessor]:
+  def get_preprocessors(
+      self,
+  ) -> Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor]:
     """Returns AirIO preprocessors corresponding to seqio.LMFeatureConverter."""
 
     update_runtime_args = functools.partial(
@@ -480,7 +485,7 @@ class T5XLMFeatureConverter:
           if self.use_multi_bin_packing
           else packing.SingleBinTruePackIterPreprocessor
       )
-      packer_prep = preprocessors_lib.LazyIterTransform(
+      packer_prep = grain_preprocessors_lib.LazyIterTransform(
           packer, update_runtime_args=packer.update_runtime_args
       )
       preps = [packer_prep] + preps

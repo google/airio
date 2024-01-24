@@ -22,16 +22,14 @@ from typing import Dict, Sequence
 import airio
 from airio import preprocessors as preprocessors_lib
 from airio.grain import dataset_providers
+from airio.grain import preprocessors as grain_preprocessors_lib
 from airio.grain.common import feature_converters
 import google_benchmark
-import grain.python as grain
 import jax
 import numpy as np
 from seqio import vocabularies
 import tensorflow_datasets as tfds
 
-
-lazy_dataset = grain.experimental.lazy_dataset
 
 _SOURCE_NAME = "imdb_reviews"
 _SOURCE_NUM_EXAMPLES = 3
@@ -57,12 +55,10 @@ def _imdb_preprocessor(raw_example: Dict[str, str]) -> Dict[str, str]:
   return final_example
 
 
-def _create_preprocessors() -> (
-    Sequence[airio.dataset_providers.AirIOPreprocessor]
-):
+def _create_preprocessors() -> Sequence[preprocessors_lib.AirIOPreprocessor]:
   return [
-      airio.preprocessors.MapFnTransform(_imdb_preprocessor),
-      airio.preprocessors.MapFnTransform(
+      preprocessors_lib.MapFnTransform(_imdb_preprocessor),
+      preprocessors_lib.MapFnTransform(
           airio.tokenizer.Tokenizer(
               tokenizer_configs={
                   "inputs": _TOKENIZER_CONFIG,
@@ -111,9 +107,7 @@ def _create_fn_src(num_elements=5):
 
 def _create_task(
     source: airio.data_sources.DataSource | None = None,
-    preprocessors: (
-        Sequence[airio.dataset_providers.AirIOPreprocessor] | None
-    ) = None,
+    preprocessors: Sequence[preprocessors_lib.AirIOPreprocessor] | None = None,
     task_name: str = "dummy_airio_task",
     num_elements: int = _SOURCE_NUM_EXAMPLES,
     idx: int = 1,
@@ -158,12 +152,14 @@ def _create_mixture(
   )
 
 
-class _TestFilterLazyDatasetIterator(airio.lazy_dataset.LazyDatasetIterator):
+class _TestFilterLazyDatasetIterator(
+    grain_preprocessors_lib.lazy_dataset.LazyDatasetIterator
+):
   """Iterator that filters elements based on an int threshold."""
 
   def __init__(
       self,
-      parent: airio.lazy_dataset.LazyDatasetIterator,
+      parent: grain_preprocessors_lib.lazy_dataset.LazyDatasetIterator,
       threshold: int,
   ):
     super().__init__()
@@ -185,12 +181,14 @@ class _TestFilterLazyDatasetIterator(airio.lazy_dataset.LazyDatasetIterator):
     self._threshold = state["threshold"]
 
 
-class TestFilterLazyIterDataset(airio.lazy_dataset.LazyIterDataset):
+class TestFilterLazyIterDataset(
+    grain_preprocessors_lib.lazy_dataset.LazyIterDataset
+):
   """LazyIterDataset thatfilters elements based on an int threshold."""
 
   def __init__(
       self,
-      parent: airio.lazy_dataset.LazyIterDataset,
+      parent: grain_preprocessors_lib.lazy_dataset.LazyIterDataset,
       threshold: int,
   ):
     super().__init__(parent)
@@ -299,7 +297,7 @@ def task_get_dataset_with_lazy_iter_prep(state):
   task_with_iter = _create_task(
       source=_create_fn_src(num_elements=10),
       preprocessors=[
-          preprocessors_lib.LazyIterTransform(
+          grain_preprocessors_lib.LazyIterTransform(
               lambda ds, *_: TestFilterLazyIterDataset(ds, threshold=4),
               update_runtime_args=lambda x: x,
           ),
@@ -330,7 +328,7 @@ def task_get_dataset_with_lazy_iter_prep_with_runtime_preps_and_batching(state):
   task_with_iter = _create_task(
       source=_create_fn_src(num_elements=10),
       preprocessors=[
-          preprocessors_lib.LazyIterTransform(
+          grain_preprocessors_lib.LazyIterTransform(
               lambda ds, *_: TestFilterLazyIterDataset(ds, threshold=4),
               update_runtime_args=lambda x: x,
           ),
@@ -935,7 +933,7 @@ def mixing_with_lazy_iter_preprocessor(state):
   task_with_iter = _create_task(
       source=_create_fn_src(num_elements=10),
       preprocessors=[
-          preprocessors_lib.LazyIterTransform(
+          grain_preprocessors_lib.LazyIterTransform(
               lambda ds, *_: TestFilterLazyIterDataset(ds, threshold=4),
               update_runtime_args=lambda x: x,
           ),
@@ -976,7 +974,7 @@ def mixing_with_lazy_iter_preprocessor_with_runtime_preps_and_batching(state):
   task_with_none = _create_task(
       source=_create_fn_src(num_elements=10),
       preprocessors=[
-          preprocessors_lib.LazyIterTransform(
+          grain_preprocessors_lib.LazyIterTransform(
               lambda ds, *_: TestFilterLazyIterDataset(ds, threshold=4),
               update_runtime_args=lambda x: x,
           ),

@@ -14,7 +14,7 @@
 
 """Microbenchmarks for AirIO lazy_dataset_transforms functions."""
 
-import airio
+from airio import lazy_dataset_transforms
 import google_benchmark
 import grain.python as grain
 import jax.random
@@ -28,7 +28,7 @@ def length(state):
   datasets = []
   for data_len in parent_lens:
     datasets.append(lazy_dataset.RangeLazyMapDataset(data_len))
-  ds = airio.lazy_dataset_transforms.ConcatLazyMapDataset(datasets)
+  ds = lazy_dataset_transforms.ConcatLazyMapDataset(datasets)
   while state:
     _ = len(ds)
 
@@ -42,7 +42,7 @@ def get_item(state):
       lazy_dataset.RangeLazyMapDataset(18, 19),
       lazy_dataset.RangeLazyMapDataset(19, 22),
   ]
-  ds = airio.lazy_dataset_transforms.ConcatLazyMapDataset(parents)
+  ds = lazy_dataset_transforms.ConcatLazyMapDataset(parents)
   while state:
     _ = [ds[i] for i in range(len(ds))]
 
@@ -57,7 +57,7 @@ def iter_items(state):
       lazy_dataset.RangeLazyMapDataset(18, 19),
       lazy_dataset.RangeLazyMapDataset(19, 22),
   ]
-  ds = airio.lazy_dataset_transforms.ConcatLazyMapDataset(parents)
+  ds = lazy_dataset_transforms.ConcatLazyMapDataset(parents)
   ds_iter = iter(ds)
   while state:
     _ = list(ds_iter)
@@ -71,7 +71,7 @@ def length_reproducible(state):
     return ex + int(jax.random.randint(rng, [], 0, 10))
 
   ds = lazy_dataset.RangeLazyMapDataset(5)
-  ds = airio.lazy_dataset_transforms.RandomMapFnLazyMapDataset(
+  ds = lazy_dataset_transforms.RandomMapFnLazyMapDataset(
       ds, random_map_fn, jax.random.PRNGKey(42)
   )
   while state:
@@ -88,7 +88,7 @@ def get_item_reproducible(state):
   ds = lazy_dataset.RangeLazyMapDataset(5)
   while state:
     for _ in range(5):
-      ds1 = airio.lazy_dataset_transforms.RandomMapFnLazyMapDataset(
+      ds1 = lazy_dataset_transforms.RandomMapFnLazyMapDataset(
           ds, random_map_fn, jax.random.PRNGKey(42)
       )
       _ = [ds1[i] for i in range(len(ds))]
@@ -104,7 +104,7 @@ def iter_items_reproducible(state):
   ds = lazy_dataset.RangeLazyMapDataset(5)
   while state:
     for _ in range(5):
-      ds1 = airio.lazy_dataset_transforms.RandomMapFnLazyMapDataset(
+      ds1 = lazy_dataset_transforms.RandomMapFnLazyMapDataset(
           ds, random_map_fn, jax.random.PRNGKey(42)
       )
       _ = list(ds1)

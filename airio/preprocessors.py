@@ -18,19 +18,18 @@ import copy
 import dataclasses
 import functools
 import inspect
-import time
 from typing import Any, Callable, Mapping
 
-from airio import lazy_dataset_transforms
 import grain.python as grain
 import jax
 import numpy as np
 
 # TODO(b/294122943): Implement flat_map.
 
-lazy_dataset = grain.experimental.lazy_dataset
-LazyDataset = lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset
 JaxRng = jax.Array
+
+
+AirIOPreprocessor = grain.Transformation
 
 
 @dataclasses.dataclass
@@ -43,6 +42,7 @@ class AirIOInjectedRuntimeArgs:
   def clone(self) -> "AirIOInjectedRuntimeArgs":
     """Returns a deep copy of self."""
     return copy.deepcopy(self)
+
 
 
 MapFnCallable = (
@@ -78,6 +78,7 @@ class MapFnTransform(grain.MapTransform):
   runtime_args: AirIOInjectedRuntimeArgs | None = None
   update_runtime_args: UpdateRuntimeArgsCallable | None = None
 
+
   def map(self, element):
     """Maps a single element."""
     return inject_runtime_args_to_fn(self.map_fn, self.runtime_args)(element)
@@ -100,6 +101,7 @@ class RandomMapFnTransform(grain.RandomMapTransform):
   map_fn: RandomMapFnCallable
   runtime_args: AirIOInjectedRuntimeArgs | None = None
   update_runtime_args: UpdateRuntimeArgsCallable | None = None
+
 
   def random_map(self, element, rng: np.random.Generator):
     """Maps a single element."""
@@ -127,205 +129,10 @@ class FilterFnTransform(grain.FilterTransform):
   runtime_args: AirIOInjectedRuntimeArgs | None = None
   update_runtime_args: UpdateRuntimeArgsCallable | None = None
 
+
   def filter(self, element) -> bool:
     """Filters a single element."""
     return inject_runtime_args_to_fn(self.filter_fn, self.runtime_args)(element)
-
-
-@dataclasses.dataclass
-class LazyMapTransform:
-  """AirIO preprocessor class for LazyMapDataset transformations.
-
-  Avoid using this Transform class if possible. It is important for users to set
-  the `update_runtime_args` and `produces_none_elements` attributes correctly
-  because it is not possible to verify correctness at runtime.
-
-  Attributes:
-    transform: A `Callable` that preprocesses `lazy_dataset.LazyMapDataset`
-      based on runtime args like sequence lengths provided via
-      `AirIOInjectedRuntimeArgs`, and returns a `lazy_dataset.LazyMapDataset`.
-    update_runtime_args: A `Callable` that updates the
-      `AirIOInjectedRuntimeArgs` for use by subsequent transforms if this
-      transform modifies or adds new features (e.g. segment ids after packing).
-      Pass `lambda x: x` if runtime args aren't updated.
-    produces_none_elements: A bool to indicate whether the transform removes
-      examples from the original dataset, e.g. filtering, packing, etc.
-    requires_non_none_elements: A bool to indicate whether the transform
-      requires strictly non-None elements in the original dataset, e.g.
-      batching, mixing, etc.
-  """
-
-  transform: Callable[
-      [lazy_dataset.LazyMapDataset, AirIOInjectedRuntimeArgs, JaxRng | None],
-      lazy_dataset.LazyMapDataset,
-  ]
-  update_runtime_args: UpdateRuntimeArgsCallable
-  produces_none_elements: bool
-  requires_non_none_elements: bool
-
-  def __call__(
-      self,
-      ds: lazy_dataset.LazyMapDataset,
-      runtime_args: AirIOInjectedRuntimeArgs,
-      rng: JaxRng | None,
-  ) -> lazy_dataset.LazyMapDataset:
-    if not isinstance(ds, lazy_dataset.LazyMapDataset):
-      raise ValueError(
-          f"Cannot apply LazyMapDataset transform: {str(self.transform)} to"
-          f" non-LazyMapDataset dataset: {str(ds)}"
-      )
-    return self.transform(ds, runtime_args, rng)
-
-
-@dataclasses.dataclass
-class LazyIterTransform:
-  """AirIO preprocessor class for LazyIterDataset transformations.
-
-  Avoid using this Transform class if possible. It is important for users to set
-  the `update_runtime_args` attribute correctly because it is not possible to
-  verify correctness at runtime.
-
-  Attributes:
-    transform: A `Callable` that preprocesses `lazy_dataset.LazyIterDataset`
-      based on runtime args like sequence lengths provided via
-      `AirIOInjectedRuntimeArgs`, and returns a `lazy_dataset.LazyIterDataset`.
-    update_runtime_args: A `Callable` that updates the
-      `AirIOInjectedRuntimeArgs` for use by subsequent transforms if this
-      transform modifies or adds new features (e.g. segment ids after packing).
-      Pass `lambda x: x` if runtime args aren't updated.
-  """
-
-  transform: Callable[
-      [lazy_dataset.LazyIterDataset, AirIOInjectedRuntimeArgs, JaxRng | None],
-      lazy_dataset.LazyIterDataset,
-  ]
-  update_runtime_args: UpdateRuntimeArgsCallable
-
-  def __call__(
-      self,
-      ds: lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset,
-      runtime_args: AirIOInjectedRuntimeArgs,
-      rng: JaxRng | None,
-  ) -> lazy_dataset.LazyIterDataset:
-    if isinstance(ds, lazy_dataset.LazyMapDataset):
-      ds = ds.to_iter_dataset()
-    if not isinstance(ds, lazy_dataset.LazyIterDataset):
-      raise ValueError(
-          f"Cannot apply LazyIterDataset transform: {str(self.transform)} to"
-          f" non-LazyIterDataset dataset: {str(ds)}"
-      )
-    return self.transform(ds, runtime_args, rng)
-
-
-# These may be extended; update LazyDatasetTransform properties when adding new
-# preprocessor types, specifically `produces_none_elements`,
-# `can_process_iter_dataset`, and `requires_non_none_elements`.
-FnTransforms = MapFnTransform | RandomMapFnTransform | FilterFnTransform
-LazyTransforms = LazyMapTransform | LazyIterTransform
-AirIOPreprocessor = grain.Transformation | LazyTransforms
-
-
-@dataclasses.dataclass
-class LazyDatasetTransform:
-  """A convenience function to map Transforms to LazyDatasets."""
-
-  transform: AirIOPreprocessor
-
-  def __post_init__(self):
-    if not isinstance(self.transform, AirIOPreprocessor):
-      raise ValueError(f"{str(self.transform)} is not supported")
-    # TODO(b/300938204): Remove error for other RandomMapTransforms, once
-    # these can be reproducibly processed.
-    if isinstance(self.transform, grain.RandomMapTransform) and not isinstance(
-        self.transform, RandomMapFnTransform
-    ):
-      raise ValueError(
-          f"{str(self.transform)} is not reproducible. Use"
-          " airio.preprocessors.RandomMapFnTransform instead."
-      )
-
-  def get_updated_runtime_args(
-      self, runtime_args: AirIOInjectedRuntimeArgs
-  ) -> AirIOInjectedRuntimeArgs:
-    # pytype:disable=attribute-error
-    if (
-        hasattr(self.transform, "update_runtime_args")
-        and self.transform.update_runtime_args
-    ):
-      return self.transform.update_runtime_args(runtime_args)
-    if isinstance(self.transform, LazyTransforms):
-      return self.transform.update_runtime_args(runtime_args)
-    return runtime_args
-    # pytype:enable=attribute-error
-
-  @property
-  def produces_none_elements(self) -> bool:
-    """Returns True if the transform produces None elements, e.g. filters and LazyMap transforms.
-
-    This is a best-effort check and may be wrong, e.g. a grain.MapTransform impl
-    could produce None elements, a LazyMapTransform `produces_none_elements`
-    attr could be misconfigured, etc.
-    """
-    if isinstance(self.transform, grain.FilterTransform):
-      return True
-    if isinstance(self.transform, LazyMapTransform):
-      return self.transform.produces_none_elements
-    return False
-
-  @property
-  def requires_non_none_elements(self)  -> bool:
-    if isinstance(self.transform, LazyMapTransform):
-      return self.transform.requires_non_none_elements
-    return isinstance(self.transform, grain.Batch)
-
-  @property
-  def can_process_iter_dataset(self) -> bool:
-    return not isinstance(self.transform, LazyMapTransform)
-
-  def __call__(
-      self,
-      ds: LazyDataset,
-      rng: JaxRng | None = None,
-      runtime_args: AirIOInjectedRuntimeArgs | None = None,
-  ):
-    # pytype: disable=attribute-error
-    if isinstance(self.transform, FnTransforms):
-      self.transform.runtime_args = runtime_args
-    match self.transform:
-      case grain.MapTransform():
-        return ds.map(self.transform)
-      case RandomMapFnTransform():
-        # Special case to support reproducible stochastic transformations with
-        # jax PRNGKeys.
-        # Note: LazyIterDatasets are not yet supported, but can be if needed.
-        if not isinstance(ds, lazy_dataset.LazyMapDataset):
-          raise ValueError(
-              "RandomMapFnTransform is not yet supported for"
-              " non-LazyMapDatasets. Please file a bug with the AirIO team."
-          )
-        if rng is None:
-          rng = jax.random.PRNGKey(np.int32(time.time()))
-        map_fn = inject_runtime_args_to_fn(self.transform.map_fn, runtime_args)
-        return lazy_dataset_transforms.RandomMapFnLazyMapDataset(
-            ds,
-            map_fn=map_fn,
-            base_rng=rng,
-        )
-      case grain.FilterTransform():
-        return ds.filter(self.transform)
-      case grain.Batch():
-        return ds.batch(
-            batch_size=self.transform.batch_size,
-            drop_remainder=self.transform.drop_remainder,
-        )
-      case LazyMapTransform():
-        return self.transform(ds, runtime_args, rng)
-      case LazyIterTransform():
-        return self.transform(ds, runtime_args, rng)
-      case _:
-        # Should be taken care of by post init validation.
-        raise ValueError("%s is not supported" % str(self.transform))
-    # pytype: enable=attribute-error
 
 
 def inject_runtime_args_to_fn(
