@@ -80,17 +80,6 @@ def _create_preprocessors() -> (
   ]
 
 
-def _create_runtime_preprocessors(
-    feature_lengths: Dict[str, int] | None = None,
-) -> Sequence[airio.dataset_providers.AirIOPreprocessor]:
-  # TODO(b/311543848): Fully remove FeatureConverter.
-  return (
-      airio.feature_converters.PyGrainEncDecFeatureConverter().get_transforms(
-          task_feature_lengths=feature_lengths
-      )
-  )
-
-
 def _create_source(
     source_name: str = _SOURCE_NAME,
     splits: Sequence[str] | None = None,

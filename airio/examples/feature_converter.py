@@ -67,13 +67,15 @@ def create_task() -> grain_dataset_providers.GrainTask:
 def main(_) -> None:
   task = create_task()
   print(f"Task name: {task.name}\n")
-  runtime_preprocessors = feature_converters.T5XEncDecFeatureConverter(
-      pack=False,
-      use_multi_bin_packing=False,
-      passthrough_feature_keys=[],
-      pad_id=0,
-      bos_id=0,
-  ).get_preprocessors()
+  runtime_preprocessors = (
+      feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
+          pack=False,
+          use_multi_bin_packing=False,
+          passthrough_feature_keys=[],
+          pad_id=0,
+          bos_id=0,
+      )
+  )
   ds = task.get_dataset(
       sequence_lengths={"inputs": 30, "targets": 5},
       split="train",

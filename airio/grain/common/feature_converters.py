@@ -15,7 +15,6 @@
 """Preprocessors to replicate conventional SeqIO FeatureConverters."""
 
 from collections.abc import Sequence
-import dataclasses
 import functools
 from airio import preprocessors as preprocessors_lib
 from airio.grain import preprocessors as grain_preprocessors_lib
@@ -255,15 +254,20 @@ def update_runtime_args_for_t5x_enc_dec_features(
   return updated
 
 
-@dataclasses.dataclass
-class T5XEncDecFeatureConverter:
-  """Helper class to get AirIO preprocessors corresponding to seqio.EncDecFeatureConverter.
+def get_t5x_enc_dec_feature_converter_preprocessors(
+    pack: bool,
+    use_multi_bin_packing: bool,
+    passthrough_feature_keys: Sequence[str],
+    pad_id: int,
+    bos_id: int,
+) -> Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor]:
+  """Returns a list of AirIO preprocessors corresponding to seqio.EncDecFeatureConverter.
 
   Applies packing (optional), trimming, padding and
   `convert_to_t5x_enc_dec_features` in order. See
   `convert_to_t5x_enc_dec_features` docstring for details on feature conversion.
 
-  Attrs:
+  Args:
     pack: bool - indicates whether the dataset should be packed. The multi-bin
       packing in airio.common.packing is functionaly equivalent to the impl in
       SeqIO, and is used here.
@@ -276,51 +280,42 @@ class T5XEncDecFeatureConverter:
     pad_id: int - token value to use for padding. 0 is commonly used.
     bos_id: int - token value to use to indicate beginning of sequence in
       decoder input tokens. 0 is commonly used.
+
+  Returns:
+    a list of AirIO preprocessors.
   """
-
-  pack: bool
-  use_multi_bin_packing: bool
-  passthrough_feature_keys: Sequence[str]
-  pad_id: int
-  bos_id: int
-
-  def get_preprocessors(
-      self,
-  ) -> Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor]:
-    """Returns AirIO preprocessors corresponding to seqio.EncDecFeatureConverter."""
-
-    update_runtime_args = functools.partial(
-        update_runtime_args_for_t5x_enc_dec_features,
-        pack=self.pack,
-        passthrough_feature_keys=self.passthrough_feature_keys,
+  update_runtime_args = functools.partial(
+      update_runtime_args_for_t5x_enc_dec_features,
+      pack=pack,
+      passthrough_feature_keys=passthrough_feature_keys,
+  )
+  convert_features = functools.partial(
+      convert_to_t5x_enc_dec_features,
+      pack=pack,
+      passthrough_feature_keys=passthrough_feature_keys,
+      pad_id=pad_id,
+      bos_id=bos_id,
+  )
+  pad = functools.partial(preprocessors.pad, pad_id=pad_id)
+  preps = [
+      preprocessors_lib.MapFnTransform(preprocessors.trim),
+      preprocessors_lib.MapFnTransform(pad),
+      preprocessors_lib.MapFnTransform(
+          convert_features,
+          update_runtime_args=update_runtime_args,
+      ),
+  ]
+  if pack:
+    packer = (
+        packing.MultiBinTruePackIterPreprocessor
+        if use_multi_bin_packing
+        else packing.SingleBinTruePackIterPreprocessor
     )
-    convert_features = functools.partial(
-        convert_to_t5x_enc_dec_features,
-        pack=self.pack,
-        passthrough_feature_keys=self.passthrough_feature_keys,
-        pad_id=self.pad_id,
-        bos_id=self.bos_id,
+    packer_prep = grain_preprocessors_lib.LazyIterTransform(
+        packer, update_runtime_args=packer.update_runtime_args
     )
-    pad = functools.partial(preprocessors.pad, pad_id=self.pad_id)
-    preps = [
-        preprocessors_lib.MapFnTransform(preprocessors.trim),
-        preprocessors_lib.MapFnTransform(pad),
-        preprocessors_lib.MapFnTransform(
-            convert_features,
-            update_runtime_args=update_runtime_args,
-        ),
-    ]
-    if self.pack:
-      packer = (
-          packing.MultiBinTruePackIterPreprocessor
-          if self.use_multi_bin_packing
-          else packing.SingleBinTruePackIterPreprocessor
-      )
-      packer_prep = grain_preprocessors_lib.LazyIterTransform(
-          packer, update_runtime_args=packer.update_runtime_args
-      )
-      preps = [packer_prep] + preps
-    return preps
+    preps = [packer_prep] + preps
+  return preps
 
 
 def convert_to_t5x_lm_features(
@@ -429,15 +424,16 @@ def update_runtime_args_for_t5x_lm_features(
   return updated
 
 
-@dataclasses.dataclass
-class T5XLMFeatureConverter:
-  """Helper class to get AirIO preprocessors corresponding to seqio.LMFeatureConverter.
+def get_t5x_lm_feature_converter_preprocessors(
+    pack: bool, use_multi_bin_packing: bool, pad_id: int, bos_id: int
+) -> Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor]:
+  """Returns a list of AirIO preprocessors corresponding to seqio.LMFeatureConverter.
 
   Applies packing (optional), trimming, padding and
   `convert_to_t5x_lm_features` in order. See
   `convert_to_t5x_lm_features` docstring for details on feature conversion.
 
-  Attrs:
+  Args:
     pack: bool - indicates whether the dataset should be packed. The multi-bin
       packing in airio.common.packing is functionaly equivalent to the impl in
       SeqIO, and is used here.
@@ -448,48 +444,40 @@ class T5XLMFeatureConverter:
     pad_id: int - token value to use for padding. 0 is commonly used.
     bos_id: int - token value to use to indicate beginning of sequence in
       decoder input tokens. 0 is commonly used.
+
+  Returns:
+    a list of AirIO preprocessors.
   """
-
-  pack: bool
-  use_multi_bin_packing: bool
-  pad_id: int
-  bos_id: int
-
-  def get_preprocessors(
-      self,
-  ) -> Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor]:
-    """Returns AirIO preprocessors corresponding to seqio.LMFeatureConverter."""
-
-    update_runtime_args = functools.partial(
-        update_runtime_args_for_t5x_lm_features,
-        packed=self.pack,
+  update_runtime_args = functools.partial(
+      update_runtime_args_for_t5x_lm_features,
+      packed=pack,
+  )
+  convert_features = functools.partial(
+      convert_to_t5x_lm_features,
+      packed=pack,
+      pad_id=pad_id,
+      bos_id=bos_id,
+  )
+  pad = functools.partial(preprocessors.pad, pad_id=pad_id)
+  preps = [
+      preprocessors_lib.MapFnTransform(preprocessors.trim),
+      preprocessors_lib.MapFnTransform(pad),
+      preprocessors_lib.MapFnTransform(
+          convert_features,
+          update_runtime_args=update_runtime_args,
+      ),
+  ]
+  if pack:
+    packer = (
+        packing.MultiBinTruePackIterPreprocessor
+        if use_multi_bin_packing
+        else packing.SingleBinTruePackIterPreprocessor
     )
-    convert_features = functools.partial(
-        convert_to_t5x_lm_features,
-        packed=self.pack,
-        pad_id=self.pad_id,
-        bos_id=self.bos_id,
+    packer_prep = grain_preprocessors_lib.LazyIterTransform(
+        packer, update_runtime_args=packer.update_runtime_args
     )
-    pad = functools.partial(preprocessors.pad, pad_id=self.pad_id)
-    preps = [
-        preprocessors_lib.MapFnTransform(preprocessors.trim),
-        preprocessors_lib.MapFnTransform(pad),
-        preprocessors_lib.MapFnTransform(
-            convert_features,
-            update_runtime_args=update_runtime_args,
-        ),
-    ]
-    if self.pack:
-      packer = (
-          packing.MultiBinTruePackIterPreprocessor
-          if self.use_multi_bin_packing
-          else packing.SingleBinTruePackIterPreprocessor
-      )
-      packer_prep = grain_preprocessors_lib.LazyIterTransform(
-          packer, update_runtime_args=packer.update_runtime_args
-      )
-      preps = [packer_prep] + preps
-    return preps
+    preps = [packer_prep] + preps
+  return preps
 
 
 # TODO(b/311543848): Implement PrefixLM feature converter from

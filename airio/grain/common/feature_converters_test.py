@@ -177,16 +177,14 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         sequence_lengths={"inputs": 7, "targets": 5}, split="unused"
     )
 
-    converter = feature_converters.T5XEncDecFeatureConverter(
+    preps = feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
         pack=False,
         use_multi_bin_packing=False,
         passthrough_feature_keys=[],
         pad_id=0,
         bos_id=0,
     )
-    ds, _ = self._apply_preprocessors(
-        ds, converter.get_preprocessors(), runtime_args
-    )
+    ds, _ = self._apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
     expected = {
@@ -218,16 +216,14 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         split="unused",
     )
 
-    converter = feature_converters.T5XEncDecFeatureConverter(
+    preps = feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
         pack=False,
         use_multi_bin_packing=False,
         passthrough_feature_keys=["passthrough"],
         pad_id=0,
         bos_id=0,
     )
-    ds, runtime_args = self._apply_preprocessors(
-        ds, converter.get_preprocessors(), runtime_args
-    )
+    ds, runtime_args = self._apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
     expected_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={
@@ -265,16 +261,14 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         split="unused",
     )
 
-    converter = feature_converters.T5XEncDecFeatureConverter(
+    preps = feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
         pack=False,
         use_multi_bin_packing=False,
         passthrough_feature_keys=[],
         pad_id=0,
         bos_id=0,
     )
-    ds, _ = self._apply_preprocessors(
-        ds, converter.get_preprocessors(), runtime_args
-    )
+    ds, _ = self._apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
     expected = {
@@ -303,16 +297,14 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         sequence_lengths={"inputs": 5, "targets": 8},
         split="unused",
     )
-    converter = feature_converters.T5XEncDecFeatureConverter(
+    preps = feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
         pack=False,
         use_multi_bin_packing=False,
         passthrough_feature_keys=[],
         pad_id=0,
         bos_id=0,
     )
-    ds, _ = self._apply_preprocessors(
-        ds, converter.get_preprocessors(), runtime_args
-    )
+    ds, _ = self._apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
     expected = {
@@ -341,16 +333,14 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         split="unused",
     )
 
-    converter = feature_converters.T5XEncDecFeatureConverter(
+    preps = feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
         pack=True,
         use_multi_bin_packing=False,
         passthrough_feature_keys=[],
         pad_id=0,
         bos_id=0,
     )
-    ds, runtime_args = self._apply_preprocessors(
-        ds, converter.get_preprocessors(), runtime_args
-    )
+    ds, runtime_args = self._apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
     expected_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={
@@ -396,16 +386,14 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         split="unused",
     )
 
-    converter = feature_converters.T5XEncDecFeatureConverter(
+    preps = feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
         pack=True,
         use_multi_bin_packing=False,
         passthrough_feature_keys=[],
         pad_id=0,
         bos_id=0,
     )
-    ds, _ = self._apply_preprocessors(
-        ds, converter.get_preprocessors(), runtime_args
-    )
+    ds, _ = self._apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
     # Corner case: packing is true but task_feature_lengths are too long for
@@ -461,16 +449,14 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         split="unused",
     )
 
-    converter = feature_converters.T5XEncDecFeatureConverter(
+    preps = feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
         pack=True,
         use_multi_bin_packing=False,
         passthrough_feature_keys=[],
         pad_id=0,
         bos_id=0,
     )
-    ds, _ = self._apply_preprocessors(
-        ds, converter.get_preprocessors(), runtime_args
-    )
+    ds, _ = self._apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
     expected = {
@@ -503,16 +489,14 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         split="unused",
     )
 
-    converter = feature_converters.T5XEncDecFeatureConverter(
+    preps = feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
         pack=True,
         use_multi_bin_packing=False,
         passthrough_feature_keys=[],
         pad_id=0,
         bos_id=10,
     )
-    ds, _ = self._apply_preprocessors(
-        ds, converter.get_preprocessors(), runtime_args
-    )
+    ds, _ = self._apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
     expected = {
@@ -560,12 +544,10 @@ class LMFeatureConverter(absltest.TestCase):
         split="unused",
     )
 
-    converter = feature_converters.T5XLMFeatureConverter(
+    preps = feature_converters.get_t5x_lm_feature_converter_preprocessors(
         pack=False, use_multi_bin_packing=False, pad_id=0, bos_id=0
     )
-    ds, updated_runtime_args = _apply_preprocessors(
-        ds, converter.get_preprocessors(), runtime_args
-    )
+    ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
     expected_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
@@ -600,12 +582,10 @@ class LMFeatureConverter(absltest.TestCase):
         split="unused",
     )
 
-    converter = feature_converters.T5XLMFeatureConverter(
+    preps = feature_converters.get_t5x_lm_feature_converter_preprocessors(
         pack=True, use_multi_bin_packing=False, pad_id=0, bos_id=0
     )
-    ds, updated_runtime_args = _apply_preprocessors(
-        ds, converter.get_preprocessors(), runtime_args
-    )
+    ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
     expected_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
@@ -644,12 +624,10 @@ class LMFeatureConverter(absltest.TestCase):
         split="unused",
     )
 
-    converter = feature_converters.T5XLMFeatureConverter(
+    preps = feature_converters.get_t5x_lm_feature_converter_preprocessors(
         pack=True, use_multi_bin_packing=False, bos_id=0, pad_id=0
     )
-    ds, updated_runtime_args = _apply_preprocessors(
-        ds, converter.get_preprocessors(), runtime_args
-    )
+    ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
     expected_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
@@ -700,12 +678,10 @@ class LMFeatureConverter(absltest.TestCase):
         split="unused",
     )
 
-    converter = feature_converters.T5XLMFeatureConverter(
+    preps = feature_converters.get_t5x_lm_feature_converter_preprocessors(
         pack=True, use_multi_bin_packing=False, bos_id=0, pad_id=0
     )
-    ds, updated_runtime_args = _apply_preprocessors(
-        ds, converter.get_preprocessors(), runtime_args
-    )
+    ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
     expected_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
@@ -744,12 +720,10 @@ class LMFeatureConverter(absltest.TestCase):
         split="unused",
     )
 
-    converter = feature_converters.T5XLMFeatureConverter(
+    preps = feature_converters.get_t5x_lm_feature_converter_preprocessors(
         pack=True, use_multi_bin_packing=False, bos_id=10, pad_id=0
     )
-    ds, updated_runtime_args = _apply_preprocessors(
-        ds, converter.get_preprocessors(), runtime_args
-    )
+    ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
     expected_runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
