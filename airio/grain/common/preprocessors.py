@@ -101,6 +101,7 @@ def pad(
     that of the feature, or if any sequence exceeds the sequence length passed
     (in this case, trim the examples first).
   """
+
   def _pad(k: str, v: np.ndarray) -> np.ndarray:
     if (
         not sequence_lengths
@@ -138,3 +139,30 @@ def pad(
 
   sequence_lengths = runtime_args.sequence_lengths
   return {k: _pad(k, v) for k, v in ex.items()}
+
+
+def rekey(x, key_map=None):
+  """Replace the feature keys according to the mapping in `key_map`.
+
+  For example, if the dataset returns examples of the format:
+  {'foo': 'something', 'bar': 'something else'}
+  and key_map = {'boo': 'foo', 'spar': 'bar'} then this function will return
+  examples with the format
+  {'boo': 'something', 'spar': 'something else'}
+
+  If a mapping is to an empty key name or None, the new value is set to an empty
+  string.
+
+  Args:
+    x: an example to process.
+    key_map: dictionary mapping new keys to original keys
+
+  Returns:
+    A preprocessed example with the format listed above.
+  """
+  if key_map:
+    return {
+        new_key: x[old_key] if old_key else ""
+        for new_key, old_key in key_map.items()
+    }
+  return x

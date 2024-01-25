@@ -15,10 +15,12 @@
 """Preprocessors for T5 Tasks."""
 
 import functools
-from typing import Optional, Sequence
+from typing import Mapping, Optional, Sequence
 
 from airio import preprocessors as preprocessors_lib
+from airio import tokenizer
 from airio.grain import lazy_dataset_transforms
+from airio.grain import preprocessors as grain_preprocessors_lib
 from airio.grain.common import packing
 import grain.python as grain
 import jax
@@ -38,9 +40,9 @@ def update_seed(seed):
 
 def span_corruption(
     dataset: lazy_dataset.LazyMapDataset,
-    seed,
-    output_features,
     runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
+    seed: jax.Array,
+    tokenizer_configs: Mapping[str, tokenizer.TokenizerConfig],
     mean_noise_span_length=3.0,
     noise_density=0.15,
     input_feature_key='inputs',
@@ -53,9 +55,9 @@ def span_corruption(
   Args:
     dataset: A tf.data.Dataset with dictionaries containing the key
       `input_feature_key`.
-    seed: An initial seed to use for stateless random operations.
-    output_features: mapping of keys to features.
     runtime_args: A AirIOInjectedRuntimeArgs obj containing sequence lengths.
+    seed: An initial seed to use for stateless random operations.
+    tokenizer_configs: mapping of keys to tokenizer configs.
     mean_noise_span_length: the mean number of tokens per masked span per
       example.
     noise_density: what fraction of the tokens to mask.
@@ -104,7 +106,7 @@ def span_corruption(
   filter_fn = functools.partial(filter_empty, feature_key=feature_key)
   select_random_chunk_fn = functools.partial(
       t5_preps.single_example_select_random_chunk,
-      output_features=output_features,
+      output_features=tokenizer_configs,
       max_length=max_length,
       feature_key=feature_key,
       passthrough_feature_keys=passthrough_feature_keys,
@@ -112,7 +114,7 @@ def span_corruption(
   packer = packing.NoamPacker(feature_lengths={feature_key: input_length})
   denoise_fn = functools.partial(
       t5_preps.single_example_denoise,
-      output_features=output_features,
+      output_features=tokenizer_configs,
       inputs_fn=t5_preps.noise_span_to_unique_sentinel,
       targets_fn=t5_preps.nonnoise_span_to_unique_sentinel,
       noise_density=noise_density,
@@ -132,3 +134,17 @@ def span_corruption(
   seed = update_seed(seed)
   ds = lazy_dataset_transforms.RandomMapFnLazyMapDataset(ds, denoise_fn, seed)
   return ds
+
+
+def create_span_corruption_transform(
+    tokenizer_configs: Mapping[str, tokenizer.TokenizerConfig]
+) -> grain_preprocessors_lib.LazyMapTransform:
+  transform = functools.partial(
+      span_corruption, tokenizer_configs=tokenizer_configs
+  )
+  return grain_preprocessors_lib.LazyMapTransform(
+      transform,
+      update_runtime_args=lambda x: x,
+      produces_none_elements=True,  # due to packing
+      requires_non_none_elements=False,
+  )

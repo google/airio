@@ -20,3 +20,4 @@ from airio.grain.common.constants import *
 from airio.grain.common.feature_converters import *
 from airio.grain.common.packing import *
 from airio.grain.common.preprocessors import *
+from airio.grain.common.span_corruption import *
