@@ -27,19 +27,21 @@ class TaskEquivalenceTest(absltest.TestCase):
     # from test_data.
     # Prints an example of the airio C4 span corruption task.
     task = tasks.get_c4_v220_span_corruption_task()
-    feature_converter = feature_converters.T5XEncDecFeatureConverter(
-        pack=False,
-        use_multi_bin_packing=False,
-        passthrough_feature_keys=[],
-        pad_id=0,
-        bos_id=0,
+    runtime_preprocessors = (
+        feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
+            pack=False,
+            use_multi_bin_packing=False,
+            passthrough_feature_keys=[],
+            pad_id=0,
+            bos_id=0,
+        )
     )
     sequence_lengths = {"inputs": 1024, "targets": 1024}
     ds = task.get_dataset(
         sequence_lengths,
         shuffle=False,
         seed=94043,
-        runtime_preprocessors=feature_converter.get_preprocessors(),
+        runtime_preprocessors=runtime_preprocessors,
         shard_info=airio.ShardInfo(index=0, num_shards=1024),
     )
     print("Element Spec:", ds.element_spec)
