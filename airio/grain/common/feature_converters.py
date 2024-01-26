@@ -12,7 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Preprocessors to replicate conventional SeqIO FeatureConverters."""
+"""Preprocessors to replicate conventional SeqIO FeatureConverters.
+
+Use the following helper corresponding to the desired FeatureConverter:
+ + EncDecFeatureConverter -> get_t5x_enc_dec_feature_converter_preprocessors
+ + LMFeatureConverter -> get_t5x_lm_feature_converter_preprocessors
+ + PrefixLMFeatureConverter -> get_t5x_prefix_lm_feature_converter_preprocessors
+
+For example, the following code snippet in SeqIO:
+```
+fc = seqio.EncDecFeatureConverter(...)
+ds = seqio.get_dataset(..., feature_converter=fc)
+```
+
+is equivalent to the following in AirIO:
+
+```
+preps = get_t5x_enc_dec_feature_converter_preprocessors
+ds = airio.get_dataset(..., runtime_preprocessors=preps)
+```
+"""
 
 from collections.abc import Sequence
 import functools
@@ -23,91 +42,232 @@ from airio.grain.common import preprocessors
 import numpy as np
 
 
-def make_autoregressive_inputs(
-    inputs: np.ndarray, sequence_ids: np.ndarray | None, bos_id: int
-):
-  """Generate inputs for an autoregressive model, by shifting the inputs.
+##### Public Methods #####
 
-  Modified from seqio.utils.make_autoregressive_inputs.
 
-  For the first element of each sequence, the returned input id is bos_id
-  (commonly 0).
+# Equivalent to seqio.EncDecFeatureConverter
+def get_t5x_enc_dec_feature_converter_preprocessors(
+    pack: bool,
+    use_multi_bin_packing: bool,
+    passthrough_feature_keys: Sequence[str],
+    pad_id: int,
+    bos_id: int,
+) -> Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor]:
+  """Returns a list of AirIO preprocessors corresponding to seqio.EncDecFeatureConverter.
 
-  For a "packed" dataset, also pass the sequence_ids tensor, which aligns
-  with the inputs tensor and contains different values for different
-  concatenated examples.
-
-  Example for a packed dataset:
-
-  ```
-        inputs = [3, 8, 1, 9, 1, 5, 4, 1, 0, 0]
-    sequence_ids = [1, 1, 1, 2, 2, 3, 3, 3, 0, 0]
-         inputs = [0, 3, 8, 0, 9, 0, 5, 4, 0, 0]
-                            |     |        |
-                            These positions are set to 0 if sequence_ids is not
-                            None.
-  ```
+  Applies packing (optional), trimming, padding and
+  `_convert_to_t5x_enc_dec_features` in order. See
+  `_convert_to_t5x_enc_dec_features` docstring for details on feature
+  conversion.
 
   Args:
-    inputs: the input sequence.
-    sequence_ids: a 1-D sequence indicating segements belonging to separate
-      examples, for packed sequences, e.g. for a padded and packed sequence =
-      [ex11, ex12, ex21, ex22, ex23, pad_id, pad_id], sequence_ids would be =
-      [1, 1, 2, 2, 2, pad_id, pad_id]. Set to None for unpacked datasets.
-    bos_id: bos (beginning of sequence) id, commonly set to 0.
+    pack: bool - indicates whether the dataset should be packed. The multi-bin
+      packing in airio.common.packing is functionaly equivalent to the impl in
+      SeqIO, and is used here.
+    use_multi_bin_packing: bool - Whether to use multi-bin or single-bin
+      packing. Seting this to True is equivalent to setting
+      `use_custom_packing_ops` to True in seqio.EncDecFeatureConverter. Ignored
+      if `pack` is False.
+    passthrough_feature_keys: Sequence[str] - A list of feature names to pass
+      through.
+    pad_id: int - token value to use for padding. 0 is commonly used.
+    bos_id: int - token value to use to indicate beginning of sequence in
+      decoder input tokens. 0 is commonly used.
 
   Returns:
-    a tensor with dtype tf.int32 and the same shape as inputs.
+    a list of AirIO preprocessors.
   """
-  output_dtype = inputs.dtype
-  if sequence_ids is not None and not np.issubdtype(
-      sequence_ids.dtype, np.integer
-  ):
-    raise ValueError(
-        "Sequence_ids should be integer-valued tensors for a packed dataset."
+  update_runtime_args = functools.partial(
+      _update_runtime_args_for_t5x_enc_dec_features,
+      pack=pack,
+      passthrough_feature_keys=passthrough_feature_keys,
+  )
+  convert_features = functools.partial(
+      _convert_to_t5x_enc_dec_features,
+      pack=pack,
+      passthrough_feature_keys=passthrough_feature_keys,
+      pad_id=pad_id,
+      bos_id=bos_id,
+  )
+  pad = functools.partial(preprocessors.pad, pad_id=pad_id)
+  preps = [
+      preprocessors_lib.MapFnTransform(preprocessors.trim),
+      preprocessors_lib.MapFnTransform(pad),
+      preprocessors_lib.MapFnTransform(
+          convert_features,
+          update_runtime_args=update_runtime_args,
+      ),
+  ]
+  if pack:
+    packer = (
+        packing.MultiBinTruePackIterPreprocessor
+        if use_multi_bin_packing
+        else packing.SingleBinTruePackIterPreprocessor
     )
-  if sequence_ids is not None and len(inputs.shape) > 1:
-    raise ValueError(
-        "Only 1-D sequences are supported with packing. Got a packed"
-        f" {len(inputs.shape)}-D sequence."
+    packer_prep = grain_preprocessors_lib.LazyIterTransform(
+        packer, update_runtime_args=packer.update_runtime_args
     )
+    preps = [packer_prep] + preps
+  return preps
 
-  def shift_right_by_one(arr, fill_value):
-    shifted = np.roll(arr, shift=1, axis=0)
-    shifted[0] = fill_value
-    return shifted
 
-  inputs = shift_right_by_one(inputs, bos_id)
-  if sequence_ids is not None:
-    # Note: This means the sequence has sub-sequences of inputs. The entire
-    # sequence, and hence all sub-sequences, have already been right shifted; we
-    # just need to find the beginning of each sub-sequence and put a bos_id
-    # there, replacing the last token of the previous input sub-sequence after
-    # the right shift.
+# Equivalent to seqio.LMFeatureConverter
+def get_t5x_lm_feature_converter_preprocessors(
+    pack: bool, use_multi_bin_packing: bool, pad_id: int, bos_id: int
+) -> Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor]:
+  """Returns a list of AirIO preprocessors corresponding to seqio.LMFeatureConverter.
 
-    # Find the beginning positions of examples from sequence_ids, e.g.
-    # [1, 1, 2, 2, 2, 0, 0] -> [0, 1, 0, 1, 1, 0, 1]. Positions with 0 will be
-    # filled by bos_id, positions with 1 will be filled by (shifted) inputs.
-    not_first_in_sequence = sequence_ids == shift_right_by_one(
-        sequence_ids, fill_value=0
+  Applies packing (optional), trimming, padding and
+  `_convert_to_t5x_lm_features` in order. See
+  `_convert_to_t5x_lm_features` docstring for details on feature conversion.
+
+  Args:
+    pack: bool - indicates whether the dataset should be packed. The multi-bin
+      packing in airio.common.packing is functionaly equivalent to the impl in
+      SeqIO, and is used here.
+    use_multi_bin_packing: bool - Whether to use multi-bin or single-bin
+      packing. Seting this to True is equivalent to setting
+      `use_custom_packing_ops` to True in seqio.EncDecFeatureConverter. Ignored
+      if `pack` is False.
+    pad_id: int - token value to use for padding. 0 is commonly used.
+    bos_id: int - token value to use to indicate beginning of sequence in
+      decoder input tokens. 0 is commonly used.
+
+  Returns:
+    a list of AirIO preprocessors.
+  """
+  update_runtime_args = functools.partial(
+      _update_runtime_args_for_t5x_lm_features,
+      packed=pack,
+  )
+  convert_features = functools.partial(
+      _convert_to_t5x_lm_features,
+      packed=pack,
+      pad_id=pad_id,
+      bos_id=bos_id,
+  )
+  pad = functools.partial(preprocessors.pad, pad_id=pad_id)
+  preps = [
+      preprocessors_lib.MapFnTransform(preprocessors.trim),
+      preprocessors_lib.MapFnTransform(pad),
+      preprocessors_lib.MapFnTransform(
+          convert_features,
+          update_runtime_args=update_runtime_args,
+      ),
+  ]
+  if pack:
+    packer = (
+        packing.MultiBinTruePackIterPreprocessor
+        if use_multi_bin_packing
+        else packing.SingleBinTruePackIterPreprocessor
     )
-    not_first_in_sequence = not_first_in_sequence.astype(output_dtype)
-    # 0s -> bos_id, 1s -> inputs
-    first_ids = (1 - not_first_in_sequence) * bos_id
-    input_ids = inputs * not_first_in_sequence
-    # Combine.
-    inputs = input_ids + first_ids
-
-  return inputs
+    packer_prep = grain_preprocessors_lib.LazyIterTransform(
+        packer, update_runtime_args=packer.update_runtime_args
+    )
+    preps = [packer_prep] + preps
+  return preps
 
 
-def _get_non_padding_positions(
-    feature_value: np.ndarray, pad_id: int
-) -> np.ndarray:
-  return feature_value != pad_id
+def get_t5x_prefix_lm_feature_converter_preprocessors(
+    pack: bool,
+    use_multi_bin_packing: bool,
+    pad_id: int,
+    bos_id: int,
+    loss_on_targets_only: bool,
+    passthrough_feature_keys: Sequence[str],
+) -> Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor]:
+  """Returns a list of AirIO preprocessors corresponding to seqio.PrefixLMFeatureConverter.
+
+  Applies `_concat_and_add_masks_for_prefix_lm`, packing (optional), trimming,
+  padding and `_convert_to_t5x_prefix_lm_features` in order. See
+  `_convert_to_t5x_prefix_lm_features` docstring for details on feature
+  conversion.
+
+  Args:
+    pack: bool - indicates whether the dataset should be packed. The multi-bin
+      packing in airio.common.packing is functionaly equivalent to the impl in
+      SeqIO, and is used here.
+    use_multi_bin_packing: bool - Whether to use multi-bin or single-bin
+      packing. Seting this to True is equivalent to setting
+      `use_custom_packing_ops` to True in seqio.EncDecFeatureConverter. Ignored
+      if `pack` is False.
+    pad_id: int - token value to use for padding. 0 is commonly used.
+    bos_id: int - token value to use to indicate beginning of sequence in
+      decoder input tokens. 0 is commonly used.
+    loss_on_targets_only: whether to compute loss on tokens which belonged to
+      "targets" before concatenation.
+    passthrough_feature_keys: Sequence[str] - A list of feature names to pass
+      through.
+
+  Returns:
+    a list of AirIO preprocessors.
+  """
+
+  def swap_vals(arr: np.ndarray, old_val: int, new_val: int):
+    return np.where(arr == old_val, np.full([arr.size], new_val), arr)
+
+  def swap_inputs_width(ex: dict[str, np.ndarray], old_val: int, new_val: int):
+    ex["inputs_width"] = swap_vals(ex["inputs_width"], old_val, new_val)
+    return ex
+
+  convert_features = functools.partial(
+      _convert_to_t5x_prefix_lm_features,
+      loss_on_targets_only=loss_on_targets_only,
+      packed=pack,
+      bos_id=bos_id,
+      pad_id=pad_id,
+      passthrough_feature_keys=passthrough_feature_keys,
+  )
+  update_runtime_args = functools.partial(
+      _update_runtime_args_for_t5x_prefix_lm_features,
+      packed=pack,
+      passthrough_feature_keys=passthrough_feature_keys,
+  )
+  concat_and_add_masks = functools.partial(
+      _concat_and_add_masks_for_prefix_lm,
+      passthrough_feature_keys=passthrough_feature_keys,
+  )
+  concat_task_feature_lengths = functools.partial(
+      _concat_task_feature_lengths_for_prefix_lm,
+      passthrough_feature_keys=passthrough_feature_keys,
+  )
+  replace_0s = functools.partial(swap_inputs_width, old_val=0, new_val=-1)
+  restore_0s = functools.partial(swap_inputs_width, old_val=-1, new_val=-0)
+  pad = functools.partial(preprocessors.pad, pad_id=pad_id)
+
+  preps = [
+      preprocessors_lib.MapFnTransform(
+          concat_and_add_masks, update_runtime_args=concat_task_feature_lengths
+      ),
+      preprocessors_lib.MapFnTransform(replace_0s),
+  ]
+  if pack:
+    packer = (
+        packing.MultiBinTruePackIterPreprocessor
+        if use_multi_bin_packing
+        else packing.SingleBinTruePackIterPreprocessor
+    )
+    packer_prep = grain_preprocessors_lib.LazyIterTransform(
+        packer, update_runtime_args=packer.update_runtime_args
+    )
+    preps.append(packer_prep)
+  preps.extend([
+      preprocessors_lib.MapFnTransform(preprocessors.trim),
+      preprocessors_lib.MapFnTransform(pad),
+      preprocessors_lib.MapFnTransform(restore_0s),
+      preprocessors_lib.MapFnTransform(
+          convert_features, update_runtime_args=update_runtime_args
+      ),
+  ])
+  return preps
+
+##### Implementation and private methods #####
 
 
-def convert_to_t5x_enc_dec_features(
+##### Encoder Decoder LM Feature Converter #####
+
+
+def _convert_to_t5x_enc_dec_features(
     ex: dict[str, np.ndarray],
     pack: bool,
     passthrough_feature_keys: Sequence[str],
@@ -142,7 +302,7 @@ def convert_to_t5x_enc_dec_features(
           "targets_segment_ids": [1, 1, 1, 2, 2, 0, 0],
             "targets_positions": [0, 1, 2, 0, 1, 0, 0],
       }
-  and applying `convert_to_t5x_enc_dec_features` on the example produces:
+  and applying `_convert_to_t5x_enc_dec_features` on the example produces:
       {
        "encoder_input_tokens": [7, 8, 5, 1, 8, 4, 9, 3, 1, 0],
         "encoder_segment_ids": [1, 1, 1, 1, 2, 2, 2, 2, 2, 0],
@@ -155,7 +315,7 @@ def convert_to_t5x_enc_dec_features(
       }]
 
   This fn should be used together with
-  `update_runtime_args_for_t5x_enc_dec_features` in airio (see docstring for
+  `_update_runtime_args_for_t5x_enc_dec_features` in airio (see docstring for
   details).
 
   Args:
@@ -172,7 +332,7 @@ def convert_to_t5x_enc_dec_features(
   """
 
   # targets_segment_id is present only for a packed dataset.
-  decoder_input_tokens = make_autoregressive_inputs(
+  decoder_input_tokens = _make_autoregressive_inputs(
       ex["targets"],
       sequence_ids=ex.get("targets_segment_ids", None),
       bos_id=bos_id,
@@ -195,23 +355,23 @@ def convert_to_t5x_enc_dec_features(
   return d
 
 
-def update_runtime_args_for_t5x_enc_dec_features(
+def _update_runtime_args_for_t5x_enc_dec_features(
     runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
     pack: bool,
     passthrough_feature_keys: Sequence[str],
 ):
-  """Updates runtime args after applying convert_to_t5x_enc_dec_features.
+  """Updates runtime args after applying _convert_to_t5x_enc_dec_features.
 
   Replaces "input" and "targets" with features produced by
-  `convert_to_t5x_enc_dec_features`, for use by downstream preprocessors. Both
+  `_convert_to_t5x_enc_dec_features`, for use by downstream preprocessors. Both
   functions should be used together as an airio preprocessor, e.g.
   update_runtime_args = functools.partial(
-      update_runtime_args_for_t5x_enc_dec_features,
+      _update_runtime_args_for_t5x_enc_dec_features,
       pack=true,
       passthrough_feature_keys=[...],
   )
   convert_features = functools.partial(
-      convert_to_t5x_enc_dec_features,
+      _convert_to_t5x_enc_dec_features,
       pack=True,
       passthrough_feature_keys=[...],
       pad_id=0,
@@ -254,71 +414,10 @@ def update_runtime_args_for_t5x_enc_dec_features(
   return updated
 
 
-def get_t5x_enc_dec_feature_converter_preprocessors(
-    pack: bool,
-    use_multi_bin_packing: bool,
-    passthrough_feature_keys: Sequence[str],
-    pad_id: int,
-    bos_id: int,
-) -> Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor]:
-  """Returns a list of AirIO preprocessors corresponding to seqio.EncDecFeatureConverter.
-
-  Applies packing (optional), trimming, padding and
-  `convert_to_t5x_enc_dec_features` in order. See
-  `convert_to_t5x_enc_dec_features` docstring for details on feature conversion.
-
-  Args:
-    pack: bool - indicates whether the dataset should be packed. The multi-bin
-      packing in airio.common.packing is functionaly equivalent to the impl in
-      SeqIO, and is used here.
-    use_multi_bin_packing: bool - Whether to use multi-bin or single-bin
-      packing. Seting this to True is equivalent to setting
-      `use_custom_packing_ops` to True in seqio.EncDecFeatureConverter. Ignored
-      if `pack` is False.
-    passthrough_feature_keys: Sequence[str] - A list of feature names to pass
-      through.
-    pad_id: int - token value to use for padding. 0 is commonly used.
-    bos_id: int - token value to use to indicate beginning of sequence in
-      decoder input tokens. 0 is commonly used.
-
-  Returns:
-    a list of AirIO preprocessors.
-  """
-  update_runtime_args = functools.partial(
-      update_runtime_args_for_t5x_enc_dec_features,
-      pack=pack,
-      passthrough_feature_keys=passthrough_feature_keys,
-  )
-  convert_features = functools.partial(
-      convert_to_t5x_enc_dec_features,
-      pack=pack,
-      passthrough_feature_keys=passthrough_feature_keys,
-      pad_id=pad_id,
-      bos_id=bos_id,
-  )
-  pad = functools.partial(preprocessors.pad, pad_id=pad_id)
-  preps = [
-      preprocessors_lib.MapFnTransform(preprocessors.trim),
-      preprocessors_lib.MapFnTransform(pad),
-      preprocessors_lib.MapFnTransform(
-          convert_features,
-          update_runtime_args=update_runtime_args,
-      ),
-  ]
-  if pack:
-    packer = (
-        packing.MultiBinTruePackIterPreprocessor
-        if use_multi_bin_packing
-        else packing.SingleBinTruePackIterPreprocessor
-    )
-    packer_prep = grain_preprocessors_lib.LazyIterTransform(
-        packer, update_runtime_args=packer.update_runtime_args
-    )
-    preps = [packer_prep] + preps
-  return preps
+##### LM Feature Converter #####
 
 
-def convert_to_t5x_lm_features(
+def _convert_to_t5x_lm_features(
     ex: dict[str, np.ndarray], packed: bool, bos_id: int, pad_id: int
 ) -> dict[str, np.ndarray]:
   """Feature converter for a T5X language model (decoder-only) architecture.
@@ -358,7 +457,7 @@ def convert_to_t5x_lm_features(
     a converted example.
   """
   # targets_segment_id is present only for a packed dataset.
-  decoder_input_tokens = make_autoregressive_inputs(
+  decoder_input_tokens = _make_autoregressive_inputs(
       ex["targets"],
       sequence_ids=ex.get("targets_segment_ids", None),
       bos_id=bos_id,
@@ -377,21 +476,21 @@ def convert_to_t5x_lm_features(
   return d
 
 
-def update_runtime_args_for_t5x_lm_features(
+def _update_runtime_args_for_t5x_lm_features(
     runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
     packed: bool,
 ):
-  """Updates runtime args after applying convert_to_t5x_lm_features.
+  """Updates runtime args after applying _convert_to_t5x_lm_features.
 
   Replaces "input" and "targets" with features produced by
-  `convert_to_t5x_lm_features`, for use by downstream preprocessors. Both
+  `_convert_to_t5x_lm_features`, for use by downstream preprocessors. Both
   functions should be used together as an airio preprocessor, e.g.
   update_runtime_args = functools.partial(
-      update_runtime_args_for_t5x_lm_features,
+      _update_runtime_args_for_t5x_lm_features,
       packed=true,
   )
   convert_features = functools.partial(
-      convert_to_t5x_lm_features,
+      _convert_to_t5x_lm_features,
       packed=True,
       pad_id=0,
       bos_id=0,
@@ -424,63 +523,10 @@ def update_runtime_args_for_t5x_lm_features(
   return updated
 
 
-def get_t5x_lm_feature_converter_preprocessors(
-    pack: bool, use_multi_bin_packing: bool, pad_id: int, bos_id: int
-) -> Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor]:
-  """Returns a list of AirIO preprocessors corresponding to seqio.LMFeatureConverter.
-
-  Applies packing (optional), trimming, padding and
-  `convert_to_t5x_lm_features` in order. See
-  `convert_to_t5x_lm_features` docstring for details on feature conversion.
-
-  Args:
-    pack: bool - indicates whether the dataset should be packed. The multi-bin
-      packing in airio.common.packing is functionaly equivalent to the impl in
-      SeqIO, and is used here.
-    use_multi_bin_packing: bool - Whether to use multi-bin or single-bin
-      packing. Seting this to True is equivalent to setting
-      `use_custom_packing_ops` to True in seqio.EncDecFeatureConverter. Ignored
-      if `pack` is False.
-    pad_id: int - token value to use for padding. 0 is commonly used.
-    bos_id: int - token value to use to indicate beginning of sequence in
-      decoder input tokens. 0 is commonly used.
-
-  Returns:
-    a list of AirIO preprocessors.
-  """
-  update_runtime_args = functools.partial(
-      update_runtime_args_for_t5x_lm_features,
-      packed=pack,
-  )
-  convert_features = functools.partial(
-      convert_to_t5x_lm_features,
-      packed=pack,
-      pad_id=pad_id,
-      bos_id=bos_id,
-  )
-  pad = functools.partial(preprocessors.pad, pad_id=pad_id)
-  preps = [
-      preprocessors_lib.MapFnTransform(preprocessors.trim),
-      preprocessors_lib.MapFnTransform(pad),
-      preprocessors_lib.MapFnTransform(
-          convert_features,
-          update_runtime_args=update_runtime_args,
-      ),
-  ]
-  if pack:
-    packer = (
-        packing.MultiBinTruePackIterPreprocessor
-        if use_multi_bin_packing
-        else packing.SingleBinTruePackIterPreprocessor
-    )
-    packer_prep = grain_preprocessors_lib.LazyIterTransform(
-        packer, update_runtime_args=packer.update_runtime_args
-    )
-    preps = [packer_prep] + preps
-  return preps
+##### Prefix LM Feature Converter #####
 
 
-def convert_to_t5x_prefix_lm_features(
+def _convert_to_t5x_prefix_lm_features(
     ex: dict[str, np.ndarray],
     loss_on_targets_only: bool,
     packed: bool,
@@ -620,7 +666,7 @@ def convert_to_t5x_prefix_lm_features(
     a converted example.
   """
   # First use the standard LM conversion.
-  lm_features = convert_to_t5x_lm_features(ex, packed, bos_id, pad_id)
+  lm_features = _convert_to_t5x_lm_features(ex, packed, bos_id, pad_id)
 
   # Initialize the return dictionary with the lm features.
   d = dict(lm_features)
@@ -655,22 +701,22 @@ def convert_to_t5x_prefix_lm_features(
   return d
 
 
-def update_runtime_args_for_t5x_prefix_lm_features(
+def _update_runtime_args_for_t5x_prefix_lm_features(
     runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
     packed: bool,
     passthrough_feature_keys: Sequence[str],
 ):
-  """Updates runtime args after applying convert_to_t5x_prefix_lm_features.
+  """Updates runtime args after applying _convert_to_t5x_prefix_lm_features.
 
   Replaces "input" and "targets" with features produced by
-  `convert_to_t5x_prefix_lm_features`, for use by downstream preprocessors. Both
-  functions should be used together as an airio preprocessor, e.g.
+  `_convert_to_t5x_prefix_lm_features`, for use by downstream preprocessors.
+  Both functions should be used together as an airio preprocessor, e.g.
   update_runtime_args = functools.partial(
-      update_runtime_args_for_t5x_prefix_lm_features,
+      _update_runtime_args_for_t5x_prefix_lm_features,
       packed=True, passthrough_feature_keys=[]
   )
   convert_features = functools.partial(
-      convert_to_t5x_lm_features,
+      _convert_to_t5x_lm_features,
       packed=True,
       pad_id=0,
       bos_id=0,
@@ -696,7 +742,7 @@ def update_runtime_args_for_t5x_prefix_lm_features(
 
   concat_args = runtime_args.clone()
   concat_args.sequence_lengths = {"targets": decoder_length}
-  lm_model_feature_lengths = update_runtime_args_for_t5x_lm_features(
+  lm_model_feature_lengths = _update_runtime_args_for_t5x_lm_features(
       concat_args, packed=packed
   ).sequence_lengths
   model_feature_lengths = dict(lm_model_feature_lengths)
@@ -708,7 +754,7 @@ def update_runtime_args_for_t5x_prefix_lm_features(
   return updated_args
 
 
-def concat_and_add_masks_for_prefix_lm(
+def _concat_and_add_masks_for_prefix_lm(
     ex: dict[str, np.ndarray],
     passthrough_feature_keys: Sequence[str],
 ) -> dict[str, np.ndarray]:
@@ -735,19 +781,19 @@ def concat_and_add_masks_for_prefix_lm(
   return d
 
 
-def concat_task_feature_lengths_for_prefix_lm(
+def _concat_task_feature_lengths_for_prefix_lm(
     runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
     passthrough_feature_keys: Sequence[str],
 ) -> preprocessors_lib.AirIOInjectedRuntimeArgs:
-  """Updates runtime_args after applying `concat_and_add_masks_for_prefix_lm`.
+  """Updates runtime_args after applying `_concat_and_add_masks_for_prefix_lm`.
 
   Both functions should be used together as an airio preprocessor, e.g.
   update_runtime_args = functools.partial(
-      concat_task_feature_lengths_for_prefix_lm
+      _concat_task_feature_lengths_for_prefix_lm
       passthrough_feature_keys=[]
   )
   concat_features = functools.partial(
-      concat_and_add_masks_for_prefix_lm,,
+      _concat_and_add_masks_for_prefix_lm,,
       passthrough_feature_keys=[]
   )
   prep = preprocessors_lib.MapFnTransform(
@@ -781,98 +827,88 @@ def concat_task_feature_lengths_for_prefix_lm(
   return updated_args
 
 
-def get_t5x_prefix_lm_feature_converter_preprocessors(
-    pack: bool,
-    use_multi_bin_packing: bool,
-    pad_id: int,
-    bos_id: int,
-    loss_on_targets_only: bool,
-    passthrough_feature_keys: Sequence[str],
-) -> Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor]:
-  """Returns a list of AirIO preprocessors corresponding to seqio.PrefixLMFeatureConverter.
+##### Utils #####
 
-  Applies `concat_and_add_masks_for_prefix_lm`, packing (optional), trimming,
-  padding and `convert_to_t5x_prefix_lm_features` in order. See
-  `convert_to_t5x_prefix_lm_features` docstring for details on feature
-  conversion.
+
+def _make_autoregressive_inputs(
+    inputs: np.ndarray, sequence_ids: np.ndarray | None, bos_id: int
+):
+  """Generate inputs for an autoregressive model, by shifting the inputs.
+
+  Modified from seqio.utils._make_autoregressive_inputs.
+
+  For the first element of each sequence, the returned input id is bos_id
+  (commonly 0).
+
+  For a "packed" dataset, also pass the sequence_ids tensor, which aligns
+  with the inputs tensor and contains different values for different
+  concatenated examples.
+
+  Example for a packed dataset:
+
+  ```
+        inputs = [3, 8, 1, 9, 1, 5, 4, 1, 0, 0]
+    sequence_ids = [1, 1, 1, 2, 2, 3, 3, 3, 0, 0]
+         inputs = [0, 3, 8, 0, 9, 0, 5, 4, 0, 0]
+                            |     |        |
+                            These positions are set to 0 if sequence_ids is not
+                            None.
+  ```
 
   Args:
-    pack: bool - indicates whether the dataset should be packed. The multi-bin
-      packing in airio.common.packing is functionaly equivalent to the impl in
-      SeqIO, and is used here.
-    use_multi_bin_packing: bool - Whether to use multi-bin or single-bin
-      packing. Seting this to True is equivalent to setting
-      `use_custom_packing_ops` to True in seqio.EncDecFeatureConverter. Ignored
-      if `pack` is False.
-    pad_id: int - token value to use for padding. 0 is commonly used.
-    bos_id: int - token value to use to indicate beginning of sequence in
-      decoder input tokens. 0 is commonly used.
-    loss_on_targets_only: whether to compute loss on tokens which belonged to
-      "targets" before concatenation.
-    passthrough_feature_keys: Sequence[str] - A list of feature names to pass
-      through.
+    inputs: the input sequence.
+    sequence_ids: a 1-D sequence indicating segements belonging to separate
+      examples, for packed sequences, e.g. for a padded and packed sequence =
+      [ex11, ex12, ex21, ex22, ex23, pad_id, pad_id], sequence_ids would be =
+      [1, 1, 2, 2, 2, pad_id, pad_id]. Set to None for unpacked datasets.
+    bos_id: bos (beginning of sequence) id, commonly set to 0.
 
   Returns:
-    a list of AirIO preprocessors.
+    a tensor with dtype tf.int32 and the same shape as inputs.
   """
-
-  def swap_vals(arr: np.ndarray, old_val: int, new_val: int):
-    return np.where(arr == old_val, np.full([arr.size], new_val), arr)
-
-  def swap_inputs_width(ex: dict[str, np.ndarray], old_val: int, new_val: int):
-    ex["inputs_width"] = swap_vals(ex["inputs_width"], old_val, new_val)
-    return ex
-
-  convert_features = functools.partial(
-      convert_to_t5x_prefix_lm_features,
-      loss_on_targets_only=loss_on_targets_only,
-      packed=pack,
-      bos_id=bos_id,
-      pad_id=pad_id,
-      passthrough_feature_keys=passthrough_feature_keys,
-  )
-  update_runtime_args = functools.partial(
-      update_runtime_args_for_t5x_prefix_lm_features,
-      packed=pack,
-      passthrough_feature_keys=passthrough_feature_keys,
-  )
-  concat_and_add_masks = functools.partial(
-      concat_and_add_masks_for_prefix_lm,
-      passthrough_feature_keys=passthrough_feature_keys,
-  )
-  concat_task_feature_lengths = functools.partial(
-      concat_task_feature_lengths_for_prefix_lm,
-      passthrough_feature_keys=passthrough_feature_keys,
-  )
-  replace_0s = functools.partial(swap_inputs_width, old_val=0, new_val=-1)
-  restore_0s = functools.partial(swap_inputs_width, old_val=-1, new_val=-0)
-  pad = functools.partial(preprocessors.pad, pad_id=pad_id)
-
-  preps = [
-      preprocessors_lib.MapFnTransform(
-          concat_and_add_masks, update_runtime_args=concat_task_feature_lengths
-      ),
-      preprocessors_lib.MapFnTransform(replace_0s),
-  ]
-  if pack:
-    packer = (
-        packing.MultiBinTruePackIterPreprocessor
-        if use_multi_bin_packing
-        else packing.SingleBinTruePackIterPreprocessor
+  output_dtype = inputs.dtype
+  if sequence_ids is not None and not np.issubdtype(
+      sequence_ids.dtype, np.integer
+  ):
+    raise ValueError(
+        "Sequence_ids should be integer-valued tensors for a packed dataset."
     )
-    packer_prep = grain_preprocessors_lib.LazyIterTransform(
-        packer, update_runtime_args=packer.update_runtime_args
+  if sequence_ids is not None and len(inputs.shape) > 1:
+    raise ValueError(
+        "Only 1-D sequences are supported with packing. Got a packed"
+        f" {len(inputs.shape)}-D sequence."
     )
-    preps.append(packer_prep)
-  preps.extend([
-      preprocessors_lib.MapFnTransform(preprocessors.trim),
-      preprocessors_lib.MapFnTransform(pad),
-      preprocessors_lib.MapFnTransform(restore_0s),
-      preprocessors_lib.MapFnTransform(
-          convert_features, update_runtime_args=update_runtime_args
-      ),
-  ])
-  return preps
 
-# TODO(b/311543848): Implement Decoder feature converter from
-# seqio/feature_converters.py.
+  def shift_right_by_one(arr, fill_value):
+    shifted = np.roll(arr, shift=1, axis=0)
+    shifted[0] = fill_value
+    return shifted
+
+  inputs = shift_right_by_one(inputs, bos_id)
+  if sequence_ids is not None:
+    # Note: This means the sequence has sub-sequences of inputs. The entire
+    # sequence, and hence all sub-sequences, have already been right shifted; we
+    # just need to find the beginning of each sub-sequence and put a bos_id
+    # there, replacing the last token of the previous input sub-sequence after
+    # the right shift.
+
+    # Find the beginning positions of examples from sequence_ids, e.g.
+    # [1, 1, 2, 2, 2, 0, 0] -> [0, 1, 0, 1, 1, 0, 1]. Positions with 0 will be
+    # filled by bos_id, positions with 1 will be filled by (shifted) inputs.
+    not_first_in_sequence = sequence_ids == shift_right_by_one(
+        sequence_ids, fill_value=0
+    )
+    not_first_in_sequence = not_first_in_sequence.astype(output_dtype)
+    # 0s -> bos_id, 1s -> inputs
+    first_ids = (1 - not_first_in_sequence) * bos_id
+    input_ids = inputs * not_first_in_sequence
+    # Combine.
+    inputs = input_ids + first_ids
+
+  return inputs
+
+
+def _get_non_padding_positions(
+    feature_value: np.ndarray, pad_id: int
+) -> np.ndarray:
+  return feature_value != pad_id

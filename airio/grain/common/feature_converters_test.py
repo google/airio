@@ -28,7 +28,7 @@ class AutoregressiveInputsTest(absltest.TestCase):
 
   def test_autoregressive_inputs_unpacked(self):
     x = np.asarray([3, 8, 9, 5, 1, 0, 0])
-    actual = feature_converters.make_autoregressive_inputs(
+    actual = feature_converters._make_autoregressive_inputs(
         x, sequence_ids=None, bos_id=0
     )
     expected = [0, 3, 8, 9, 5, 1, 0]
@@ -37,7 +37,7 @@ class AutoregressiveInputsTest(absltest.TestCase):
 
   def test_autoregressive_inputs_unpacked_with_bos_id(self):
     x = np.asarray([3, 8, 9, 5, 1, 0, 0])
-    actual = feature_converters.make_autoregressive_inputs(
+    actual = feature_converters._make_autoregressive_inputs(
         x, sequence_ids=None, bos_id=1
     )
     expected = [1, 3, 8, 9, 5, 1, 0]
@@ -46,7 +46,7 @@ class AutoregressiveInputsTest(absltest.TestCase):
 
   def test_autoregressive_inputs_unpacked_2d(self):
     x = np.asarray([[3, 8, 1, 0, 0], [9, 5, 2, 0, 6]])
-    actual = feature_converters.make_autoregressive_inputs(
+    actual = feature_converters._make_autoregressive_inputs(
         x, sequence_ids=None, bos_id=0
     )
     expected = [[0, 0, 0, 0, 0], [3, 8, 1, 0, 0]]
@@ -56,7 +56,7 @@ class AutoregressiveInputsTest(absltest.TestCase):
   def test_autoregressive_inputs_packed(self):
     x = np.asarray([3, 8, 1, 9, 1, 5, 4, 1, 0, 0])
     sequence_ids = np.asarray([1, 1, 1, 2, 2, 3, 3, 3, 0, 0])
-    actual = feature_converters.make_autoregressive_inputs(
+    actual = feature_converters._make_autoregressive_inputs(
         x,
         sequence_ids=sequence_ids,
         bos_id=0,
@@ -68,7 +68,7 @@ class AutoregressiveInputsTest(absltest.TestCase):
   def test_autoregressive_inputs_packed_with_bos_id(self):
     x = np.asarray([3, 8, 1, 9, 1, 5, 4, 1, 0, 0])
     sequence_ids = np.asarray([1, 1, 1, 2, 2, 3, 3, 3, 0, 0])
-    actual = feature_converters.make_autoregressive_inputs(
+    actual = feature_converters._make_autoregressive_inputs(
         x,
         sequence_ids=sequence_ids,
         bos_id=1,
@@ -87,7 +87,7 @@ class AutoregressiveInputsTest(absltest.TestCase):
             "Got a packed 2-D sequence."
         ),
     ):
-      feature_converters.make_autoregressive_inputs(
+      feature_converters._make_autoregressive_inputs(
           x, sequence_ids=sequence_ids, bos_id=0
       )
 
@@ -96,7 +96,7 @@ class AutoregressiveInputsTest(absltest.TestCase):
     x = np.asarray([3, 8, 1, 9, 6, 5, 4, 1, 0, 0])
     # sequence_id is correctly formatted.
     sequence_ids = np.asarray([1, 1, 1, 2, 2, 3, 3, 3, 0, 0])
-    actual = feature_converters.make_autoregressive_inputs(
+    actual = feature_converters._make_autoregressive_inputs(
         x,
         sequence_ids=sequence_ids,
         bos_id=0,
@@ -110,7 +110,7 @@ class AutoregressiveInputsTest(absltest.TestCase):
   def test_autoregressive_inputs_different_dtypes(self):
     x = np.asarray([3, 8, 1, 9.9, 1, 5, 4, 1, 0, 0], dtype=np.float32)
     sequence_ids = np.asarray([1, 1, 1, 2, 2, 3, 3, 3, 0, 0])
-    actual = feature_converters.make_autoregressive_inputs(
+    actual = feature_converters._make_autoregressive_inputs(
         x,
         sequence_ids=sequence_ids,
         bos_id=0,
@@ -1287,7 +1287,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
         "inputs_width": np.array([4, 4, 4, 4, 4, 4, 4, 0]),
         "inputs_width_add_pos": np.array([5, 5, 5, 5, 5, 5, 5, 0]),
     }
-    converted_ex = feature_converters.convert_to_t5x_prefix_lm_features(
+    converted_ex = feature_converters._convert_to_t5x_prefix_lm_features(
         ex,
         loss_on_targets_only=True,
         packed=False,
