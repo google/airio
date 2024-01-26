@@ -1,0 +1,37 @@
+include 'third_party/py/t5x/examples/t5/t5_1_1/small.gin'
+include 'third_party/py/t5x/configs/runs/pretrain.gin'
+
+from __gin__ import dynamic_registration
+
+import __main__ as train_script
+
+import airio.examples.tasks
+from airio.grain.common import feature_converters
+from t5x import utils
+
+MIXTURE_OR_TASK_NAME = @airio.examples.tasks.get_c4_v220_span_corruption_task()
+TASK_FEATURE_LENGTHS = {"inputs": 512, "targets": 114}
+TRAIN_STEPS = 10000
+DROPOUT_RATE = 0.0
+BATCH_SIZE = 256
+
+train_script.train:
+  # TODO(b/321406238): Enable train_eval when supported
+  train_eval_dataset_cfg = None
+  infer_eval_dataset_cfg = None
+
+train/utils.DatasetConfig:
+  runtime_preprocessors = @feature_converters.get_t5x_enc_dec_feature_converter_preprocessors()
+  seed = 94043
+
+feature_converters.get_t5x_enc_dec_feature_converter_preprocessors:
+  pack = False
+  use_multi_bin_packing = False
+  passthrough_feature_keys = []
+  pad_id = 0
+  bos_id = 0
+
+utils.SaveCheckpointConfig:
+  period = 2
+  save_dataset = True
+
