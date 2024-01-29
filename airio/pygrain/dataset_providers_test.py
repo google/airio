@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for airio.grain.dataset_providers."""
+"""Tests for airio.pygrain.dataset_providers."""
 
 import functools
 import os
@@ -27,9 +27,9 @@ from airio import dataset_providers as airio_dataset_providers
 from airio import preprocessors as preprocessors_lib
 from airio import test_utils
 from airio import tokenizer
-from airio.grain import dataset_providers
-from airio.grain import preprocessors as grain_preprocessors_lib
-from airio.grain.common import feature_converters
+from airio.pygrain import dataset_providers
+from airio.pygrain import preprocessors as grain_preprocessors_lib
+from airio.pygrain.common import feature_converters
 import grain.python as grain
 import jax
 import numpy as np
@@ -1726,7 +1726,7 @@ class MixtureTest(absltest.TestCase):
     )
 
   @mock.patch(
-      "airio.grain.lazy_dataset_transforms.ConcatLazyMapDataset",
+      "airio.pygrain.lazy_dataset_transforms.ConcatLazyMapDataset",
       new_callable=mock.NonCallableMock,
   )
   def test_single_epoch_concat_not_called(self, unused_mock_concat_fn):

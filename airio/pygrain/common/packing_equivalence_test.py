@@ -17,7 +17,7 @@
 import functools
 from absl.testing import absltest
 import airio
-import airio.grain.common
+import airio.pygrain.common
 import grain.python as grain
 import numpy as np
 import seqio
@@ -89,7 +89,7 @@ class PackingEquivalenceTest(absltest.TestCase):
         sequence_lengths={"targets": 1024}, split="unused"
     )
     unused_rng = None
-    packed_airio_ds = airio.grain.common.packing.NoamPackMapPreprocessor(
+    packed_airio_ds = airio.pygrain.common.packing.NoamPackMapPreprocessor(
         packed_airio_ds, runtime_args, unused_rng
     )
     packed_airio_ds_iter = iter(packed_airio_ds)
@@ -165,12 +165,12 @@ class PackingEquivalenceTest(absltest.TestCase):
         sequence_lengths=feature_lengths, split="unused"
     )
     unused_rng = None
-    pack_prep = airio.grain.common.packing.SingleBinTruePackMapPreprocessor
+    pack_prep = airio.pygrain.common.packing.SingleBinTruePackMapPreprocessor
     packed_airio_ds = pack_prep(packed_airio_ds, runtime_args, unused_rng)
     updated_runtime_args = pack_prep.update_runtime_args(runtime_args)
     packed_airio_ds = packed_airio_ds.map(
         functools.partial(
-            airio.grain.common.pad, runtime_args=updated_runtime_args
+            airio.pygrain.common.pad, runtime_args=updated_runtime_args
         )
     )
     packed_airio_ds_iter = iter(packed_airio_ds)
@@ -262,13 +262,13 @@ class PackingEquivalenceTest(absltest.TestCase):
         sequence_lengths=feature_lengths, split="unused"
     )
     unused_rng = None
-    pack_prep = airio.grain.common.packing.MultiBinTruePackMapPreprocessor
+    pack_prep = airio.pygrain.common.packing.MultiBinTruePackMapPreprocessor
     packed_airio_ds = pack_prep(packed_airio_ds, runtime_args, unused_rng)
     updated_runtime_args = pack_prep.update_runtime_args(runtime_args)
 
     packed_airio_ds = packed_airio_ds.map(
         functools.partial(
-            airio.grain.common.pad, runtime_args=updated_runtime_args
+            airio.pygrain.common.pad, runtime_args=updated_runtime_args
         )
     )
     packed_airio_ds = list(iter(packed_airio_ds))

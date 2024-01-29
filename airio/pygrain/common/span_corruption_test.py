@@ -21,9 +21,9 @@ from typing import Any, Callable
 from absl.testing import absltest
 from airio import preprocessors as preprocessors_lib
 from airio import tokenizer
-from airio.grain import lazy_dataset_transforms
-from airio.grain.common import packing
-from airio.grain.common import span_corruption as asc
+from airio.pygrain import lazy_dataset_transforms
+from airio.pygrain.common import packing
+from airio.pygrain.common import span_corruption as asc
 import grain.python as grain
 import numpy as np
 import seqio

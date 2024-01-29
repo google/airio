@@ -23,7 +23,7 @@ from unittest import mock
 from absl.testing import absltest
 from airio import preprocessors as preprocessors_lib
 from airio import tokenizer
-from airio.grain import dataset_iterators
+from airio.pygrain import dataset_iterators
 from clu.data import dataset_iterator as clu_dataset_iterator
 import grain.python as grain
 import numpy as np

@@ -22,7 +22,7 @@ import tempfile
 
 from absl import app
 from airio import examples
-from airio.grain import dataset_providers
+from airio.pygrain import dataset_providers
 from seqio import vocabularies
 from t5x import adafactor
 from t5x import gin_utils

@@ -18,8 +18,8 @@ from typing import Dict
 
 from absl import app
 import airio
-from airio.grain import dataset_providers as grain_dataset_providers
-from airio.grain.common import feature_converters
+from airio.pygrain import dataset_providers as grain_dataset_providers
+from airio.pygrain.common import feature_converters
 from seqio import vocabularies
 
 

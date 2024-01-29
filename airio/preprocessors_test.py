@@ -20,7 +20,7 @@ from unittest import mock
 from absl.testing import absltest
 from airio import data_sources
 from airio import preprocessors
-from airio.grain import dataset_providers as grain_dataset_providers
+from airio.pygrain import dataset_providers as grain_dataset_providers
 import jax.random
 import numpy as np
 

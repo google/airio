@@ -16,8 +16,8 @@
 
 # pylint:disable=wildcard-import,g-bad-import-order,g-importing-member
 
-from airio.grain.common.constants import *
-from airio.grain.common.feature_converters import *
-from airio.grain.common.packing import *
-from airio.grain.common.preprocessors import *
-from airio.grain.common.span_corruption import *
+from airio.pygrain.common.constants import *
+from airio.pygrain.common.feature_converters import *
+from airio.pygrain.common.packing import *
+from airio.pygrain.common.preprocessors import *
+from airio.pygrain.common.span_corruption import *

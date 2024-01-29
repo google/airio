@@ -19,7 +19,7 @@ import os
 from absl.testing import absltest
 import airio
 from airio import examples
-from airio.grain.common import feature_converters
+from airio.pygrain.common import feature_converters
 from seqio import vocabularies
 import tensorflow_datasets as tfds
 

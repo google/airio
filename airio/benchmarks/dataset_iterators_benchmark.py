@@ -20,7 +20,7 @@ import tempfile
 from typing import Dict
 
 import airio
-from airio.grain import dataset_iterators
+from airio.pygrain import dataset_iterators
 import google_benchmark
 import grain.python as grain
 from seqio import vocabularies

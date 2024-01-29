@@ -23,7 +23,7 @@ from absl.testing import absltest
 import airio
 from airio import preprocessors as preprocessors_lib
 from airio import test_utils
-from airio.grain import dataset_providers
+from airio.pygrain import dataset_providers
 import grain.python as grain
 import numpy as np
 from seqio import vocabularies

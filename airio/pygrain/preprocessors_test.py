@@ -18,7 +18,7 @@ from unittest import mock
 
 from absl.testing import absltest
 from airio import preprocessors as airio_preprocessors_lib
-from airio.grain import preprocessors
+from airio.pygrain import preprocessors
 import grain.python as grain
 import jax.random
 import numpy as np

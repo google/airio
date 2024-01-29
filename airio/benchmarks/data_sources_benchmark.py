@@ -17,7 +17,7 @@
 import os
 
 import airio
-from airio.grain import data_sources
+from airio.pygrain import data_sources
 import google_benchmark
 import numpy as np
 import tensorflow_datasets as tfds

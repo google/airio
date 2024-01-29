@@ -19,9 +19,9 @@ import logging
 
 from absl import logging
 import airio
-from airio.grain import dataset_providers
-from airio.grain.common import preprocessors as ap
-from airio.grain.common import span_corruption as asc
+from airio.pygrain import dataset_providers
+from airio.pygrain.common import preprocessors as ap
+from airio.pygrain.common import span_corruption as asc
 import babel
 from seqio import preprocessors as seqio_preprocessors
 from seqio import vocabularies

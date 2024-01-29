@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for airio.grain.data_sources."""
+"""Tests for airio.pygrain.data_sources."""
 
 import os
 from typing import Sequence
@@ -20,7 +20,7 @@ from unittest import mock
 
 from absl.testing import absltest
 import airio
-from airio.grain import data_sources
+from airio.pygrain import data_sources
 
 import multiprocessing
 

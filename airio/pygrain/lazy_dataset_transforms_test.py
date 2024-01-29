@@ -19,7 +19,7 @@ from unittest import mock
 
 from absl.testing import absltest
 from absl.testing import parameterized
-from airio.grain import lazy_dataset_transforms
+from airio.pygrain import lazy_dataset_transforms
 import grain.python as grain
 import jax.random
 

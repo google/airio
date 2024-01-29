@@ -17,8 +17,8 @@
 from absl.testing import absltest
 from absl.testing import parameterized
 from airio import preprocessors as preprocessors_lib
-from airio.grain.common import constants
-from airio.grain.common import preprocessors
+from airio.pygrain.common import constants
+from airio.pygrain.common import preprocessors
 import grain.python as grain
 import numpy as np
 
