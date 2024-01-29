@@ -16,7 +16,6 @@
 
 import functools
 import logging
-from typing import Dict
 
 from absl import logging
 import airio
@@ -36,7 +35,7 @@ _DEFAULT_VOCAB = vocabularies.SentencePieceVocabulary(
 
 
 def get_wmt_19_ende_v003_task(
-    tokenizer_configs: Dict[str, airio.tokenizer.TokenizerConfig] | None = None,
+    tokenizer_configs: dict[str, airio.tokenizer.TokenizerConfig] | None = None,
 ) -> dataset_providers.GrainTask:
   """Returns an AirIO Task for WMT 19 en/de dataset."""
   # source
@@ -74,7 +73,7 @@ def get_wmt_19_ende_v003_task(
 
 
 def get_nqo_v001_task(
-    tokenizer_configs: Dict[str, airio.tokenizer.TokenizerConfig] | None = None,
+    tokenizer_configs: dict[str, airio.tokenizer.TokenizerConfig] | None = None,
 ) -> dataset_providers.GrainTask:
   """Create example AirIO task."""
 
@@ -108,10 +107,10 @@ def get_nqo_v001_task(
 
 # Preprocessors for WMT Task.
 def translate(
-    ex: Dict[bytes | str, bytes | str],
+    ex: dict[bytes | str, bytes | str],
     source_language: str,
     target_language: str,
-) -> Dict[bytes | str, bytes | str]:
+) -> dict[bytes | str, bytes | str]:
   """Convert a translation dataset to a text2text pair.
 
   For example, say the dataset returns examples of this format:
@@ -160,7 +159,7 @@ def translate(
 
 
 # Preprocessors for NQO Task.
-def question(ex: Dict[str, str]) -> Dict[str, str]:
+def question(ex: dict[str, str]) -> dict[str, str]:
   """Convert a natural question dataset to a text2text pair.
 
   For example, say the dataset returns examples of this format:
@@ -195,16 +194,19 @@ def append_eos_after_trim(
   )
 
 
-def get_c4_v220_span_corruption_task():
+def get_c4_v220_span_corruption_task(
+    tokenizer_configs: dict[str, airio.tokenizer.TokenizerConfig] | None = None,
+):
   """AirIO Task for C4 span corruption."""
   rekey_fn = functools.partial(
       ap.rekey, key_map={"inputs": None, "targets": "text"}
   )
   vocab = _DEFAULT_VOCAB
-  tokenizer_configs = {
-      "inputs": airio.tokenizer.TokenizerConfig(vocab=vocab, add_eos=True),
-      "targets": airio.tokenizer.TokenizerConfig(vocab=vocab, add_eos=True),
-  }
+  if tokenizer_configs is None:
+    tokenizer_configs = {
+        "inputs": airio.tokenizer.TokenizerConfig(vocab=vocab, add_eos=True),
+        "targets": airio.tokenizer.TokenizerConfig(vocab=vocab, add_eos=True),
+    }
   append_eos_after_trim_fn = functools.partial(
       append_eos_after_trim, tokenizer_configs=tokenizer_configs
   )
