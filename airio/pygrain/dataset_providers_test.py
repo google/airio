@@ -1176,6 +1176,119 @@ class TaskTest(absltest.TestCase):
     ]
     test_utils.assert_datasets_equal(ds, expected)
 
+  def test_task_switch_to_lazy_dataset_runtime_preprocessors(self):
+    # Add a preprocessor that consumes a `LazyMapDataset`, and verify that
+    # Task.get_dataset() works correctly by running preprocessing using
+    # lazy_dataset instead of DataLoader operations.
+    def lazy_id_fn(
+        ds: lazy_dataset.LazyMapDataset,
+        rargs: preprocessors_lib.AirIOInjectedRuntimeArgs,
+        rng: jax.Array,
+    ):
+      del rargs, rng
+      return ds
+
+    preprocessors = _create_preprocessors()
+    runtime_preprocessors = [
+        grain_preprocessors_lib.LazyMapTransform(
+            lazy_id_fn,
+            update_runtime_args=lambda rargs: rargs,
+            produces_none_elements=False,
+            requires_non_none_elements=False,
+        )
+    ]
+    source = _create_source(
+        source_name=_SOURCE_NAME,
+        splits=_SOURCE_SPLITS,
+        num_examples=_SOURCE_NUM_EXAMPLES,
+    )
+
+    task = _create_task(source=source, preprocessors=preprocessors)
+    ds = task.get_dataset(
+        split="train",
+        shuffle=False,
+        runtime_preprocessors=runtime_preprocessors,
+    )
+    expected = [
+        {
+            "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
+            "inputs": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                4,
+                2,
+                13,
+                3,
+                5,
+                20,
+                2,
+                4,
+                2,
+                20,
+                2,
+                4,
+            ],
+            "targets_pretokenized": "positive",
+            "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+        },
+        {
+            "inputs_pretokenized": "imdb hj aijbcidcibdg",
+            "inputs": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                20,
+                2,
+                3,
+                5,
+                8,
+                2,
+                13,
+                8,
+                21,
+                13,
+                8,
+                2,
+                21,
+                2,
+            ],
+            "targets_pretokenized": "negative",
+            "targets": [3, 22, 4, 2, 18, 8, 25, 4],
+        },
+        {
+            "inputs_pretokenized": "imdb acdhdacfhhjb",
+            "inputs": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                5,
+                13,
+                21,
+                20,
+                21,
+                5,
+                13,
+                2,
+                20,
+                20,
+                2,
+            ],
+            "targets_pretokenized": "positive",
+            "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+        },
+    ]
+    test_utils.assert_datasets_equal(ds, expected)
+
   def test_task_lazy_dataset_batch_across_epochs(self):
     # Create a Task with 3 elements.
     test_task = _create_task(

@@ -51,11 +51,19 @@ class GrainTask(airio_dataset_providers.Task):
       raise ValueError("Source has not been set on this task object.")
     return self.source.get_data_source(split=split)
 
-  def _switch_to_lazy_dataset(self):
+  def _switch_to_lazy_dataset(
+      self,
+      runtime_preprocessors: (
+          Sequence[grain_preprocessors_lib.PyGrainAirIOPreprocessor] | None
+      ) = None,
+  ):
     # TODO(b/311720936): Until Task preprocessing is fully switched to
     # lazy_dataset, check and use lazy_dataset only if any preprocessor requires
     # lazy_dataset.
-    for preprocessor in self.get_preprocessors():
+    preps = self.get_preprocessors()
+    if runtime_preprocessors:
+      preps.extend(runtime_preprocessors)
+    for preprocessor in preps:
       if not isinstance(preprocessor, grain.Transformation):
         return True
     return False
@@ -188,7 +196,7 @@ class GrainTask(airio_dataset_providers.Task):
     # TODO(b/311720936): Until Task preprocessing is fully switched to
     # lazy_dataset, check and use lazy_dataset only if any preprocessor requires
     # lazy_dataset.
-    if self._switch_to_lazy_dataset():
+    if self._switch_to_lazy_dataset(runtime_preprocessors):
       ds = self.get_lazy_dataset(
           sequence_lengths=sequence_lengths,
           split=split,
