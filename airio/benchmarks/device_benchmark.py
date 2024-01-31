@@ -19,6 +19,7 @@ import os
 
 import airio
 from airio import examples
+from airio.pygrain.common import feature_converters
 import google_benchmark
 import jax
 import jax.numpy as jnp
@@ -122,6 +123,95 @@ def wmt_from_file_benchmark(state):
           _sum_of_squares_dx_jit(x).block_until_ready()
       element_count += 1
       if element_count >= _SOURCE_NUM_EXAMPLES:
+        break
+
+
+@google_benchmark.register
+@requires_tpu(2)
+def c4_span_corruption_generated_data_benchmark(state):
+  """Loads a generated C4 dataset onto TPUs and performs a simple calculation."""
+  with tfds.testing.mock_data(num_examples=_SOURCE_NUM_EXAMPLES):
+    c4_task = examples.tasks.get_c4_v220_span_corruption_task(
+        tokenizer_configs=_get_tokenizer_configs()
+    )
+  runtime_preprocessors = (
+      feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
+          pack=False,
+          use_multi_bin_packing=False,
+          passthrough_feature_keys=[],
+          pad_id=0,
+          bos_id=0,
+      )
+  )
+  sequence_lengths = {"inputs": 1024, "targets": 1024}
+  ds = c4_task.get_dataset(
+      sequence_lengths,
+      split="train",
+      shuffle=False,
+      seed=42,
+      runtime_preprocessors=runtime_preprocessors,
+      shard_info=airio.ShardInfo(index=0, num_shards=1024),
+  )
+
+  while state:
+    for element in ds:
+      for _, v in element.items():
+        if isinstance(v, np.ndarray):
+          if v.dtype == np.int64 or v.dtype == bool:
+            v = v.astype(np.float32)
+          # Transfer to device.
+          x = jax.device_put(v)
+          state.pause_timing()
+          # Compile.
+          _sum_of_squares_dx_jit(x).block_until_ready()
+          state.resume_timing()
+          # Run.
+          _sum_of_squares_dx_jit(x).block_until_ready()
+
+
+@google_benchmark.register
+@requires_tpu(2)
+def c4_span_corruption_from_file_benchmark(state):
+  """Loads a C4 dataset from file onto TPUs and performs a simple calculation."""
+  c4_task = examples.tasks.get_c4_v220_span_corruption_task(
+      tokenizer_configs=_get_tokenizer_configs()
+  )
+  runtime_preprocessors = (
+      feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
+          pack=False,
+          use_multi_bin_packing=False,
+          passthrough_feature_keys=[],
+          pad_id=0,
+          bos_id=0,
+      )
+  )
+  sequence_lengths = {"inputs": 1024, "targets": 1024}
+  ds = c4_task.get_dataset(
+      sequence_lengths,
+      split="train",
+      shuffle=False,
+      seed=42,
+      runtime_preprocessors=runtime_preprocessors,
+      shard_info=airio.ShardInfo(index=0, num_shards=1024),
+  )
+
+  element_count = 0
+  while state:
+    for element in ds:
+      for _, v in element.items():
+        if isinstance(v, np.ndarray):
+          if v.dtype == np.int64 or v.dtype == bool:
+            v = v.astype(np.float32)
+          # Transfer to device.
+          x = jax.device_put(v)
+          state.pause_timing()
+          # Compile.
+          _sum_of_squares_dx_jit(x).block_until_ready()
+          state.resume_timing()
+          # Run.
+          _sum_of_squares_dx_jit(x).block_until_ready()
+      element_count += 1
+      if element_count >= 100:
         break
 
 
