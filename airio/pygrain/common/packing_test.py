@@ -15,6 +15,7 @@
 """Tests for packing."""
 
 import functools
+import json
 from absl.testing import absltest
 from absl.testing import parameterized
 from airio import preprocessors as preprocessors_lib
@@ -872,23 +873,13 @@ class NoamPackingMapTest(parameterized.TestCase):
     # 5 examples.
     expected_elements = [
         # First element is distributed across 2 packed examples.
-        {
-            "inputs": [1, 2]
-        },
-        {
-            "inputs": [3, 4]
-        },
+        {"inputs": [1, 2]},
+        {"inputs": [3, 4]},
         # Second element.
-        {
-            "inputs": [5, 6]
-        },
+        {"inputs": [5, 6]},
         # Third element is distributed across 2 packed examples.
-        {
-            "inputs": [11, 12]
-        },
-        {
-            "inputs": [13, 14]
-        },
+        {"inputs": [11, 12]},
+        {"inputs": [13, 14]},
         # Fourth and fifth elements are dropped.
     ]
 
@@ -1418,6 +1409,30 @@ class MultiBinPackingIterTest(parameterized.TestCase):
       self.assertSequenceEqual(sorted(actual), sorted(expected))
       np.testing.assert_array_equal(actual[feature], expected[feature])
 
+  def test_checkpointing_with_json_serialization(self):
+    input_elements = [[1, 2], [3], [4], [5, 6], [11], [12], [13], [14, 7, 8]]
+    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = ds.map(np.asarray)
+    ds = ds.to_iter_dataset()
+    packer = packing.MultiBinPacker(feature_lengths=2, num_partial_examples=10)
+    ds = packing.PackLazyIterDataset(ds, packer=packer)
+    ds_iter = iter(ds)
+
+    max_steps = 6
+    values_without_interruption = []
+    checkpoints = []
+
+    for _ in range(max_steps):
+      st = ds_iter.get_state()
+      checkpoints.append(json.dumps(st))  # pytype: disable=attribute-error
+      values_without_interruption.append(next(ds_iter))
+    for starting_step in [0, 1, 3, 5]:
+      ds_iter.set_state(json.loads(checkpoints[starting_step]))  # pytype: disable=attribute-error
+      for i in range(starting_step, max_steps):
+        np.testing.assert_array_equal(
+            next(ds_iter), values_without_interruption[i]
+        )
+
 
 class NoamPackingIterTest(parameterized.TestCase):
 
@@ -1812,7 +1827,7 @@ class NoamPackingIterTest(parameterized.TestCase):
     for actual, expected in zip(ds, expected_elements, strict=True):
       np.testing.assert_array_equal(actual, expected)
 
-  def test_checkpointing(self):
+  def test_checkpointing_with_json_serialization(self):
     # 5 elements of variable sequence length.
     input_elements = [[1, 2, 3, 4], [5, 6], [11, 12, 13, 14], [7]]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
@@ -1828,10 +1843,10 @@ class NoamPackingIterTest(parameterized.TestCase):
 
     for _ in range(max_steps):
       st = ds_iter.get_state()
-      checkpoints.append(st)  # pytype: disable=attribute-error
+      checkpoints.append(json.dumps(st))  # pytype: disable=attribute-error
       values_without_interruption.append(next(ds_iter))
     for starting_step in [0, 1, 3, 5]:
-      ds_iter.set_state(checkpoints[starting_step])  # pytype: disable=attribute-error
+      ds_iter.set_state(json.loads(checkpoints[starting_step]))  # pytype: disable=attribute-error
       for i in range(starting_step, max_steps):
         np.testing.assert_array_equal(
             next(ds_iter), values_without_interruption[i]

@@ -85,6 +85,13 @@ class PackerProtocol(typing_extensions.Protocol):
     """
     ...
 
+  def as_dict(self) -> dict[str, Any]:
+    """Returns a dict representation of the packer."""
+
+  @classmethod
+  def from_dict(cls, state: dict[str, Any]):
+    """Loads the packer from a dict representation."""
+
 
 @dataclasses.dataclass
 class AirIOPackDatasetMapPreprocessor:
@@ -312,6 +319,7 @@ class _PackLazyDatasetIterator(lazy_dataset.LazyDatasetIterator):
     super().__init__()
     self._parent = parent
     self._packer = packer
+    self._packer_type = type(packer)
     self._packed_examples = collections.deque[PyTree[np.ndarray]]()
 
   # pytype:disable=attribute-error
@@ -335,14 +343,16 @@ class _PackLazyDatasetIterator(lazy_dataset.LazyDatasetIterator):
   def get_state(self):
     return {
         "parent": self._parent.get_state(),
-        "packer": copy.deepcopy(self._packer),
-        "packed_examples": copy.deepcopy(self._packed_examples),
+        "packer": self._packer.as_dict(),
+        "packed_examples": [save_np_tree(ex) for ex in self._packed_examples],
     }
 
   def set_state(self, state):
     self._parent.set_state(state["parent"])
-    self._packer = state["packer"]
-    self._packed_examples = state["packed_examples"]
+    self._packer = self._packer_type.from_dict(state["packer"])
+    self._packed_examples = collections.deque[PyTree[np.ndarray]](
+        [load_np_tree(t) for t in state["packed_examples"]]
+    )
 
 
 @dataclasses.dataclass(frozen=False)
@@ -438,6 +448,26 @@ class MultiBinPacker:
   def feature_lengths(self, feature_lengths):
     self._feature_lengths = feature_lengths
     self._flat_feature_lengths = flatten(feature_lengths)
+
+  def as_dict(self):
+    return {
+        "num_partial_examples": copy.deepcopy(self.num_partial_examples),
+        "feature_lengths": copy.deepcopy(self._feature_lengths),
+        "partially_packed_examples": [
+            p.as_dict() for p in self._partially_packed_examples
+        ],
+    }
+
+  @classmethod
+  def from_dict(cls, state):
+    obj = cls(state["num_partial_examples"])
+    if state["feature_lengths"]:
+      obj.feature_lengths = state["feature_lengths"]
+    obj._partially_packed_examples = collections.deque[PartiallyPackedExample]([
+        PartiallyPackedExample.from_dict(p)
+        for p in state["partially_packed_examples"]
+    ])
+    return obj
 
   def has_partially_packed_examples(self):
     return len(self._partially_packed_examples)
@@ -610,6 +640,22 @@ class NoamPacker:
         copy.copy(self._flat_feature_lengths)
     )
 
+  def as_dict(self):
+    return {
+        "feature_lengths": copy.deepcopy(self._feature_lengths),
+        "partially_packed_example": self._partially_packed_example.as_dict(),
+    }
+
+  @classmethod
+  def from_dict(cls, state):
+    obj = cls()
+    if state["feature_lengths"]:
+      obj.feature_lengths = state["feature_lengths"]
+      obj._partially_packed_example = PartiallyPackedExample.from_dict(
+          state["partially_packed_example"]
+      )
+    return obj
+
   # pytype:disable=attribute-error
   def has_partially_packed_examples(self):
     return not self._partially_packed_example.is_empty()
@@ -696,6 +742,25 @@ class PartiallyPackedExample:
     self._combined_flat_lengths = [
         SKIP_FEATURE if l == SKIP_FEATURE else 0 for l in available_flat_lengths
     ]
+
+  def as_dict(self):
+    d = {
+        "partially_packed_flat_example_list": (
+            save_np_tree(self._partially_packed_flat_example_list)
+        ),
+        "combined_flat_lengths": copy.deepcopy(self._combined_flat_lengths),
+        "available_flat_lengths": copy.deepcopy(self._available_flat_lengths),
+    }
+    return d
+
+  @classmethod
+  def from_dict(cls, state):
+    obj = cls(state["available_flat_lengths"])
+    obj._partially_packed_flat_example_list = load_np_tree(
+        state["partially_packed_flat_example_list"]
+    )
+    obj._combined_flat_lengths = state["combined_flat_lengths"]
+    return obj
 
   def add_example(self, flat_ex: Any):
     """Adds example to partially packed example list."""
@@ -828,6 +893,23 @@ def unflatten_packed_example(
         packed_element[f"{key}_segment_ids"] = value[1]
         packed_element[f"{key}_positions"] = value[2]
   return packed_element
+
+
+def save_np_tree(tree: PyTree[np.ndarray]):
+  return {
+      "data": jax.tree_map(lambda x: x.tobytes().decode(), tree),
+      "dtypes": jax.tree_map(lambda x: x.dtype.descr[0][1], tree),
+      "shapes": jax.tree_map(lambda x: x.shape, tree),
+  }
+
+
+def load_np_tree(tree: dict[str, PyTree[Any]]):
+  return jax.tree_map(
+      lambda x, y, z: np.frombuffer(x.encode(), dtype=np.dtype(y)).reshape(z),
+      tree["data"],
+      tree["dtypes"],
+      tree["shapes"],
+  )
 
 
 NoamPackMapPreprocessor = AirIOPackDatasetMapPreprocessor(
