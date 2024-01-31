@@ -19,7 +19,7 @@ from typing import Sequence
 from unittest import mock
 
 from absl.testing import absltest
-import airio
+import airio.core as airio
 from airio.pygrain import data_sources
 
 import multiprocessing
@@ -35,8 +35,8 @@ class ArrayRecordDataSourceTest(absltest.TestCase):
   def setUp(self):
     super().setUp()
     self.test_data_dir = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "test_data",
+        os.path.dirname(os.path.abspath(__file__)),
+        "../../test_data",
         "classification",
     )
 
@@ -98,8 +98,8 @@ class JsonDataSourceTest(absltest.TestCase):
   def setUp(self):
     super().setUp()
     self.test_data_dir = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "test_data",
+        os.path.dirname(os.path.abspath(__file__)),
+        "../../test_data",
         "classification",
     )
 

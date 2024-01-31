@@ -16,7 +16,7 @@
 
 # pylint:disable=wildcard-import,g-bad-import-order,g-importing-member
 
-from airio.pygrain.data_sources import *
-from airio.pygrain.dataset_iterators import *
-from airio.pygrain.dataset_providers import *
-from airio.pygrain.preprocessors import *
+from airio._src.pygrain.data_sources import *
+from airio._src.pygrain.dataset_iterators import *
+from airio._src.pygrain.dataset_providers import *
+from airio._src.pygrain.preprocessors import *

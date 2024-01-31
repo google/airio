@@ -16,7 +16,7 @@
 
 import os
 
-import airio
+import airio.core as airio
 import google_benchmark
 from seqio import vocabularies
 

@@ -18,9 +18,9 @@ import functools
 import json
 from absl.testing import absltest
 from absl.testing import parameterized
-from airio import preprocessors as preprocessors_lib
-from airio.pygrain.common import packing
-from airio.pygrain.common import preprocessors
+from airio.core import preprocessors as preprocessors_lib
+from airio.pygrain_common import packing
+from airio.pygrain_common import preprocessors
 import grain.python as grain
 import numpy as np
 

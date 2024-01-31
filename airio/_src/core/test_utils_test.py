@@ -15,7 +15,7 @@
 """Tests for asserts."""
 
 from absl.testing import absltest
-from airio import test_utils
+from airio._src.core import test_utils
 import numpy as np
 
 _TEXT_DATASET = [{'key1': ['val1'], 'key2': ['val2']}]

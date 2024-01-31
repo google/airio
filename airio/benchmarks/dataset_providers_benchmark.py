@@ -19,11 +19,11 @@ import functools
 import os
 from typing import Dict, Sequence
 
-import airio
-from airio import preprocessors as preprocessors_lib
+import airio.core as airio
+from airio.core import preprocessors as preprocessors_lib
 from airio.pygrain import dataset_providers
 from airio.pygrain import preprocessors as grain_preprocessors_lib
-from airio.pygrain.common import feature_converters
+from airio.pygrain_common import feature_converters
 import google_benchmark
 import jax
 import numpy as np

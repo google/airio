@@ -18,20 +18,30 @@ import functools
 import itertools
 import os
 from typing import Any, Callable
+
 from absl.testing import absltest
-from airio import preprocessors as preprocessors_lib
-from airio import tokenizer
+from airio.core import preprocessors as preprocessors_lib
+from airio.core import tokenizer
 from airio.pygrain import lazy_dataset_transforms
-from airio.pygrain.common import packing
-from airio.pygrain.common import span_corruption as asc
+from airio.pygrain_common import packing
+from airio.pygrain_common import span_corruption as asc
 import grain.python as grain
 import numpy as np
 import seqio
 from t5.data import preprocessors as t5_preps
 import tensorflow as tf
 
+
 lazy_dataset = grain.experimental.lazy_dataset
 mock = absltest.mock
+
+_TEST_DATA_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "../../../test_data/span_corruption",
+)
+_SRC_FILENAME = os.path.join(
+    _TEST_DATA_DIR, "c4_tokenized_t5_default_vocab_500_examples.tfrecord*"
+)
 
 
 # Utils
@@ -121,20 +131,13 @@ class SpanCorruptionTest(absltest.TestCase):
 
 
     # Step 1: Create a data source over the tokenized c4 test data.
-    test_data_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "../../test_data/span_corruption",
-    )
-    src_filename = os.path.join(
-        test_data_dir, "c4_tokenized_t5_default_vocab_500_examples.tfrecord*"
-    )
     src_feature_description = {
         "targets": tf.io.FixedLenSequenceFeature(
             [], dtype=tf.int64, allow_missing=True
         )
     }
     test_src = seqio.TFExampleDataSource(
-        split_to_filepattern={"train": src_filename},
+        split_to_filepattern={"train": _SRC_FILENAME},
         feature_description=src_feature_description,
     )
     src_ds = test_src.get_dataset("train")
@@ -161,7 +164,7 @@ class SpanCorruptionTest(absltest.TestCase):
 
     # Step 3: Load golden data and compare.
     output_filename = os.path.join(
-        test_data_dir,
+        _TEST_DATA_DIR,
         "c4_span_corruption_t5_default_vocab_inputs_1024_targets_1024_add_eos_true_seed_94043.tfrecord*",
     )
     output_feature_description = {
@@ -195,20 +198,13 @@ class SpanCorruptionTest(absltest.TestCase):
 
   def test_select_random_chunk_equivalence(self):
     # Step 1: Load tokenized test data.
-    test_data_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "../../test_data/span_corruption",
-    )
-    src_filename = os.path.join(
-        test_data_dir, "c4_tokenized_t5_default_vocab_500_examples.tfrecord*"
-    )
     src_feature_description = {
         "targets": tf.io.FixedLenSequenceFeature(
             [], dtype=tf.int64, allow_missing=True
         )
     }
     test_src = seqio.TFExampleDataSource(
-        split_to_filepattern={"train": src_filename},
+        split_to_filepattern={"train": _SRC_FILENAME},
         feature_description=src_feature_description,
     )
     src_ds = test_src.get_dataset("train")
@@ -262,20 +258,13 @@ class SpanCorruptionTest(absltest.TestCase):
 
   def test_split_tokens_equivalence(self):
     # Step 1: Load tokenized test data.
-    test_data_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "../../test_data/span_corruption",
-    )
-    src_filename = os.path.join(
-        test_data_dir, "c4_tokenized_t5_default_vocab_500_examples.tfrecord*"
-    )
     src_feature_description = {
         "targets": tf.io.FixedLenSequenceFeature(
             [], dtype=tf.int64, allow_missing=True
         )
     }
     test_src = seqio.TFExampleDataSource(
-        split_to_filepattern={"train": src_filename},
+        split_to_filepattern={"train": _SRC_FILENAME},
         feature_description=src_feature_description,
     )
     src_ds = test_src.get_dataset("train")

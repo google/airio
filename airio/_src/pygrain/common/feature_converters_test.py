@@ -15,9 +15,9 @@
 """Tests for feature_converters."""
 
 from absl.testing import absltest
-from airio import preprocessors as preprocessors_lib
+from airio.core import preprocessors as preprocessors_lib
 from airio.pygrain import preprocessors as grain_preprocessors_lib
-from airio.pygrain.common import feature_converters
+from airio.pygrain_common import feature_converters
 import grain.python as grain
 import numpy as np
 

@@ -20,16 +20,16 @@ from typing import Dict, Sequence
 from unittest import mock
 
 from absl.testing import absltest
-from airio import data_sources
-from airio import dataset_providers as airio_dataset_providers
+from airio._src.core import test_utils
+from airio.core import data_sources
+from airio.core import dataset_providers as airio_dataset_providers
 # Import "preprocessors" as "preprocessors_lib" to prevent naming conflicts with
 # "preprocessors" attrs in this file.
-from airio import preprocessors as preprocessors_lib
-from airio import test_utils
-from airio import tokenizer
+from airio.core import preprocessors as preprocessors_lib
+from airio.core import tokenizer
 from airio.pygrain import dataset_providers
 from airio.pygrain import preprocessors as grain_preprocessors_lib
-from airio.pygrain.common import feature_converters
+from airio.pygrain_common import feature_converters
 import grain.python as grain
 import jax
 import numpy as np
@@ -58,8 +58,8 @@ def _imdb_preprocessor(raw_example: Dict[str, str]) -> Dict[str, str]:
 
 def _create_sentencepiece_vocab() -> vocabularies.SentencePieceVocabulary:
   test_data_dir = os.path.join(
-      os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-      "test_data",
+      os.path.dirname(os.path.abspath(__file__)),
+      "../../test_data",
   )
   sentencepiece_vocab = vocabularies.SentencePieceVocabulary(
       os.path.join(test_data_dir, "sentencepiece", "sentencepiece.model")
@@ -1591,7 +1591,7 @@ class TaskBuilderTest(absltest.TestCase):
     self.assertStartsWith(
         repr(task_builder),
         "GrainTaskBuilder(task_name=dummy_airio_task,"
-        " source=<airio.data_sources.TfdsDataSource",
+        " source=<airio._src.core.data_sources.TfdsDataSource",
     )
 
 
@@ -2614,53 +2614,6 @@ class EvenSplitTest(absltest.TestCase):
     self.assertTupleEqual(intervals[0], (0, 3))  # First 3 elements.
     self.assertTupleEqual(intervals[1], (3, 6))  # Next 3 elements.
     self.assertTupleEqual(intervals[2], (6, 8))  # Last 2 elements.
-
-
-class IterAndPrefetchTest(absltest.TestCase):
-
-  def test_read_configs_none(self):
-    self.assertEqual(
-        dataset_providers._get_read_options(None), grain.ReadOptions()
-    )
-
-  def test_read_configs_0(self):
-    self.assertEqual(
-        dataset_providers._get_read_options(0), grain.ReadOptions()
-    )
-
-  def test_read_configs_10(self):
-    self.assertEqual(
-        dataset_providers._get_read_options(10),
-        grain.ReadOptions(num_threads=10),
-    )
-
-  def test_iter_and_prefetch_none_multiprocessing(self):
-    ds = lazy_dataset.RangeLazyMapDataset(10)
-    ds = dataset_providers._iter_and_prefetch(
-        ds, num_workers=None, num_prefetch_threads=2
-    )
-    self.assertDictEqual(iter(ds).get_state(), {'next_index': 0})
-
-  def test_iter_and_prefetch_zero_multiprocessing(self):
-    ds = lazy_dataset.RangeLazyMapDataset(10)
-    ds = dataset_providers._iter_and_prefetch(
-        ds, num_workers=0, num_prefetch_threads=2
-    )
-    self.assertDictEqual(iter(ds).get_state(), {'next_index': 0})
-
-  def test_iter_and_prefetch_with_multiprocessing(self):
-    ds = lazy_dataset.RangeLazyMapDataset(10)
-    ds = dataset_providers._iter_and_prefetch(
-        ds, num_workers=2, num_prefetch_threads=2
-    )
-    self.assertDictEqual(
-        iter(ds).get_state(),
-        {
-            "workers_state": {"0": {"next_index": 0}, "1": {"next_index": 0}},
-            "iterations_to_skip": {"0": 0, "1": 0},
-            "last_worker_index": -1,
-        },
-    )
 
 
 class DatasetProvidersTest(absltest.TestCase):

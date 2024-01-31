@@ -18,10 +18,10 @@ import functools
 import logging
 
 from absl import logging
-import airio
+import airio.core as airio
 from airio.pygrain import dataset_providers
-from airio.pygrain.common import preprocessors as ap
-from airio.pygrain.common import span_corruption as asc
+from airio.pygrain_common import preprocessors as ap
+from airio.pygrain_common import span_corruption as asc
 import babel
 from seqio import preprocessors as seqio_preprocessors
 from seqio import vocabularies
@@ -184,7 +184,7 @@ def question(ex: dict[str, str]) -> dict[str, str]:
 
 def append_eos_after_trim(
     ex,
-    runtime_args: airio.AirIOInjectedRuntimeArgs,
+    runtime_args: airio.preprocessors.AirIOInjectedRuntimeArgs,
     tokenizer_configs,
 ):
   """Wrapper over seqio append_eos_after_trim preprocessor."""
@@ -216,13 +216,13 @@ def get_c4_v220_span_corruption_task(
           tfds_name="c4/en:2.2.0", splits=["train", "validation"]
       ),
       preprocessors=[
-          airio.MapFnTransform(rekey_fn),
-          airio.MapFnTransform(
+          airio.preprocessors.MapFnTransform(rekey_fn),
+          airio.preprocessors.MapFnTransform(
               airio.tokenizer.Tokenizer(
                   tokenizer_configs=tokenizer_configs,
               )
           ),
           asc.create_span_corruption_transform(tokenizer_configs),
-          airio.MapFnTransform(append_eos_after_trim_fn),
+          airio.preprocessors.MapFnTransform(append_eos_after_trim_fn),
       ],
   )

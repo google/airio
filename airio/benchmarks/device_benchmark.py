@@ -17,9 +17,9 @@
 import functools
 import os
 
-import airio
 from airio import examples
-from airio.pygrain.common import feature_converters
+import airio.core as airio
+from airio.pygrain_common import feature_converters
 import google_benchmark
 import jax
 import jax.numpy as jnp

@@ -15,11 +15,11 @@
 """Import to top-level API."""
 # pylint:disable=wildcard-import,g-bad-import-order,g-importing-member
 
-from airio.dataset_providers import *
-from airio.data_sources import *
-from airio.tokenizer import *
-from airio.dataset_iterators import *
-from airio.preprocessors import *
+from airio._src.core.dataset_providers import *
+from airio._src.core.data_sources import *
+from airio._src.core.tokenizer import *
+from airio._src.core.dataset_iterators import *
+from airio._src.core.preprocessors import *
 
 # Version number.
 from airio.version import __version__

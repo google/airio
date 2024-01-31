@@ -18,13 +18,13 @@ import os
 from unittest import mock
 
 from absl.testing import absltest
-from airio import tokenizer
+from airio.core import tokenizer
 import numpy as np
 from seqio import vocabularies
 
 
 _TEST_DATA_DIR = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "test_data"
+    os.path.dirname(os.path.abspath(__file__)), "../../test_data"
 )
 
 

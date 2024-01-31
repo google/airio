@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Temporary link to facilitate package rename."""
+"""Import to top-level API."""
 
-# pylint:disable=wildcard-import,g-importing-member
+# pylint:disable=unused-import
 
-from airio._src.core.preprocessors import *
+from ._src.google import usage_logging

@@ -21,16 +21,16 @@ from typing import Dict, Sequence
 from unittest import mock
 
 from absl.testing import absltest
-from airio import data_sources
-from airio import dataset_providers as airio_dataset_providers
+from airio._src.core import test_utils
+from airio.core import data_sources
+from airio.core import dataset_providers as airio_dataset_providers
 # Import "preprocessors" as "preprocessors_lib" to prevent naming conflicts with
 # "preprocessors" attrs in this file.
-from airio import preprocessors as preprocessors_lib
-from airio import test_utils
-from airio import tokenizer
+from airio.core import preprocessors as preprocessors_lib
+from airio.core import tokenizer
 from airio.pygrain import dataset_providers
 from airio.pygrain import preprocessors as grain_preprocessors_lib
-from airio.pygrain.common import feature_converters
+from airio.pygrain_common import feature_converters
 import grain.python as grain
 import numpy as np
 from seqio import vocabularies

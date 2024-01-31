@@ -19,7 +19,7 @@ import os
 import tempfile
 from typing import Dict
 
-import airio
+import airio.core as airio
 from airio.pygrain import dataset_iterators
 import google_benchmark
 import grain.python as grain

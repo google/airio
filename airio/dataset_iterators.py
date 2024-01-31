@@ -12,37 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""AirIO-specific dataset iterators."""
+"""Temporary link to facilitate package rename."""
 
-import collections
-import concurrent.futures
-from typing import Any
+# pylint:disable=wildcard-import,g-importing-member
 
-from clu.data import dataset_iterator as clu_dataset_iterator
-
-
-class AirIODatasetIterator(clu_dataset_iterator.DatasetIterator):
-  """Wrapper iterator for AirIO."""
-
-  _iterator: collections.abc.Iterator[Any] = None
-
-  def __next__(self) -> clu_dataset_iterator.Element:
-    raise NotImplementedError()
-
-  def peek(self) -> clu_dataset_iterator.Element:
-    raise NotImplementedError()
-
-  def peek_async(
-      self,
-  ) -> concurrent.futures.Future[clu_dataset_iterator.Element]:
-    raise NotImplementedError()
-
-  def get_state(self) -> dict[str, Any]:
-    raise NotImplementedError()
-
-  def set_state(self, state: dict[str, Any]) -> None:
-    raise NotImplementedError()
-
-  def __repr__(self) -> str:
-    return f"AirIODatasetIterator(), state: {self.get_state()!r}"
-
+from airio._src.core.dataset_iterators import *

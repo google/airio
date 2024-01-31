@@ -17,9 +17,9 @@
 from typing import Dict
 
 from absl import app
-import airio
+import airio.core as airio
 from airio.pygrain import dataset_providers as grain_dataset_providers
-from airio.pygrain.common import feature_converters
+from airio.pygrain_common import feature_converters
 from seqio import vocabularies
 
 

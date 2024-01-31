@@ -15,9 +15,8 @@
 """Import to top-level API."""
 
 # pylint:disable=wildcard-import,g-bad-import-order,g-importing-member
-
-from airio.pygrain.common.constants import *
-from airio.pygrain.common.feature_converters import *
-from airio.pygrain.common.packing import *
-from airio.pygrain.common.preprocessors import *
-from airio.pygrain.common.span_corruption import *
+from airio._src.pygrain.common.constants import *
+from airio._src.pygrain.common.feature_converters import *
+from airio._src.pygrain.common.packing import *
+from airio._src.pygrain.common.preprocessors import *
+from airio._src.pygrain.common.span_corruption import *

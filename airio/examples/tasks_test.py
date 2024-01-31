@@ -17,9 +17,9 @@
 import os
 
 from absl.testing import absltest
-import airio
 from airio import examples
-from airio.pygrain.common import feature_converters
+import airio.core as airio
+from airio.pygrain_common import feature_converters
 from seqio import vocabularies
 import tensorflow_datasets as tfds
 
@@ -425,7 +425,9 @@ class TasksTest(absltest.TestCase):
         shuffle=False,
         seed=42,
         runtime_preprocessors=runtime_preprocessors,
-        shard_info=airio.ShardInfo(index=0, num_shards=source_sequence_length),
+        shard_info=airio.dataset_providers.ShardInfo(
+            index=0, num_shards=source_sequence_length
+        ),
     )
 
     expected_first_batch = {

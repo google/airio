@@ -15,13 +15,15 @@
 """Tests for equivalence between the airio and seqio packing impls."""
 
 import functools
+
 from absl.testing import absltest
-import airio
-import airio.pygrain.common
+from airio import pygrain_common
+import airio.core as airio
 import grain.python as grain
 import numpy as np
 import seqio
 import t5.data
+
 
 lazy_dataset = grain.experimental.lazy_dataset
 
@@ -89,7 +91,7 @@ class PackingEquivalenceTest(absltest.TestCase):
         sequence_lengths={"targets": 1024}, split="unused"
     )
     unused_rng = None
-    packed_airio_ds = airio.pygrain.common.packing.NoamPackMapPreprocessor(
+    packed_airio_ds = pygrain_common.packing.NoamPackMapPreprocessor(
         packed_airio_ds, runtime_args, unused_rng
     )
     packed_airio_ds_iter = iter(packed_airio_ds)
@@ -165,12 +167,12 @@ class PackingEquivalenceTest(absltest.TestCase):
         sequence_lengths=feature_lengths, split="unused"
     )
     unused_rng = None
-    pack_prep = airio.pygrain.common.packing.SingleBinTruePackMapPreprocessor
+    pack_prep = pygrain_common.packing.SingleBinTruePackMapPreprocessor
     packed_airio_ds = pack_prep(packed_airio_ds, runtime_args, unused_rng)
     updated_runtime_args = pack_prep.update_runtime_args(runtime_args)
     packed_airio_ds = packed_airio_ds.map(
         functools.partial(
-            airio.pygrain.common.pad, runtime_args=updated_runtime_args
+            pygrain_common.preprocessors.pad, runtime_args=updated_runtime_args
         )
     )
     packed_airio_ds_iter = iter(packed_airio_ds)
@@ -262,13 +264,13 @@ class PackingEquivalenceTest(absltest.TestCase):
         sequence_lengths=feature_lengths, split="unused"
     )
     unused_rng = None
-    pack_prep = airio.pygrain.common.packing.MultiBinTruePackMapPreprocessor
+    pack_prep = pygrain_common.packing.MultiBinTruePackMapPreprocessor
     packed_airio_ds = pack_prep(packed_airio_ds, runtime_args, unused_rng)
     updated_runtime_args = pack_prep.update_runtime_args(runtime_args)
 
     packed_airio_ds = packed_airio_ds.map(
         functools.partial(
-            airio.pygrain.common.pad, runtime_args=updated_runtime_args
+            pygrain_common.preprocessors.pad, runtime_args=updated_runtime_args
         )
     )
     packed_airio_ds = list(iter(packed_airio_ds))

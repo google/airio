@@ -20,9 +20,9 @@ from typing import Dict, Sequence
 from unittest import mock
 
 from absl.testing import absltest
-import airio
-from airio import preprocessors as preprocessors_lib
-from airio import test_utils
+from airio._src.core import test_utils
+import airio.core as airio
+from airio.core import preprocessors as preprocessors_lib
 from airio.pygrain import dataset_providers
 import grain.python as grain
 import numpy as np
@@ -51,7 +51,7 @@ def _imdb_preprocessor(raw_example: Dict[str, str]) -> Dict[str, str]:
 
 def _create_sentencepiece_vocab() -> vocabularies.SentencePieceVocabulary:
   test_data_dir = os.path.join(
-      os.path.dirname(os.path.abspath(__file__)), "test_data"
+      os.path.dirname(os.path.abspath(__file__)), "../../test_data"
   )
   sentencepiece_vocab = vocabularies.SentencePieceVocabulary(
       os.path.join(test_data_dir, "sentencepiece", "sentencepiece.model")
@@ -363,7 +363,7 @@ class TaskBuilderTest(absltest.TestCase):
     self.assertStartsWith(
         repr(task_builder),
         "TaskBuilder(task_name=dummy_airio_task,"
-        " source=<airio.data_sources.TfdsDataSource",
+        " source=<airio._src.core.data_sources.TfdsDataSource",
     )
 
 

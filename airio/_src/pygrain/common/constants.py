@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Temporary link to facilitate package rename."""
+"""Common constants."""
 
-# pylint:disable=wildcard-import,g-importing-member
-
-from airio._src.core.preprocessors import *
+SKIP_FEATURE = -1

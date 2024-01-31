@@ -18,8 +18,8 @@ import inspect
 from unittest import mock
 
 from absl.testing import absltest
-from airio import data_sources
-from airio import preprocessors
+from airio.core import data_sources
+from airio.core import preprocessors
 from airio.pygrain import dataset_providers as grain_dataset_providers
 import jax.random
 import numpy as np

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Common constants."""
+"""Temporary link to facilitate package rename."""
 
-SKIP_FEATURE = -1
+# pylint:disable=wildcard-import,g-importing-member
+
+from airio._src.pygrain.common.constants import *

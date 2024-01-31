@@ -17,7 +17,7 @@
 from unittest import mock
 
 from absl.testing import absltest
-from airio import dataset_iterators
+from airio.core import dataset_iterators
 
 
 class AirIODatasetIteratorsTest(absltest.TestCase):

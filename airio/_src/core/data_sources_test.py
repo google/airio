@@ -18,7 +18,7 @@ from typing import Sequence
 from unittest import mock
 
 from absl.testing import absltest
-from airio import data_sources
+from airio.core import data_sources
 import numpy as np
 import tensorflow_datasets as tfds
 

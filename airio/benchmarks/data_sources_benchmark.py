@@ -16,7 +16,7 @@
 
 import os
 
-import airio
+import airio.core as airio
 from airio.pygrain import data_sources
 import google_benchmark
 import numpy as np
