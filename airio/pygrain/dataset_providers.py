@@ -79,6 +79,10 @@ class GrainTask(airio_dataset_providers.Task):
     prep_rng = base_rng
     for prep in preps:
       transform = grain_preprocessors_lib.LazyDatasetTransform(prep)
+      if transform.requires_iter_dataset and isinstance(
+          ds, lazy_dataset.LazyMapDataset
+      ):
+        ds = ds.to_iter_dataset()
       if (
           has_none_elems
           and transform.requires_non_none_elements

@@ -328,6 +328,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    ds = ds.to_iter_dataset()
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 10, "targets": 7},
         split="unused",
@@ -381,6 +382,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    ds = ds.to_iter_dataset()
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 7, "targets": 3},
         split="unused",
@@ -444,6 +446,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    ds = ds.to_iter_dataset()
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 10, "targets": 7},
         split="unused",
@@ -484,6 +487,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    ds = ds.to_iter_dataset()
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 10, "targets": 7},
         split="unused",
@@ -577,6 +581,7 @@ class LMFeatureConverter(absltest.TestCase):
     x = [{"targets": [3, 9, 1]}, {"targets": [4, 1]}]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    ds = ds.to_iter_dataset()
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"targets": 6},
         split="unused",
@@ -619,6 +624,7 @@ class LMFeatureConverter(absltest.TestCase):
     x = [{"targets": [3, 9, 4, 5, 1]}, {"targets": [4, 3, 2, 1]}]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    ds = ds.to_iter_dataset()
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"targets": 5},
         split="unused",
@@ -673,6 +679,7 @@ class LMFeatureConverter(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    ds = ds.to_iter_dataset()
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"targets": 6},
         split="unused",
@@ -715,6 +722,7 @@ class LMFeatureConverter(absltest.TestCase):
     x = [{"targets": [3, 9, 1]}, {"targets": [4, 1]}]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    ds = ds.to_iter_dataset()
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"targets": 6},
         split="unused",
@@ -973,6 +981,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    ds = ds.to_iter_dataset()
 
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 8, "targets": 7},
@@ -1090,6 +1099,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    ds = ds.to_iter_dataset()
 
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 8, "targets": 7},
@@ -1162,6 +1172,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    ds = ds.to_iter_dataset()
 
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 4, "targets": 3},
@@ -1225,6 +1236,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    ds = ds.to_iter_dataset()
 
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 4, "targets": 3},
@@ -1311,6 +1323,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    ds = ds.to_iter_dataset()
 
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 8, "targets": 7},
@@ -1407,6 +1420,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    ds = ds.to_iter_dataset()
 
     runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 7, "targets": 7},

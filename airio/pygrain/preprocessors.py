@@ -114,8 +114,6 @@ class LazyIterTransform:
       runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
       rng: JaxRng | None,
   ) -> lazy_dataset.LazyIterDataset:
-    if isinstance(ds, lazy_dataset.LazyMapDataset):
-      ds = ds.to_iter_dataset()
     if not isinstance(ds, lazy_dataset.LazyIterDataset):
       raise ValueError(
           f"Cannot apply LazyIterDataset transform: {str(self.transform)} to"
@@ -192,6 +190,10 @@ class LazyDatasetTransform:
   @property
   def can_process_iter_dataset(self) -> bool:
     return not isinstance(self.transform, LazyMapTransform)
+
+  @property
+  def requires_iter_dataset(self) -> bool:
+    return isinstance(self.transform, LazyIterTransform)
 
   def __call__(
       self,

@@ -508,6 +508,7 @@ def lazy_iter_transform_on_map_dataset_with_runtime_args(state):
       update_runtime_args=_update_runtime_args,
   )
   ds = lazy_dataset.SourceLazyMapDataset(range(10))
+  ds = ds.to_iter_dataset()
   while state:
     unused_rng = None
     _ = transform(ds, runtime_args, unused_rng)

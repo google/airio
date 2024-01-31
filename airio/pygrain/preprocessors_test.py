@@ -352,7 +352,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     self.assertListEqual(list(ds), [7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
-  def test_lazy_iter_transform_on_map_dataset(self):
+  def test_lazy_iter_transform_on_map_dataset_fails(self):
     run_args = airio_preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"val": 3}, split="unused"
     )
@@ -360,15 +360,14 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         lazy_iter_fn,
         update_runtime_args=self._update_runtime_args,
     )
-    ds = lazy_dataset.SourceLazyMapDataset(range(10))
-    ds = transform(ds, run_args, rng=None)
-    updated_runtime_args = transform.update_runtime_args(run_args)
-    expected_runtime_args = airio_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"val": 4, "val_new": 3},
-        split="unused",
+    self.assertTrue(
+        preprocessors.LazyDatasetTransform(transform).requires_iter_dataset
     )
-    self.assertListEqual(list(ds), list(range(3, 13)))
-    self.assertEqual(updated_runtime_args, expected_runtime_args)
+    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    with self.assertRaisesRegex(
+        ValueError, "Cannot apply LazyIterDataset transform.*"
+    ):
+      _ = transform(ds, run_args, rng=None)
 
   def test_map_transform_on_iter_dataset(self):
     transform = airio_preprocessors_lib.MapFnTransform(lambda x: x + 1)
