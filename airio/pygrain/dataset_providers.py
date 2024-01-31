@@ -75,6 +75,7 @@ class GrainTask(airio_dataset_providers.Task):
       runtime_args: airio_preprocessors_lib.AirIOInjectedRuntimeArgs,
       base_rng: JaxRng,
       has_none_elems: bool,
+      num_prefetch_threads: int | None,
   ):
     prep_rng = base_rng
     for prep in preps:
@@ -82,7 +83,7 @@ class GrainTask(airio_dataset_providers.Task):
       if transform.requires_iter_dataset and isinstance(
           ds, lazy_dataset.LazyMapDataset
       ):
-        ds = ds.to_iter_dataset()
+        ds = ds.to_iter_dataset(_get_read_options(num_prefetch_threads))
       if (
           has_none_elems
           and transform.requires_non_none_elements
@@ -96,7 +97,7 @@ class GrainTask(airio_dataset_providers.Task):
               " elements, or process a LazyIterDataset. Task name:"
               f" {self.name}, preprocessor: {prep}"
           )
-        ds = ds.to_iter_dataset()
+        ds = ds.to_iter_dataset(_get_read_options(num_prefetch_threads))
       if transform.produces_none_elements:
         has_none_elems = True
       ds = transform(ds, prep_rng, runtime_args)
@@ -116,6 +117,7 @@ class GrainTask(airio_dataset_providers.Task):
       seed: int | None,
       shard_info: airio_dataset_providers.ShardInfo | None,
       num_epochs: int | None,
+      num_prefetch_threads: int | None,
   ) -> lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset:
     """Returns a lazy dataset for Task source and preprocessors."""
     # Step 1: Get Source.
@@ -152,7 +154,12 @@ class GrainTask(airio_dataset_providers.Task):
       prep_rng, shuffle_rng = jax.random.split(prep_rng)
       ds, updated_runtime_args, has_none_elems = (
           self._apply_preprocessors_to_lazy_dataset(
-              ds, preps, ds_runtime_args, prep_rng, has_none_elems
+              ds,
+              preps,
+              ds_runtime_args,
+              prep_rng,
+              has_none_elems,
+              num_prefetch_threads,
           )
       )
       if shuffle:
@@ -178,7 +185,12 @@ class GrainTask(airio_dataset_providers.Task):
       )
     unused_next_epoch_rng, prep_rng = jax.random.split(next_epoch_rng)
     ds, _, _ = self._apply_preprocessors_to_lazy_dataset(
-        ds, runtime_preps, runtime_args, prep_rng, has_none_elems
+        ds,
+        runtime_preps,
+        runtime_args,
+        prep_rng,
+        has_none_elems,
+        num_prefetch_threads,
     )
     return ds
 
@@ -195,6 +207,8 @@ class GrainTask(airio_dataset_providers.Task):
       seed: int | None = 0,
       shard_info: airio_dataset_providers.ShardInfo | None = None,
       num_epochs: int | None = 1,
+      num_prefetch_threads: int | None = None,
+      num_workers: int | None = 0,
   ) -> clu_dataset_iterator.DatasetIterator:
     """Returns the dataset iterator as per the task configuration."""
     # TODO(b/311720936): Until Task preprocessing is fully switched to
@@ -210,6 +224,10 @@ class GrainTask(airio_dataset_providers.Task):
           seed=seed,
           shard_info=shard_info,
           num_epochs=num_epochs,
+          num_prefetch_threads=num_prefetch_threads,
+      )
+      ds = _iter_and_prefetch(
+          ds, num_workers=num_workers, num_prefetch_threads=num_prefetch_threads
       )
       return dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader=ds)
     if shard_info is None:
@@ -244,13 +262,21 @@ class GrainTask(airio_dataset_providers.Task):
       if isinstance(op, grain_preprocessors_lib.FnTransforms):
         op.runtime_args = runtime_args
 
-    return self._load_data(source=source, sampler=sampler, ops=ops)
+    return self._load_data(
+        source=source,
+        sampler=sampler,
+        ops=ops,
+        num_prefetch_threads=num_prefetch_threads,
+        num_workers=num_workers,
+    )
 
   def _load_data(
       self,
       source: GrainDataSource,
       sampler: grain.IndexSampler,
       ops: Sequence[grain.Transformation],
+      num_prefetch_threads: int | None = None,
+      num_workers: int | None = 0,
   ) -> clu_dataset_iterator.DatasetIterator:
     """Returns a sampled data source after applying `ops`.
 
@@ -266,6 +292,11 @@ class GrainTask(airio_dataset_providers.Task):
         one or more `grain.Transformation`s or handled before this call. Once
         the switch to lazy_dataset API is complete, this arg will be removed and
         all transformations will be baked into the `source` arg.
+      num_prefetch_threads: Number of threads reading from the DataSource in
+        parallel.
+      num_workers: Number of child processes launched to parallelize the
+        transformations among. Zero means processing runs in the same process.
+        None lets the python backend choose the value.
 
     Returns an iterator of records after applying `ops`.
     """
@@ -273,8 +304,9 @@ class GrainTask(airio_dataset_providers.Task):
         data_source=source,
         sampler=sampler,
         operations=ops,
+        worker_count=num_workers,
+        read_options=_get_read_options(num_prefetch_threads),
     )
-
     return dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader=ds)
 
   def get_dataset_by_step(
@@ -419,6 +451,7 @@ class GrainMixture(airio_dataset_providers.Mixture):
       seed: int | None = 0,
       shard_info: airio_dataset_providers.ShardInfo | None = None,
       num_epochs: int | None = 1,
+      num_prefetch_threads: int | None = None,
   ) -> lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset:
     """Returns a lazy dataset for the Mixture."""
     if num_epochs is None and shuffle:
@@ -440,6 +473,7 @@ class GrainMixture(airio_dataset_providers.Mixture):
               seed=seed,
               shard_info=shard_info,
               num_epochs=num_epochs,
+              num_prefetch_threads=num_prefetch_threads,
           )
       )
       proportions.append(self.get_proportion(task))
@@ -463,8 +497,9 @@ class GrainMixture(airio_dataset_providers.Mixture):
 
     if use_mix_iter:
       # Convert any LazyMapDatasets datasets to LazyIterDatasets.
+      read_options = _get_read_options(num_prefetch_threads)
       datasets = [
-          ds.to_iter_dataset()
+          ds.to_iter_dataset(read_options)
           if isinstance(ds, lazy_dataset.LazyMapDataset)
           else ds
           for ds in datasets
@@ -514,6 +549,8 @@ class GrainMixture(airio_dataset_providers.Mixture):
       seed: int | None = 0,
       shard_info: airio_dataset_providers.ShardInfo | None = None,
       num_epochs: int | None = 1,
+      num_prefetch_threads: int | None = None,
+      num_workers: int | None = 0,
   ) -> clu_dataset_iterator.DatasetIterator:
     """Returns the dataset iterator."""
     ds = self.get_lazy_dataset(
@@ -525,6 +562,10 @@ class GrainMixture(airio_dataset_providers.Mixture):
         seed=seed,
         shard_info=shard_info,
         num_epochs=num_epochs,
+        num_prefetch_threads=num_prefetch_threads,
+    )
+    ds = _iter_and_prefetch(
+        ds, num_workers=num_workers, num_prefetch_threads=num_prefetch_threads
     )
     return dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader=ds)
 
@@ -605,3 +646,21 @@ def _even_split(
     shard_start += min(shard_index, num_unused_examples)
     shard_end += min(shard_index + 1, num_unused_examples)
   return shard_start, shard_end
+
+
+def _get_read_options(num_prefetch_threads: int | None) -> grain.ReadOptions:
+  if num_prefetch_threads:
+    return grain.ReadOptions(num_threads=num_prefetch_threads)
+  return grain.ReadOptions()
+
+
+def _iter_and_prefetch(
+    ds: lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset,
+    num_workers: int | None,
+    num_prefetch_threads: int | None,
+) -> lazy_dataset.LazyIterDataset:
+  if not isinstance(ds, lazy_dataset.LazyIterDataset):
+    ds = ds.to_iter_dataset(_get_read_options(num_prefetch_threads))
+  if num_workers and num_workers > 0:
+    ds = ds.prefetch(grain.MultiprocessingOptions(num_workers=num_workers))
+  return ds
