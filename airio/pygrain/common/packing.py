@@ -14,6 +14,7 @@
 
 """Packing implementation."""
 
+import base64
 import collections
 import copy
 import dataclasses
@@ -897,7 +898,9 @@ def unflatten_packed_example(
 
 def save_np_tree(tree: PyTree[np.ndarray]):
   return {
-      "data": jax.tree_map(lambda x: x.tobytes().decode(), tree),
+      "data": jax.tree_map(
+          lambda x: base64.b64encode(x.tobytes()).decode(), tree
+      ),
       "dtypes": jax.tree_map(lambda x: x.dtype.descr[0][1], tree),
       "shapes": jax.tree_map(lambda x: x.shape, tree),
   }
@@ -905,7 +908,9 @@ def save_np_tree(tree: PyTree[np.ndarray]):
 
 def load_np_tree(tree: dict[str, PyTree[Any]]):
   return jax.tree_map(
-      lambda x, y, z: np.frombuffer(x.encode(), dtype=np.dtype(y)).reshape(z),
+      lambda x, y, z: np.frombuffer(
+          base64.b64decode(x), dtype=np.dtype(y)
+      ).reshape(z),
       tree["data"],
       tree["dtypes"],
       tree["shapes"],
