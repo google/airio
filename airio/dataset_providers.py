@@ -56,6 +56,8 @@ class DatasetProviderBase(Protocol):
       seed: int | None = 0,
       shard_info: ShardInfo | None = None,
       num_epochs: int | None = 1,
+      num_prefetch_threads: int | None = None,
+      num_workers: int | None = 0,
   ) -> clu_dataset_iterator.DatasetIterator:
     """Returns the dataset iterator."""
     ...
@@ -263,6 +265,8 @@ def get_dataset(
     num_epochs: int | None = 1,
     seed: int | None = None,
     shard_info: ShardInfo | None = None,
+    num_prefetch_threads: int | None = None,
+    num_workers: int | None = 0,
 ) -> clu_dataset_iterator.DatasetIterator:
   """Returns the PyGrain dataset iterator."""
   return mixture_or_task.get_dataset(
@@ -274,6 +278,8 @@ def get_dataset(
       num_epochs=num_epochs,
       seed=seed,
       shard_info=shard_info,
+      num_prefetch_threads=num_prefetch_threads,
+      num_workers=num_workers,
   )
 
 
