@@ -13,13 +13,16 @@
 # limitations under the License.
 
 """Import to top-level API."""
-# pylint:disable=wildcard-import,g-bad-import-order,g-importing-member
 
-from airio.dataset_providers import *
-from airio.data_sources import *
-from airio.tokenizer import *
-from airio.dataset_iterators import *
-from airio.preprocessors import *
+# pylint:disable=unused-import,g-importing-member,g-bad-import-order
+
+from ._src.core.data_sources import *
+from ._src.core.dataset_iterators import *
+from ._src.core.dataset_providers import *
+from ._src.core.preprocessors import *
+from ._src.core.tokenizer import *
+
+import airio.core
 
 # Version number.
-from airio.version import __version__
+from .version import __version__

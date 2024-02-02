@@ -16,8 +16,8 @@
 
 # pylint:disable=unused-import
 
-from airio._src.pygrain import data_sources
-from airio._src.pygrain import dataset_iterators
-from airio._src.pygrain import dataset_providers
-from airio._src.pygrain import lazy_dataset_transforms
-from airio._src.pygrain import preprocessors
+from .pygrain import data_sources
+from .pygrain import dataset_iterators
+from .pygrain import dataset_providers
+from .pygrain import lazy_dataset_transforms
+from .pygrain import preprocessors

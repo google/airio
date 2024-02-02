@@ -43,7 +43,22 @@ setuptools.setup(
     author_email='no-reply@google.com',
     url='http://github.com/google/airio',
     license='Apache 2.0',
-    packages=setuptools.find_packages(),
+    packages=[
+        'airio',
+        'airio._src',
+        'airio.core',
+        'airio.pygrain',
+        'airio.pygrain_common',
+        'airio.pygrain.common',
+    ],
+    package_dir={
+        'airio': 'airio',
+        'airio._src': 'airio/_src/',
+        'airio.core': 'airio/_src/core/',
+        'airio.pygrain': 'airio/_src/pygrain/',
+        'airio.pygrain_common': 'airio/_src/pygrain/common/',
+        'airio.pygrain.common': 'airio/pygrain/common/',
+    },
     include_package_data=True,
     scripts=[],
     install_requires=[
@@ -58,6 +73,7 @@ setuptools.setup(
         ),
         'numpy',
         'seqio @ git+https://github.com/google/seqio#egg=seqio',
+        't5',
         # Ping to a specific version to avoid endless backtracking during
         # pip dependency resolution.
         'tfds-nightly==4.9.2.dev202308090034',
