@@ -14,6 +14,7 @@
 
 """Tasks tests."""
 
+import multiprocessing as mp  # pylint:disable=unused-import
 import os
 
 from absl.testing import absltest
@@ -22,6 +23,7 @@ from airio import examples
 from airio.pygrain.common import feature_converters
 from seqio import vocabularies
 import tensorflow_datasets as tfds
+
 
 _SOURCE_NUM_EXAMPLES = 3
 _SOURCE_SEQUENCE_LENGTH = 32
@@ -35,6 +37,16 @@ def _pad(
     return values
   padding_length = total_length - len(values)
   return values + [pad_value] * padding_length
+
+
+def _get_runtime_preprocessors(pack=False):
+  return feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
+      pack=pack,
+      use_multi_bin_packing=False,
+      passthrough_feature_keys=[],
+      pad_id=0,
+      bos_id=0,
+  )
 
 
 class TasksTest(absltest.TestCase):
@@ -52,15 +64,142 @@ class TasksTest(absltest.TestCase):
         "inputs": airio.tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),
         "targets": airio.tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),
     }
-    self.runtime_preprocessors = (
-        feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
-            pack=False,
-            use_multi_bin_packing=False,
-            passthrough_feature_keys=[],
-            pad_id=0,
-            bos_id=0,
-        )
+
+  def test_wmt_task_with_multiprocessing(self):
+    with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
+      wmt_task = examples.tasks.get_wmt_19_ende_v003_task(
+          tokenizer_configs=self.tokenizer_configs
+      )
+    sequence_lengths = {
+        "inputs": _SOURCE_SEQUENCE_LENGTH,
+        "targets": _SOURCE_SEQUENCE_LENGTH,
+    }
+    ds = wmt_task.get_dataset(
+        sequence_lengths,
+        "train",
+        shuffle=False,
+        runtime_preprocessors=_get_runtime_preprocessors(),
+        batch_size=2,
+        num_workers=2,
     )
+    expected_first_batch = {
+        "decoder_input_tokens": [
+            _pad(
+                [0, 3, 2, 4, 2, 13, 3, 5, 20, 2, 4, 2, 20, 2, 4, 2],
+                _SOURCE_SEQUENCE_LENGTH,
+            ),
+            _pad(
+                [
+                    0,
+                    3,
+                    2,
+                    5,
+                    13,
+                    21,
+                    20,
+                    21,
+                    5,
+                    13,
+                    2,
+                    20,
+                    20,
+                    2,
+                    8,
+                    3,
+                    2,
+                    13,
+                    2,
+                ],
+                _SOURCE_SEQUENCE_LENGTH,
+            ),
+        ],
+        "decoder_loss_weights": [
+            _pad([1], 15, 1) + _pad([0], 17, 0),
+            _pad([1], 18, 1) + _pad([0], 14, 0),
+        ],
+        "decoder_target_tokens": [
+            _pad(
+                [3, 2, 4, 2, 13, 3, 5, 20, 2, 4, 2, 20, 2, 4, 2],
+                _SOURCE_SEQUENCE_LENGTH,
+            ),
+            _pad(
+                [3, 2, 5, 13, 21, 20, 21, 5, 13, 2, 20, 20, 2, 8, 3, 2, 13, 2],
+                _SOURCE_SEQUENCE_LENGTH,
+            ),
+        ],
+        "encoder_input_tokens": [
+            [
+                3,
+                24,
+                23,
+                5,
+                22,
+                6,
+                9,
+                5,
+                16,
+                3,
+                2,
+                22,
+                2,
+                9,
+                8,
+                6,
+                20,
+                3,
+                24,
+                7,
+                3,
+                2,
+                4,
+                23,
+                14,
+                5,
+                22,
+                12,
+                3,
+                13,
+                20,
+                2,
+            ],
+            [
+                3,
+                24,
+                23,
+                5,
+                22,
+                6,
+                9,
+                5,
+                16,
+                3,
+                2,
+                22,
+                2,
+                9,
+                8,
+                6,
+                20,
+                3,
+                24,
+                7,
+                3,
+                2,
+                4,
+                23,
+                14,
+                5,
+                22,
+                12,
+                3,
+                13,
+                2,
+                5,
+            ],
+        ],
+    }
+    actual_first_batch = {k: v.tolist() for k, v in next(ds).items()}
+    self.assertDictEqual(actual_first_batch, expected_first_batch)
 
   def test_wmt_task(self):
     with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
@@ -75,19 +214,27 @@ class TasksTest(absltest.TestCase):
         sequence_lengths,
         "train",
         shuffle=False,
-        runtime_preprocessors=self.runtime_preprocessors,
+        runtime_preprocessors=_get_runtime_preprocessors(pack=True),
         batch_size=2,
     )
     expected_first_batch = {
         "decoder_input_tokens": [
             _pad(
-                [0, 3, 2, 4, 2, 13, 3, 5, 20, 2, 4, 2, 20, 2, 4, 2],
+                [0, 3, 2, 4, 2, 13, 3, 5, 20, 2, 4, 2, 20, 2, 4],
                 _SOURCE_SEQUENCE_LENGTH,
             ),
             _pad(
-                [0, 3, 4, 20, 2, 3, 5, 8, 2, 13, 8, 21, 13, 8, 2],
+                [0, 3, 4, 20, 2, 3, 5, 8, 2, 13, 8, 21, 13, 8],
                 _SOURCE_SEQUENCE_LENGTH,
             ),
+        ],
+        "decoder_positions": [
+            _pad(list(range(15)), _SOURCE_SEQUENCE_LENGTH),
+            _pad(list(range(14)), _SOURCE_SEQUENCE_LENGTH),
+        ],
+        "decoder_segment_ids": [
+            _pad([1], 15, 1) + _pad([0], 17),
+            _pad([1], 14, 1) + _pad([0], 18),
         ],
         "decoder_loss_weights": [
             _pad([1], 15, 1) + _pad([0], 17),
@@ -102,6 +249,14 @@ class TasksTest(absltest.TestCase):
                 [3, 4, 20, 2, 3, 5, 8, 2, 13, 8, 21, 13, 8, 2],
                 _SOURCE_SEQUENCE_LENGTH,
             ),
+        ],
+        "encoder_positions": [
+            list(range(_SOURCE_SEQUENCE_LENGTH)),
+            list(range(_SOURCE_SEQUENCE_LENGTH)),
+        ],
+        "encoder_segment_ids": [
+            _pad([1], _SOURCE_SEQUENCE_LENGTH, 1),
+            _pad([1], _SOURCE_SEQUENCE_LENGTH, 1),
         ],
         "encoder_input_tokens": [
             [
@@ -190,7 +345,7 @@ class TasksTest(absltest.TestCase):
         sequence_lengths,
         "train",
         shuffle=False,
-        runtime_preprocessors=self.runtime_preprocessors,
+        runtime_preprocessors=_get_runtime_preprocessors(),
         batch_size=2,
     )
     expected_first_batch = {
@@ -457,4 +612,4 @@ class TasksTest(absltest.TestCase):
 
 
 if __name__ == "__main__":
-  absltest.main()
+  mp.handle_test_main(absltest.main)

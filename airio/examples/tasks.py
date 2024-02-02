@@ -66,6 +66,7 @@ def get_wmt_19_ende_v003_task(
           airio.preprocessors.MapFnTransform(
               airio.tokenizer.Tokenizer(
                   tokenizer_configs=tokenizer_configs,
+                  copy_pretokenized=False,
               )
           ),
       ],
