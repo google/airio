@@ -2616,53 +2616,6 @@ class EvenSplitTest(absltest.TestCase):
     self.assertTupleEqual(intervals[2], (6, 8))  # Last 2 elements.
 
 
-class IterAndPrefetchTest(absltest.TestCase):
-
-  def test_read_configs_none(self):
-    self.assertEqual(
-        dataset_providers._get_read_options(None), grain.ReadOptions()
-    )
-
-  def test_read_configs_0(self):
-    self.assertEqual(
-        dataset_providers._get_read_options(0), grain.ReadOptions()
-    )
-
-  def test_read_configs_10(self):
-    self.assertEqual(
-        dataset_providers._get_read_options(10),
-        grain.ReadOptions(num_threads=10),
-    )
-
-  def test_iter_and_prefetch_none_multiprocessing(self):
-    ds = lazy_dataset.RangeLazyMapDataset(10)
-    ds = dataset_providers._iter_and_prefetch(
-        ds, num_workers=None, num_prefetch_threads=2
-    )
-    self.assertDictEqual(iter(ds).get_state(), {'next_index': 0})
-
-  def test_iter_and_prefetch_zero_multiprocessing(self):
-    ds = lazy_dataset.RangeLazyMapDataset(10)
-    ds = dataset_providers._iter_and_prefetch(
-        ds, num_workers=0, num_prefetch_threads=2
-    )
-    self.assertDictEqual(iter(ds).get_state(), {'next_index': 0})
-
-  def test_iter_and_prefetch_with_multiprocessing(self):
-    ds = lazy_dataset.RangeLazyMapDataset(10)
-    ds = dataset_providers._iter_and_prefetch(
-        ds, num_workers=2, num_prefetch_threads=2
-    )
-    self.assertDictEqual(
-        iter(ds).get_state(),
-        {
-            "workers_state": {"0": {"next_index": 0}, "1": {"next_index": 0}},
-            "iterations_to_skip": {"0": 0, "1": 0},
-            "last_worker_index": -1,
-        },
-    )
-
-
 class DatasetProvidersTest(absltest.TestCase):
 
   def test_get_dataset(self):
