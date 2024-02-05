@@ -16,11 +16,11 @@
 
 # pylint:disable=unused-import,g-importing-member
 
-from ._src.core.data_sources import *
-from ._src.core.dataset_iterators import *
-from ._src.core.dataset_providers import *
-from ._src.core.preprocessors import *
-from ._src.core.tokenizer import *
+from ._src.core import data_sources
+from ._src.core import dataset_iterators
+from ._src.core import dataset_providers
+from ._src.core import preprocessors
+from ._src.core import tokenizer
 
 # Version number.
 from .version import __version__

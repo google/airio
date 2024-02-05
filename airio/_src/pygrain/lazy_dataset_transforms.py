@@ -12,15 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Import to top-level API."""
+"""Temporary link to facilitate package rename."""
 
-# pylint:disable=unused-import,g-importing-member
+# pylint:disable=wildcard-import,g-importing-member
 
-from ._src.core.data_sources import *
-from ._src.core.dataset_iterators import *
-from ._src.core.dataset_providers import *
-from ._src.core.preprocessors import *
-from ._src.core.tokenizer import *
-
-# Version number.
-from .version import __version__
+from airio.pygrain.lazy_dataset_transforms import *

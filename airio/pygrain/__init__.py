@@ -14,9 +14,10 @@
 
 """Import to top-level API."""
 
-# pylint:disable=wildcard-import,g-bad-import-order,g-importing-member
+# pylint:disable=unused-import
 
-from airio.pygrain.data_sources import *
-from airio.pygrain.dataset_iterators import *
-from airio.pygrain.dataset_providers import *
-from airio.pygrain.preprocessors import *
+from airio._src.pygrain import data_sources
+from airio._src.pygrain import dataset_iterators
+from airio._src.pygrain import dataset_providers
+from airio._src.pygrain import lazy_dataset_transforms
+from airio._src.pygrain import preprocessors
