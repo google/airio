@@ -64,6 +64,16 @@ class RandomMapFnLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
   map_fn: Callable[[Any, JaxRng], Any]
   base_rng: JaxRng
 
+  def __init__(
+      self,
+      parent: lazy_dataset.LazyMapDataset,
+      map_fn: Callable[[Any, JaxRng], Any],
+      base_rng: JaxRng,
+  ):
+    super().__init__([parent])
+    self.parent = parent
+    self.map_fn = map_fn
+    self.base_rng = base_rng
 
   def __len__(self) -> int:
     return len(self.parent)

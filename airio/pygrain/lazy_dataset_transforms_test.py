@@ -105,6 +105,16 @@ class RandomMapFnLazyMapDatasetTest(absltest.TestCase):
     )
     self.assertLen(ds, 5)
 
+  def test_parents_property(self):
+    def random_map_fn(ex, rng):
+      return ex + int(jax.random.randint(rng, [], 0, 10))
+
+    parent_ds = lazy_dataset.RangeLazyMapDataset(5)
+    ds = lazy_dataset_transforms.RandomMapFnLazyMapDataset(
+        parent_ds, random_map_fn, jax.random.PRNGKey(42)
+    )
+    self.assertTupleEqual(ds.parents, (parent_ds,))
+
 
 
 if __name__ == "__main__":
