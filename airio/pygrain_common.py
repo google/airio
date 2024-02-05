@@ -16,8 +16,8 @@
 
 # pylint:disable=unused-import
 
-from airio._src.pygrain import data_sources
-from airio._src.pygrain import dataset_iterators
-from airio._src.pygrain import dataset_providers
-from airio._src.pygrain import lazy_dataset_transforms
-from airio._src.pygrain import preprocessors
+from ._src.pygrain.common import constants
+from ._src.pygrain.common import feature_converters
+from ._src.pygrain.common import packing
+from ._src.pygrain.common import preprocessors
+from ._src.pygrain.common import span_corruption

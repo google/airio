@@ -14,10 +14,13 @@
 
 """Import to top-level API."""
 
-# pylint:disable=unused-import
+# pylint:disable=unused-import,g-importing-member
 
-from airio._src.pygrain import data_sources
-from airio._src.pygrain import dataset_iterators
-from airio._src.pygrain import dataset_providers
-from airio._src.pygrain import lazy_dataset_transforms
-from airio._src.pygrain import preprocessors
+from ._src.core import data_sources
+from ._src.core import dataset_iterators
+from ._src.core import dataset_providers
+from ._src.core import preprocessors
+from ._src.core import tokenizer
+
+# Version number.
+from .version import __version__
