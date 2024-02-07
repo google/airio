@@ -6,7 +6,7 @@ from __gin__ import dynamic_registration
 import __main__ as train_script
 
 import airio.examples.tasks
-from airio.grain.common import feature_converters
+from airio.pygrain.common import feature_converters
 from t5x import utils
 
 MIXTURE_OR_TASK_NAME = @airio.examples.tasks.get_c4_v220_span_corruption_task()

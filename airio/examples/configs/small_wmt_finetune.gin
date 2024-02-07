@@ -1,0 +1,42 @@
+from __gin__ import dynamic_registration
+
+import __main__ as train_script
+
+include "third_party/py/t5x/examples/t5/t5_1_1/small.gin"
+include "third_party/py/t5x/configs/runs/finetune.gin"
+
+import airio.examples.tasks
+from airio.pygrain.common import feature_converters
+from t5x import utils
+
+MIXTURE_OR_TASK_NAME = @airio.examples.tasks.get_wmt_19_ende_v003_task()
+TASK_FEATURE_LENGTHS = {"inputs": 256, "targets": 256}
+TRAIN_STEPS = 1_020_000  # 1000000 pre-trained steps + 20000 fine-tuning steps.
+DROPOUT_RATE = 0.0
+INITIAL_CHECKPOINT_PATH = "gs://t5-data/pretrained_models/t5x/t5_1_1_small/checkpoint_1000000"
+# `LOSS_NORMALIZING_FACTOR`: When fine-tuning a model that was pre-trained
+# using Mesh Tensorflow (e.g. the public T5 / mT5 / ByT5 models), this should be
+# set to `pretraining batch_size` * `target_token_length`. For T5 and T5.1.1:
+# `2048 * 114`. For mT5: `1024 * 229`. For ByT5: `1024 * 189`.
+LOSS_NORMALIZING_FACTOR = 233472
+
+train_script.train:
+  # TODO(b/321406238): Enable train_eval when supported
+  train_eval_dataset_cfg = None
+  infer_eval_dataset_cfg = None
+
+train/utils.DatasetConfig:
+  runtime_preprocessors = @feature_converters.get_t5x_enc_dec_feature_converter_preprocessors()
+  seed = 94043
+
+feature_converters.get_t5x_enc_dec_feature_converter_preprocessors:
+  pack=True
+  use_multi_bin_packing=False
+  passthrough_feature_keys=[]
+  pad_id=0
+  bos_id=0
+
+utils.SaveCheckpointConfig:
+  period = 2
+  save_dataset = True
+
