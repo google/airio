@@ -28,6 +28,8 @@ train_script.train:
 train/utils.DatasetConfig:
   runtime_preprocessors = @feature_converters.get_t5x_enc_dec_feature_converter_preprocessors()
   seed = 94043
+  num_prefetch_threads = 16
+  num_workers = 16
 
 feature_converters.get_t5x_enc_dec_feature_converter_preprocessors:
   pack=True
