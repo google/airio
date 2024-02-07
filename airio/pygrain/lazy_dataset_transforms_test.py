@@ -79,7 +79,7 @@ class RandomMapFnLazyMapDatasetTest(absltest.TestCase):
 
     for _ in range(5):
       ds1 = lazy_dataset_transforms.RandomMapFnLazyMapDataset(
-          ds, random_map_fn, jax.random.PRNGKey(42)
+          ds, random_map_fn, jax.random.key(42)
       )
       self.assertListEqual(list(ds1), [5, 4, 5, 12, 13])
 
@@ -91,7 +91,7 @@ class RandomMapFnLazyMapDatasetTest(absltest.TestCase):
 
     for _ in range(5):
       ds1 = lazy_dataset_transforms.RandomMapFnLazyMapDataset(
-          ds, random_map_fn, jax.random.PRNGKey(42)
+          ds, random_map_fn, jax.random.key(42)
       )
       self.assertListEqual([ds1[i] for i in range(len(ds))], [5, 4, 5, 12, 13])
 
@@ -101,7 +101,7 @@ class RandomMapFnLazyMapDatasetTest(absltest.TestCase):
 
     ds = lazy_dataset.RangeLazyMapDataset(5)
     ds = lazy_dataset_transforms.RandomMapFnLazyMapDataset(
-        ds, random_map_fn, jax.random.PRNGKey(42)
+        ds, random_map_fn, jax.random.key(42)
     )
     self.assertLen(ds, 5)
 
@@ -111,7 +111,7 @@ class RandomMapFnLazyMapDatasetTest(absltest.TestCase):
 
     parent_ds = lazy_dataset.RangeLazyMapDataset(5)
     ds = lazy_dataset_transforms.RandomMapFnLazyMapDataset(
-        parent_ds, random_map_fn, jax.random.PRNGKey(42)
+        parent_ds, random_map_fn, jax.random.key(42)
     )
     self.assertTupleEqual(ds.parents, (parent_ds,))
 

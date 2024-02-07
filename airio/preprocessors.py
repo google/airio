@@ -105,7 +105,7 @@ class RandomMapFnTransform(grain.RandomMapTransform):
 
   def random_map(self, element, rng: np.random.Generator):
     """Maps a single element."""
-    jax_rng = jax.random.PRNGKey(rng.integers(0, 2**16 - 1))
+    jax_rng = jax.random.key(rng.integers(0, 2**16 - 1))
     return inject_runtime_args_to_fn(self.map_fn, self.runtime_args)(
         element, jax_rng
     )

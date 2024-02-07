@@ -64,7 +64,7 @@ class PreprocessorsTest(absltest.TestCase):
     transform = airio_preprocessors_lib.RandomMapFnTransform(test_random_map_fn)
     lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
     ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
-    ds = lazy_dataset_transform(ds, rng=jax.random.PRNGKey(42))
+    ds = lazy_dataset_transform(ds, rng=jax.random.key(42))
     self.assertListEqual(list(ds), [5, 4, 5, 12, 13])
 
   def test_random_map_lazydataset_transform_disallowed(self):
@@ -168,7 +168,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
     ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
     ds = lazy_dataset_transform(
-        ds, rng=jax.random.PRNGKey(42), runtime_args=self._runtime_args
+        ds, rng=jax.random.key(42), runtime_args=self._runtime_args
     )
     self.assertListEqual(list(ds), [8, 7, 8, 15, 16])
 
@@ -188,7 +188,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
     ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
     ds = lazy_dataset_transform(
-        ds, rng=jax.random.PRNGKey(42), runtime_args=self._runtime_args
+        ds, rng=jax.random.key(42), runtime_args=self._runtime_args
     )
     updated_runtime_args = lazy_dataset_transform.get_updated_runtime_args(
         self._runtime_args
@@ -265,7 +265,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         requires_non_none_elements=False,
     )
     ds = lazy_dataset.SourceLazyMapDataset(range(10))
-    ds = transform(ds, run_args, rng=jax.random.PRNGKey(42))
+    ds = transform(ds, run_args, rng=jax.random.key(42))
     updated_runtime_args = transform.update_runtime_args(run_args)
     expected_runtime_args = airio_preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"val": 4, "val_new": 3},
@@ -343,7 +343,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     )
     ds = lazy_dataset.SourceLazyMapDataset(range(10))
     ds = ds.to_iter_dataset()
-    ds = transform(ds, run_args, rng=jax.random.PRNGKey(42))
+    ds = transform(ds, run_args, rng=jax.random.key(42))
     updated_runtime_args = transform.update_runtime_args(run_args)
     expected_runtime_args = airio_preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths={"val": 4, "val_new": 3},

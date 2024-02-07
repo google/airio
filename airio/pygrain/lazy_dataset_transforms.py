@@ -58,7 +58,7 @@ class ConcatLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
 
 @dataclasses.dataclass(frozen=False)
 class RandomMapFnLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
-  """LazyMapDataset for random map fns with jax PRNGKey support."""
+  """LazyMapDataset for random map fns with jax rng key support."""
 
   parent: lazy_dataset.LazyMapDataset
   map_fn: Callable[[Any, JaxRng], Any]

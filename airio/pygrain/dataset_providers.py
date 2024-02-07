@@ -147,7 +147,7 @@ class GrainTask(airio_dataset_providers.Task):
     preprocessed_dss = []
     updated_runtime_args = runtime_args
     has_none_elems = False
-    next_epoch_rng = jax.random.PRNGKey(seed)
+    next_epoch_rng = jax.random.key(seed)
     for ds in dss:
       ds_runtime_args = runtime_args.clone()
       next_epoch_rng, prep_rng = jax.random.split(next_epoch_rng)

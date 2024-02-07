@@ -199,7 +199,7 @@ def random_map_fn_lazydataset_transform(state):
   )
   ds = lazy_dataset.SourceLazyMapDataset(list(range(_SOURCE_NUM_EXAMPLES)))
   while state:
-    _ = lazy_dataset_transform(ds, rng=jax.random.PRNGKey(42))
+    _ = lazy_dataset_transform(ds, rng=jax.random.key(42))
 
 
 @google_benchmark.register
@@ -365,7 +365,7 @@ def random_map_fn_lazydataset_transform_with_runtime_args(state):
   ds = lazy_dataset.SourceLazyMapDataset(list(range(_SOURCE_NUM_EXAMPLES)))
   while state:
     _ = lazy_dataset_transform(
-        ds, rng=jax.random.PRNGKey(42), runtime_args=runtime_args
+        ds, rng=jax.random.key(42), runtime_args=runtime_args
     )
 
 
@@ -392,7 +392,7 @@ def random_map_fn_lazydataset_transform_updated_runtime_args(state):
   ds = lazy_dataset.SourceLazyMapDataset(list(range(_SOURCE_NUM_EXAMPLES)))
   while state:
     _ = lazy_dataset_transform(
-        ds, rng=jax.random.PRNGKey(42), runtime_args=runtime_args
+        ds, rng=jax.random.key(42), runtime_args=runtime_args
     )
 
 

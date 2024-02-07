@@ -25,6 +25,7 @@ from airio.pygrain import lazy_dataset_transforms
 from airio.pygrain.common import packing
 from airio.pygrain.common import span_corruption as asc
 import grain.python as grain
+import jax
 import numpy as np
 import seqio
 from t5.data import preprocessors as t5_preps
@@ -111,6 +112,13 @@ class SpanCorruptionTest(absltest.TestCase):
             lazy_dataset_transforms,
             "RandomMapFnLazyMapDataset",
             side_effect=mock_random_map_fn_lazy_map_dataset,
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            jax.random,
+            "key_data",
+            side_effect=lambda x: x,
         )
     )
 

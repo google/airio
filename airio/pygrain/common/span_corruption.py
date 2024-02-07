@@ -15,7 +15,7 @@
 """Preprocessors for T5 Tasks."""
 
 import functools
-from typing import Mapping, Optional, Sequence
+from typing import Mapping, Sequence
 
 from airio import preprocessors as preprocessors_lib
 from airio import tokenizer
@@ -38,6 +38,51 @@ def update_seed(seed):
   return seed
 
 
+def _t5_single_example_select_random_chunk(
+    ex,
+    seed: jax.Array,
+    tokenizer_configs: Mapping[str, tokenizer.TokenizerConfig],
+    max_length: int,
+    feature_key: str,
+    passthrough_feature_keys: Sequence[str] | None,
+):
+  seed = jax.random.key_data(seed)
+  return t5_preps.single_example_select_random_chunk(
+      ex,
+      seed,
+      output_features=tokenizer_configs,  # pytype: disable=wrong-arg-types
+      max_length=max_length,
+      feature_key=feature_key,
+      passthrough_feature_keys=passthrough_feature_keys,
+  )
+
+
+def _t5_single_example_denoise(
+    ex,
+    seed: jax.Array,
+    tokenizer_configs: Mapping[str, tokenizer.TokenizerConfig],
+    noise_density: float,
+    mean_noise_span_length: float,
+    input_feature_key: str,
+    passthrough_feature_keys: Sequence[str] | None = None,
+):
+  seed = jax.random.key_data(seed)
+  return t5_preps.single_example_denoise(
+      ex,
+      seed,
+      output_features=tokenizer_configs,    # pytype: disable=wrong-arg-types
+      inputs_fn=t5_preps.noise_span_to_unique_sentinel,
+      targets_fn=t5_preps.nonnoise_span_to_unique_sentinel,
+      noise_density=noise_density,
+      noise_mask_fn=functools.partial(
+          t5_preps.random_spans_noise_mask,
+          mean_noise_span_length=mean_noise_span_length,
+      ),
+      input_feature_key=input_feature_key,
+      passthrough_feature_keys=passthrough_feature_keys,
+  )
+
+
 def span_corruption(
     dataset: lazy_dataset.LazyMapDataset,
     runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
@@ -48,7 +93,7 @@ def span_corruption(
     input_feature_key='inputs',
     merge_examples_to_reduce_padding=True,
     reserved_for_packing=None,
-    passthrough_feature_keys: Optional[Sequence[str]] = None,
+    passthrough_feature_keys: Sequence[str] | None = None,
 ):
   """Final pretraining objective used in Raffel et al., 2019.
 
@@ -105,23 +150,18 @@ def span_corruption(
 
   filter_fn = functools.partial(filter_empty, feature_key=feature_key)
   select_random_chunk_fn = functools.partial(
-      t5_preps.single_example_select_random_chunk,
-      output_features=tokenizer_configs,
+      _t5_single_example_select_random_chunk,
+      tokenizer_configs=tokenizer_configs,
       max_length=max_length,
       feature_key=feature_key,
       passthrough_feature_keys=passthrough_feature_keys,
   )
   packer = packing.NoamPacker(feature_lengths={feature_key: input_length})
   denoise_fn = functools.partial(
-      t5_preps.single_example_denoise,
-      output_features=tokenizer_configs,
-      inputs_fn=t5_preps.noise_span_to_unique_sentinel,
-      targets_fn=t5_preps.nonnoise_span_to_unique_sentinel,
+      _t5_single_example_denoise,
+      tokenizer_configs=tokenizer_configs,
       noise_density=noise_density,
-      noise_mask_fn=functools.partial(
-          t5_preps.random_spans_noise_mask,
-          mean_noise_span_length=mean_noise_span_length,
-      ),
+      mean_noise_span_length=mean_noise_span_length,
       input_feature_key=input_feature_key,
       passthrough_feature_keys=passthrough_feature_keys,
   )

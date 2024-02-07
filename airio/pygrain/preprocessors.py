@@ -209,7 +209,7 @@ class LazyDatasetTransform:
         return ds.map(self.transform)
       case preprocessors_lib.RandomMapFnTransform():
         # Special case to support reproducible stochastic transformations with
-        # jax PRNGKeys.
+        # jax rng keys.
         # Note: LazyIterDatasets are not yet supported, but can be if needed.
         if not isinstance(ds, lazy_dataset.LazyMapDataset):
           raise ValueError(
@@ -217,7 +217,7 @@ class LazyDatasetTransform:
               " non-LazyMapDatasets. Please file a bug with the AirIO team."
           )
         if rng is None:
-          rng = jax.random.PRNGKey(np.int32(time.time()))
+          rng = jax.random.key(np.int32(time.time()))
         map_fn = preprocessors_lib.inject_runtime_args_to_fn(
             self.transform.map_fn, runtime_args
         )
