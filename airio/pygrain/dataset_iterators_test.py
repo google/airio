@@ -47,6 +47,41 @@ def _parse_and_preprocess(raw_example: bytes) -> Dict[str, str]:
   return final_example
 
 
+def _get_expected_data() -> list[dict[str, str]]:
+  return [
+      {
+          "inputs_pretokenized": "abc",
+          "inputs": [3, 5, 2, 13],
+          "targets_pretokenized": "negative",
+          "targets": [3, 22, 4, 2, 18, 8, 25, 4],
+      },
+      {
+          "inputs_pretokenized": "def",
+          "inputs": [3, 21, 4, 2],
+          "targets_pretokenized": "positive",
+          "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+      },
+      {
+          "inputs_pretokenized": "ghi",
+          "inputs": [3, 2, 20, 8],
+          "targets_pretokenized": "negative",
+          "targets": [3, 22, 4, 2, 18, 8, 25, 4],
+      },
+      {
+          "inputs_pretokenized": "jkl",
+          "inputs": [3, 2, 9],
+          "targets_pretokenized": "positive",
+          "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+      },
+      {
+          "inputs_pretokenized": "mno",
+          "inputs": [3, 14, 22, 7],
+          "targets_pretokenized": "negative",
+          "targets": [3, 22, 4, 2, 18, 8, 25, 4],
+      },
+  ]
+
+
 class DatasetIteratorsWithDataLoaderTest(absltest.TestCase):
 
   def setUp(self):
@@ -58,6 +93,7 @@ class DatasetIteratorsWithDataLoaderTest(absltest.TestCase):
         os.path.join(self.test_dir, "sentencepiece", "sentencepiece.model")
     )
     self.tokenizer_config = tokenizer.TokenizerConfig(vocab=sentencepiece_vocab)
+    self.expected_data = _get_expected_data()
 
   def _get_dummy_data_loader(self) -> grain.DataLoader:
     test_data_path = os.path.join(self.test_dir, "classification")
@@ -80,6 +116,44 @@ class DatasetIteratorsWithDataLoaderTest(absltest.TestCase):
             ),
         ],
     )
+
+  def test_iterator(self):
+    data_loader = self._get_dummy_data_loader()
+    it = dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader)
+    for actual, expected in zip(it, self.expected_data, strict=True):
+      self.assertSequenceEqual(sorted(actual.keys()), sorted(expected.keys()))
+      for k in actual.keys():
+        np.testing.assert_array_equal(actual[k], expected[k])
+
+  def test_take(self):
+    data_loader = self._get_dummy_data_loader()
+    it = dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader)
+    for actual, expected in zip(
+        it.take(3), self.expected_data[:3], strict=True
+    ):
+      self.assertSequenceEqual(sorted(actual.keys()), sorted(expected.keys()))
+      for k in actual.keys():
+        np.testing.assert_array_equal(actual[k], expected[k])
+
+  def test_take_less_then_more(self):
+    data_loader = self._get_dummy_data_loader()
+    it = dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader)
+    for actual, expected in zip(
+        it.take(3).take(5), self.expected_data[:3], strict=True
+    ):
+      self.assertSequenceEqual(sorted(actual.keys()), sorted(expected.keys()))
+      for k in actual.keys():
+        np.testing.assert_array_equal(actual[k], expected[k])
+
+  def test_take_more_then_less(self):
+    data_loader = self._get_dummy_data_loader()
+    it = dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader)
+    for actual, expected in zip(
+        it.take(5).take(3), self.expected_data[:3], strict=True
+    ):
+      self.assertSequenceEqual(sorted(actual.keys()), sorted(expected.keys()))
+      for k in actual.keys():
+        np.testing.assert_array_equal(actual[k], expected[k])
 
   def test_verify_element_spec(self):
     """Verifies that element_spec can be correctly determined."""
@@ -219,6 +293,7 @@ class DatasetIteratorsWithLazyMapDatasetTest(absltest.TestCase):
         os.path.join(self.test_dir, "sentencepiece", "sentencepiece.model")
     )
     self.tokenizer_config = tokenizer.TokenizerConfig(vocab=sentencepiece_vocab)
+    self.expected_data = _get_expected_data()
 
   def _get_dummy_lazy_map_dataset(self) -> lazy_dataset.LazyMapDataset:
     test_data_path = os.path.join(self.test_dir, "classification")
@@ -240,6 +315,36 @@ class DatasetIteratorsWithLazyMapDatasetTest(absltest.TestCase):
     )
     ds = ds[:5]
     return ds
+
+  def test_take(self):
+    ds = self._get_dummy_lazy_map_dataset()
+    it = dataset_iterators.PyGrainDatasetIteratorWrapper(ds)
+    for actual, expected in zip(
+        it.take(3), self.expected_data[:3], strict=True
+    ):
+      self.assertSequenceEqual(sorted(actual.keys()), sorted(expected.keys()))
+      for k in actual.keys():
+        np.testing.assert_array_equal(actual[k], expected[k])
+
+  def test_take_less_then_more(self):
+    ds = self._get_dummy_lazy_map_dataset()
+    it = dataset_iterators.PyGrainDatasetIteratorWrapper(ds)
+    for actual, expected in zip(
+        it.take(3).take(5), self.expected_data[:3], strict=True
+    ):
+      self.assertSequenceEqual(sorted(actual.keys()), sorted(expected.keys()))
+      for k in actual.keys():
+        np.testing.assert_array_equal(actual[k], expected[k])
+
+  def test_take_more_then_less(self):
+    ds = self._get_dummy_lazy_map_dataset()
+    it = dataset_iterators.PyGrainDatasetIteratorWrapper(ds)
+    for actual, expected in zip(
+        it.take(5).take(3), self.expected_data[:3], strict=True
+    ):
+      self.assertSequenceEqual(sorted(actual.keys()), sorted(expected.keys()))
+      for k in actual.keys():
+        np.testing.assert_array_equal(actual[k], expected[k])
 
   def test_verify_element_spec(self):
     """Verifies that element_spec can be correctly determined."""
@@ -356,6 +461,7 @@ class DatasetIteratorsWithLazyIterDatasetTest(absltest.TestCase):
         os.path.join(self.test_dir, "sentencepiece", "sentencepiece.model")
     )
     self.tokenizer_config = tokenizer.TokenizerConfig(vocab=sentencepiece_vocab)
+    self.expected_data = _get_expected_data()
 
   def _get_dummy_lazy_iter_dataset(self) -> lazy_dataset.LazyMapDataset:
     test_data_path = os.path.join(self.test_dir, "classification")
@@ -378,6 +484,44 @@ class DatasetIteratorsWithLazyIterDatasetTest(absltest.TestCase):
     ds = ds[:5]
     ds = ds.to_iter_dataset()
     return ds
+
+  def test_iterator(self):
+    ds = self._get_dummy_lazy_iter_dataset()
+    it = dataset_iterators.PyGrainDatasetIteratorWrapper(ds)
+    for actual, expected in zip(it, self.expected_data, strict=True):
+      self.assertSequenceEqual(sorted(actual.keys()), sorted(expected.keys()))
+      for k in actual.keys():
+        np.testing.assert_array_equal(actual[k], expected[k])
+
+  def test_take(self):
+    ds = self._get_dummy_lazy_iter_dataset()
+    it = dataset_iterators.PyGrainDatasetIteratorWrapper(ds)
+    for actual, expected in zip(
+        it.take(3), self.expected_data[:3], strict=True
+    ):
+      self.assertSequenceEqual(sorted(actual.keys()), sorted(expected.keys()))
+      for k in actual.keys():
+        np.testing.assert_array_equal(actual[k], expected[k])
+
+  def test_take_less_then_more(self):
+    ds = self._get_dummy_lazy_iter_dataset()
+    it = dataset_iterators.PyGrainDatasetIteratorWrapper(ds)
+    for actual, expected in zip(
+        it.take(3).take(5), self.expected_data[:3], strict=True
+    ):
+      self.assertSequenceEqual(sorted(actual.keys()), sorted(expected.keys()))
+      for k in actual.keys():
+        np.testing.assert_array_equal(actual[k], expected[k])
+
+  def test_take_more_then_less(self):
+    ds = self._get_dummy_lazy_iter_dataset()
+    it = dataset_iterators.PyGrainDatasetIteratorWrapper(ds)
+    for actual, expected in zip(
+        it.take(5).take(3), self.expected_data[:3], strict=True
+    ):
+      self.assertSequenceEqual(sorted(actual.keys()), sorted(expected.keys()))
+      for k in actual.keys():
+        np.testing.assert_array_equal(actual[k], expected[k])
 
   def test_verify_element_spec(self):
     """Verifies that element_spec can be correctly determined."""

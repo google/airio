@@ -44,7 +44,14 @@ class PyGrainDatasetIteratorWrapper(dataset_iterators.AirIODatasetIterator):
     self._peek_future = None
     self._pool = None
 
+    # Necessary to support take().
+    self._next_idx = 0
+    self._stop_after = None
+
   def __next__(self) -> clu_dataset_iterator.Element:
+    if self._stop_after is not None and self._next_idx >= self._stop_after:
+      raise StopIteration()
+    self._next_idx += 1
     return next(self._iterator)
 
   @property
@@ -115,3 +122,13 @@ class PyGrainDatasetIteratorWrapper(dataset_iterators.AirIODatasetIterator):
         f"PyGrainDatasetIteratorWrapper({self._data_loader!r}), "
         f"state: {self.get_state()!r}"
     )
+
+  def take(self, num_elements: int):
+    # Set if unset.
+    if self._stop_after is None:
+      self._stop_after = num_elements
+      return self
+    # Override if less then current.
+    if self._stop_after >= num_elements:
+      self._stop_after = num_elements
+    return self
