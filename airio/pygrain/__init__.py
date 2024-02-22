@@ -16,7 +16,22 @@
 
 # pylint:disable=wildcard-import,g-bad-import-order,g-importing-member
 
+from airio.pygrain import data_sources
+from airio.pygrain import dataset_iterators
+from airio.pygrain import dataset_providers
+from airio.pygrain import preprocessors
+
 from airio.pygrain.data_sources import *
 from airio.pygrain.dataset_iterators import *
 from airio.pygrain.dataset_providers import *
 from airio.pygrain.preprocessors import *
+
+from airio.data_sources import FunctionDataSource
+from airio.data_sources import TfdsDataSource
+from airio.preprocessors import AirIOInjectedRuntimeArgs
+from airio.preprocessors import FilterFnTransform
+from airio.preprocessors import inject_runtime_args_to_fn
+from airio.preprocessors import MapFnTransform
+from airio.preprocessors import RandomMapFnTransform
+from airio.tokenizer import Tokenizer
+from airio.tokenizer import TokenizerConfig
