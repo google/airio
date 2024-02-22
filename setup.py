@@ -43,7 +43,20 @@ setuptools.setup(
     author_email='no-reply@google.com',
     url='http://github.com/google/airio',
     license='Apache 2.0',
-    packages=setuptools.find_packages(),
+    packages=[
+        # 'airio',
+        'airio.core',
+        'airio.pygrain',
+        'airio.pygrain_common',
+        'airio.tfgrain',
+    ],
+    package_dir={
+        # 'airio': 'airio',
+        'airio.core': 'airio/_src/core/',
+        'airio.pygrain': 'airio/_src/pygrain/',
+        'airio.pygrain.common': 'airio/_src/pygrain/common/',
+        'airio.tfgrain': 'airio/_src/tfgrain/',
+    },
     include_package_data=True,
     scripts=[],
     install_requires=[
