@@ -16,7 +16,7 @@
 
 import os
 
-import airio
+import airio.pygrain as airio
 import google_benchmark
 from seqio import vocabularies
 
@@ -27,7 +27,7 @@ _TEST_DIR = os.path.join(
 _SENTENCEPIECE_VOCAB = vocabularies.SentencePieceVocabulary(
     os.path.join(_TEST_DIR, "sentencepiece", "sentencepiece.model")
 )
-_TOKENIZER_CONFIG = airio.tokenizer.TokenizerConfig(vocab=_SENTENCEPIECE_VOCAB)
+_TOKENIZER_CONFIG = airio.TokenizerConfig(vocab=_SENTENCEPIECE_VOCAB)
 
 
 @google_benchmark.register
@@ -41,7 +41,7 @@ def tokenize(state):
       "inputs": _TOKENIZER_CONFIG,
       "targets": _TOKENIZER_CONFIG,
   }
-  tokenizer_obj = airio.tokenizer.Tokenizer(tokenizer_configs=tokenizer_configs)
+  tokenizer_obj = airio.Tokenizer(tokenizer_configs=tokenizer_configs)
   tokenized_example = tokenizer_obj(orig_example)
   while state:
     _ = tokenized_example.items()
@@ -58,7 +58,7 @@ def tokenize_do_not_copy_pretokenized(state):
       "inputs": _TOKENIZER_CONFIG,
       "targets": _TOKENIZER_CONFIG,
   }
-  tokenizer_obj = airio.tokenizer.Tokenizer(
+  tokenizer_obj = airio.Tokenizer(
       tokenizer_configs=tokenizer_configs,
       copy_pretokenized=False,
   )
@@ -78,7 +78,7 @@ def tokenize_empty(state):
       "inputs": _TOKENIZER_CONFIG,
       "targets": _TOKENIZER_CONFIG,
   }
-  tokenizer_obj = airio.tokenizer.Tokenizer(tokenizer_configs=tokenizer_configs)
+  tokenizer_obj = airio.Tokenizer(tokenizer_configs=tokenizer_configs)
   tokenized_example = tokenizer_obj(orig_example)
   while state:
     _ = tokenized_example.items()

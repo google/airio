@@ -19,11 +19,9 @@ import functools
 import os
 from typing import Dict, Sequence
 
-import airio
-from airio import preprocessors as preprocessors_lib
-from airio.pygrain import dataset_providers
-from airio.pygrain import preprocessors as grain_preprocessors_lib
-from airio.pygrain.common import feature_converters
+import airio.core as airio_core
+import airio.pygrain as airio
+import airio.pygrain_common as airio_common
 import google_benchmark
 import jax
 import numpy as np
@@ -40,7 +38,7 @@ _TEST_DIR = os.path.join(
 _SENTENCEPIECE_VOCAB = vocabularies.SentencePieceVocabulary(
     os.path.join(_TEST_DIR, "sentencepiece", "sentencepiece.model")
 )
-_TOKENIZER_CONFIG = airio.tokenizer.TokenizerConfig(vocab=_SENTENCEPIECE_VOCAB)
+_TOKENIZER_CONFIG = airio.TokenizerConfig(vocab=_SENTENCEPIECE_VOCAB)
 
 
 def _imdb_preprocessor(raw_example: Dict[str, str]) -> Dict[str, str]:
@@ -55,11 +53,13 @@ def _imdb_preprocessor(raw_example: Dict[str, str]) -> Dict[str, str]:
   return final_example
 
 
-def _create_preprocessors() -> Sequence[preprocessors_lib.AirIOPreprocessor]:
+def _create_preprocessors() -> (
+    Sequence[airio_core.preprocessors.AirIOPreprocessor]
+):
   return [
-      preprocessors_lib.MapFnTransform(_imdb_preprocessor),
-      preprocessors_lib.MapFnTransform(
-          airio.tokenizer.Tokenizer(
+      airio.MapFnTransform(_imdb_preprocessor),
+      airio.MapFnTransform(
+          airio.Tokenizer(
               tokenizer_configs={
                   "inputs": _TOKENIZER_CONFIG,
                   "targets": _TOKENIZER_CONFIG,
@@ -70,9 +70,9 @@ def _create_preprocessors() -> Sequence[preprocessors_lib.AirIOPreprocessor]:
 
 
 def _create_runtime_preprocessors() -> (
-    Sequence[preprocessors_lib.AirIOPreprocessor]
+    Sequence[airio_core.preprocessors.AirIOPreprocessor]
 ):
-  return feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
+  return airio_common.feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
       pack=False,
       use_multi_bin_packing=False,
       passthrough_feature_keys=["inputs", "targets"],
@@ -85,14 +85,12 @@ def _create_source(
     source_name: str = _SOURCE_NAME,
     splits: Sequence[str] | None = None,
     num_examples: int = _SOURCE_NUM_EXAMPLES,
-) -> airio.data_sources.TfdsDataSource:
+) -> airio.TfdsDataSource:
   """Creates a basic TfdsDataSource."""
   if splits is None:
     splits = _SOURCE_SPLITS
   with tfds.testing.mock_data(num_examples):
-    return airio.data_sources.TfdsDataSource(
-        tfds_name=source_name, splits=splits
-    )
+    return airio.TfdsDataSource(tfds_name=source_name, splits=splits)
 
 
 def _create_fn_src(num_elements=5):
@@ -100,18 +98,18 @@ def _create_fn_src(num_elements=5):
     del split
     return np.arange(num_elements)
 
-  return airio.data_sources.FunctionDataSource(
-      dataset_fn=_dataset_fn, splits=["train"]
-  )
+  return airio.FunctionDataSource(dataset_fn=_dataset_fn, splits=["train"])
 
 
 def _create_task(
-    source: airio.data_sources.DataSource | None = None,
-    preprocessors: Sequence[preprocessors_lib.AirIOPreprocessor] | None = None,
+    source: airio_core.DataSource | None = None,
+    preprocessors: (
+        Sequence[airio_core.preprocessors.AirIOPreprocessor] | None
+    ) = None,
     task_name: str = "dummy_airio_task",
     num_elements: int = _SOURCE_NUM_EXAMPLES,
     idx: int = 1,
-) -> dataset_providers.GrainTask:
+) -> airio.GrainTask:
   """Create a simple task."""
   if source is None:
 
@@ -119,18 +117,14 @@ def _create_task(
       del split
       return np.arange(num_elements)
 
-    source = airio.data_sources.FunctionDataSource(
-        dataset_fn=dataset_fn, splits=["train"]
-    )
+    source = airio.FunctionDataSource(dataset_fn=dataset_fn, splits=["train"])
   if preprocessors is None:
 
     def map_fn(ex, idx):
       return {"idx": idx, "val": ex}
 
-    preprocessors = [
-        preprocessors_lib.MapFnTransform(functools.partial(map_fn, idx=idx))
-    ]
-  return dataset_providers.GrainTask(
+    preprocessors = [airio.MapFnTransform(functools.partial(map_fn, idx=idx))]
+  return airio.GrainTask(
       name=task_name,
       source=source,
       preprocessors=preprocessors,
@@ -138,14 +132,14 @@ def _create_task(
 
 
 def _create_mixture(
-    tasks: Sequence[dataset_providers.GrainTask] | None = None,
+    tasks: Sequence[airio.GrainTask] | None = None,
     proportions: Sequence[float] | None = None,
 ):
   if tasks is None:
     tasks = [_create_task(idx=1), _create_task(idx=2)]
   if proportions is None:
     proportions = [2.0, 1.0]
-  return dataset_providers.GrainMixture(
+  return airio.GrainMixture(
       name="test_mix",
       tasks=tasks,
       proportions=proportions,
@@ -153,13 +147,13 @@ def _create_mixture(
 
 
 class _TestFilterLazyDatasetIterator(
-    grain_preprocessors_lib.lazy_dataset.LazyDatasetIterator
+    airio.preprocessors.lazy_dataset.LazyDatasetIterator
 ):
   """Iterator that filters elements based on an int threshold."""
 
   def __init__(
       self,
-      parent: grain_preprocessors_lib.lazy_dataset.LazyDatasetIterator,
+      parent: airio.preprocessors.lazy_dataset.LazyDatasetIterator,
       threshold: int,
   ):
     super().__init__()
@@ -182,13 +176,13 @@ class _TestFilterLazyDatasetIterator(
 
 
 class TestFilterLazyIterDataset(
-    grain_preprocessors_lib.lazy_dataset.LazyIterDataset
+    airio.preprocessors.lazy_dataset.LazyIterDataset
 ):
   """LazyIterDataset thatfilters elements based on an int threshold."""
 
   def __init__(
       self,
-      parent: grain_preprocessors_lib.lazy_dataset.LazyIterDataset,
+      parent: airio.preprocessors.lazy_dataset.LazyIterDataset,
       threshold: int,
   ):
     super().__init__(parent)
@@ -205,7 +199,7 @@ class TestFilterLazyIterDataset(
 def task_create(state):
   source = _create_source()
   while state:
-    dataset_providers.GrainTask(
+    airio.GrainTask(
         name=f"{_SOURCE_NAME}_task",
         source=source,
         preprocessors=[],
@@ -217,7 +211,7 @@ def task_create_with_preprocessors(state):
   source = _create_source()
   preprocessors = _create_preprocessors()
   while state:
-    dataset_providers.GrainTask(
+    airio.GrainTask(
         name=f"{_SOURCE_NAME}_task",
         source=source,
         preprocessors=preprocessors,
@@ -279,9 +273,7 @@ def task_get_dataset_with_shard_info(state):
       source=_create_source(), preprocessors=_create_preprocessors()
   )
   while state:
-    _ = task.get_dataset(
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=1)
-    )
+    _ = task.get_dataset(shard_info=airio.ShardInfo(index=0, num_shards=1))
 
 
 @google_benchmark.register
@@ -291,13 +283,13 @@ def task_get_dataset_with_lazy_iter_prep(state):
   def test_map_fn(ex, idx):
     return {"idx": idx, "val": ex}
 
-  map_transform_idx_1 = preprocessors_lib.MapFnTransform(
+  map_transform_idx_1 = airio.MapFnTransform(
       functools.partial(test_map_fn, idx=1)
   )
   task_with_iter = _create_task(
       source=_create_fn_src(num_elements=10),
       preprocessors=[
-          grain_preprocessors_lib.LazyIterTransform(
+          airio.preprocessors.LazyIterTransform(
               lambda ds, *_: TestFilterLazyIterDataset(ds, threshold=4),
               update_runtime_args=lambda x: x,
           ),
@@ -313,9 +305,7 @@ def task_get_dataset_with_lazy_iter_prep(state):
 def task_get_dataset_with_lazy_iter_prep_with_runtime_preps_and_batching(state):
   """Analogous to the DatasetProvidersTest with the same name."""
 
-  def simple_to_imdb_map_fn(
-      ex, rargs: preprocessors_lib.AirIOInjectedRuntimeArgs
-  ):
+  def simple_to_imdb_map_fn(ex, rargs: airio.AirIOInjectedRuntimeArgs):
     return {
         "inputs_pretokenized": f"{ex}",
         "inputs": np.array([ex] * rargs.sequence_lengths["inputs"]),
@@ -323,12 +313,12 @@ def task_get_dataset_with_lazy_iter_prep_with_runtime_preps_and_batching(state):
         "targets": np.array([ex + 1] * rargs.sequence_lengths["targets"]),
     }
 
-  simple_to_imdb_prep = preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn)
+  simple_to_imdb_prep = airio.MapFnTransform(simple_to_imdb_map_fn)
 
   task_with_iter = _create_task(
       source=_create_fn_src(num_elements=10),
       preprocessors=[
-          grain_preprocessors_lib.LazyIterTransform(
+          airio.preprocessors.LazyIterTransform(
               lambda ds, *_: TestFilterLazyIterDataset(ds, threshold=4),
               update_runtime_args=lambda x: x,
           ),
@@ -353,13 +343,13 @@ def task_get_dataset_with_none_elements(state):
   def test_map_fn(ex, idx):
     return {"idx": idx, "val": ex}
 
-  map_transform_idx_1 = preprocessors_lib.MapFnTransform(
+  map_transform_idx_1 = airio.MapFnTransform(
       functools.partial(test_map_fn, idx=1)
   )
   task_with_none = _create_task(
       source=_create_fn_src(num_elements=10),
       preprocessors=[
-          preprocessors_lib.FilterFnTransform(lambda x: x > 4),
+          airio.FilterFnTransform(lambda x: x > 4),
           map_transform_idx_1,
       ],
       task_name="test_task_with_none",
@@ -372,9 +362,7 @@ def task_get_dataset_with_none_elements(state):
 def task_get_dataset_with_none_elements_with_runtime_preps_and_batching(state):
   """Analogous to the DatasetProvidersTest with the same name."""
 
-  def simple_to_imdb_map_fn(
-      ex, rargs: preprocessors_lib.AirIOInjectedRuntimeArgs
-  ):
+  def simple_to_imdb_map_fn(ex, rargs: airio.AirIOInjectedRuntimeArgs):
     return {
         "inputs_pretokenized": f"{ex}",
         "inputs": np.array([ex] * rargs.sequence_lengths["inputs"]),
@@ -382,11 +370,11 @@ def task_get_dataset_with_none_elements_with_runtime_preps_and_batching(state):
         "targets": np.array([ex + 1] * rargs.sequence_lengths["targets"]),
     }
 
-  simple_to_imdb_prep = preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn)
+  simple_to_imdb_prep = airio.MapFnTransform(simple_to_imdb_map_fn)
   task_with_iter = _create_task(
       source=_create_fn_src(num_elements=10),
       preprocessors=[
-          preprocessors_lib.FilterFnTransform(lambda x: x > 4),
+          airio.FilterFnTransform(lambda x: x > 4),
           simple_to_imdb_prep,
       ],
       task_name="test_task_with_none",
@@ -441,7 +429,7 @@ def function_get_dataset(state):
       source=_create_source(), preprocessors=_create_preprocessors()
   )
   while state:
-    _ = airio.dataset_providers.get_dataset(task)
+    _ = airio_core.dataset_providers.get_dataset(task)
 
 
 @google_benchmark.register
@@ -456,18 +444,18 @@ def task_get_updated_runtime_args(state):
     args.sequence_lengths.update({"another_val": 7})
     return args
 
-  prep_1 = preprocessors_lib.MapFnTransform(
+  prep_1 = airio.MapFnTransform(
       lambda x: x,
       update_runtime_args=update_runtime_args_1,
   )
-  prep_2 = preprocessors_lib.MapFnTransform(
+  prep_2 = airio.MapFnTransform(
       lambda x: x,
       update_runtime_args=update_runtime_args_2,
   )
-  task = dataset_providers.GrainTask(
+  task = airio.GrainTask(
       "test", source=_create_source(), preprocessors=[prep_1, prep_2]
   )
-  runtime_args = preprocessors_lib.AirIOInjectedRuntimeArgs(
+  runtime_args = airio.AirIOInjectedRuntimeArgs(
       sequence_lengths={"val": 3}, split="train"
   )
   while state:
@@ -478,19 +466,19 @@ def task_get_updated_runtime_args(state):
 def function_get_vocabularies(state):
   task = _create_task(source=_create_source(), preprocessors=[])
   while state:
-    _ = airio.dataset_providers.get_vocabularies(task)
+    _ = airio_core.dataset_providers.get_vocabularies(task)
 
 
 @google_benchmark.register
 def task_builder_from_task(state):
   task = _create_task(source=_create_source(), preprocessors=[])
   while state:
-    _ = dataset_providers.GrainTaskBuilder.from_task(task)
+    _ = airio.GrainTaskBuilder.from_task(task)
 
 
 @google_benchmark.register
 def task_builder_build(state):
-  task_builder = dataset_providers.GrainTaskBuilder(
+  task_builder = airio.GrainTaskBuilder(
       task_name="dummy_airio_task",
       source=_create_source(),
       preprocessors=_create_preprocessors(),
@@ -503,9 +491,7 @@ def task_builder_build(state):
 def task_get_dataset_with_runtime_args(state):
   """Analogous to the DatasetProvidersTest with the same name."""
 
-  def simple_to_imdb_map_fn(
-      ex, rargs: preprocessors_lib.AirIOInjectedRuntimeArgs
-  ):
+  def simple_to_imdb_map_fn(ex, rargs: airio.AirIOInjectedRuntimeArgs):
     return {
         "inputs_pretokenized": f"{ex}",
         "inputs": np.array([ex] * rargs.sequence_lengths["inputs"]),
@@ -515,7 +501,7 @@ def task_get_dataset_with_runtime_args(state):
 
   simple_task = _create_task(
       source=_create_fn_src(),
-      preprocessors=[preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn)],
+      preprocessors=[airio.MapFnTransform(simple_to_imdb_map_fn)],
   )
   while state:
     _ = simple_task.get_dataset(
@@ -527,9 +513,7 @@ def task_get_dataset_with_runtime_args(state):
 def task_get_dataset_by_step_with_runtime_args(state):
   """Analogous to the DatasetProvidersTest with the same name."""
 
-  def simple_to_imdb_map_fn(
-      ex, rargs: preprocessors_lib.AirIOInjectedRuntimeArgs
-  ):
+  def simple_to_imdb_map_fn(ex, rargs: airio.AirIOInjectedRuntimeArgs):
     return {
         "inputs_pretokenized": f"{ex}",
         "inputs": np.array([ex] * rargs.sequence_lengths["inputs"]),
@@ -539,7 +523,7 @@ def task_get_dataset_by_step_with_runtime_args(state):
 
   simple_task = _create_task(
       source=_create_fn_src(),
-      preprocessors=[preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn)],
+      preprocessors=[airio.MapFnTransform(simple_to_imdb_map_fn)],
   )
   while state:
     _ = simple_task.get_dataset_by_step(
@@ -574,7 +558,7 @@ def mixture_runtime_args_updated_by_task(state):
   """Analogous to the MixtureTest with the same name."""
 
   def update_runtime_args_fn(rargs):
-    return preprocessors_lib.AirIOInjectedRuntimeArgs(
+    return airio.AirIOInjectedRuntimeArgs(
         sequence_lengths={"inputs": 20, "targets": 10}, split=rargs.split
     )
 
@@ -582,18 +566,18 @@ def mixture_runtime_args_updated_by_task(state):
       source=_create_source(), preprocessors=_create_preprocessors()
   )
   task_with_runtime_args_update = (
-      dataset_providers.GrainTaskBuilder.from_task(task)
+      airio.GrainTaskBuilder.from_task(task)
       .set_preprocessors(
           task.get_preprocessors()
           + [
-              preprocessors_lib.MapFnTransform(
+              airio.MapFnTransform(
                   lambda x: x, update_runtime_args=update_runtime_args_fn
               ),
           ]
       )
       .build()
   )
-  mix = dataset_providers.GrainMixture(
+  mix = airio.GrainMixture(
       name="test_mix",
       tasks=[task_with_runtime_args_update],
       proportions=[1.0],
@@ -602,7 +586,7 @@ def mixture_runtime_args_updated_by_task(state):
     _ = mix.get_dataset(
         sequence_lengths={"xyz": 5, "abc": 7},  # will be updated
         shuffle=False,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
         runtime_preprocessors=_create_runtime_preprocessors(),
     )
@@ -621,7 +605,7 @@ def mixture_sharding(state):
   while state:
     _ = mix.get_dataset(
         shuffle=False,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.ShardInfo(index=0, num_shards=2),
     )
 
 
@@ -632,7 +616,7 @@ def mixture_shuffling(state):
     _ = mix.get_dataset(
         shuffle=True,
         seed=42,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.ShardInfo(index=0, num_shards=2),
     )
 
 
@@ -643,7 +627,7 @@ def multi_epoch(state):
     _ = mix.get_dataset(
         shuffle=True,
         seed=42,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.ShardInfo(index=0, num_shards=2),
         num_epochs=2,
     )
 
@@ -662,25 +646,25 @@ def multi_epoch_with_stochastic_preprocessor(state):
   def test_map_fn(ex, idx):
     return {"idx": idx, "val": ex}
 
-  map_transform_idx_1 = preprocessors_lib.MapFnTransform(
+  map_transform_idx_1 = airio.MapFnTransform(
       functools.partial(test_map_fn, idx=1)
   )
-  map_transform_idx_2 = preprocessors_lib.MapFnTransform(
+  map_transform_idx_2 = airio.MapFnTransform(
       functools.partial(test_map_fn, idx=2)
   )
   task1 = (
-      dataset_providers.GrainTaskBuilder.from_task(simple_task_1)
+      airio.GrainTaskBuilder.from_task(simple_task_1)
       .set_preprocessors([
           map_transform_idx_1,
-          preprocessors_lib.RandomMapFnTransform(test_random_map_fn),
+          airio.RandomMapFnTransform(test_random_map_fn),
       ])
       .build()
   )
   task2 = (
-      dataset_providers.GrainTaskBuilder.from_task(simple_task_2)
+      airio.GrainTaskBuilder.from_task(simple_task_2)
       .set_preprocessors([
           map_transform_idx_2,
-          preprocessors_lib.RandomMapFnTransform(test_random_map_fn),
+          airio.RandomMapFnTransform(test_random_map_fn),
       ])
       .build()
   )
@@ -691,7 +675,7 @@ def multi_epoch_with_stochastic_preprocessor(state):
         "train",
         shuffle=True,
         seed=42,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.ShardInfo(index=0, num_shards=2),
         num_epochs=2,
     )
 
@@ -702,7 +686,7 @@ def indefinite_repeat(state):
   while state:
     _ = mix.get_dataset(
         shuffle=False,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.ShardInfo(index=0, num_shards=2),
         num_epochs=None,
     )
 
@@ -714,9 +698,7 @@ def mixture_with_different_sources_and_preprocessors(state):
       source=_create_source(), preprocessors=_create_preprocessors()
   )
 
-  def simple_to_imdb_map_fn(
-      ex, rargs: preprocessors_lib.AirIOInjectedRuntimeArgs
-  ):
+  def simple_to_imdb_map_fn(ex, rargs: airio.AirIOInjectedRuntimeArgs):
     return {
         "inputs_pretokenized": f"{ex}",
         "inputs": np.array([ex] * rargs.sequence_lengths["inputs"]),
@@ -725,9 +707,9 @@ def mixture_with_different_sources_and_preprocessors(state):
     }
 
   simple_to_imdb_task = (
-      dataset_providers.GrainTaskBuilder.from_task(_create_task())
+      airio.GrainTaskBuilder.from_task(_create_task())
       .set_preprocessors([
-          preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn),
+          airio.MapFnTransform(simple_to_imdb_map_fn),
       ])
       .build()
   )
@@ -738,7 +720,7 @@ def mixture_with_different_sources_and_preprocessors(state):
     _ = mix.get_dataset(
         sequence_lengths={"inputs": 20, "targets": 10},
         shuffle=False,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
     )
 
@@ -750,9 +732,7 @@ def mixture_with_runtime_preps(state):
       source=_create_source(), preprocessors=_create_preprocessors()
   )
 
-  def simple_to_imdb_map_fn(
-      ex, rargs: preprocessors_lib.AirIOInjectedRuntimeArgs
-  ):
+  def simple_to_imdb_map_fn(ex, rargs: airio.AirIOInjectedRuntimeArgs):
     return {
         "inputs_pretokenized": f"{ex}",
         "inputs": np.array([ex] * rargs.sequence_lengths["inputs"]),
@@ -761,9 +741,9 @@ def mixture_with_runtime_preps(state):
     }
 
   simple_to_imdb_task = (
-      dataset_providers.GrainTaskBuilder.from_task(_create_task())
+      airio.GrainTaskBuilder.from_task(_create_task())
       .set_preprocessors([
-          preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn),
+          airio.MapFnTransform(simple_to_imdb_map_fn),
       ])
       .build()
   )
@@ -775,7 +755,7 @@ def mixture_with_runtime_preps(state):
     _ = mix.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
         runtime_preprocessors=_create_runtime_preprocessors(),
     )
@@ -788,9 +768,7 @@ def mixture_with_runtime_preps_and_batching(state):
       source=_create_source(), preprocessors=_create_preprocessors()
   )
 
-  def simple_to_imdb_map_fn(
-      ex, rargs: preprocessors_lib.AirIOInjectedRuntimeArgs
-  ):
+  def simple_to_imdb_map_fn(ex, rargs: airio.AirIOInjectedRuntimeArgs):
     return {
         "inputs_pretokenized": f"{ex}",
         "inputs": np.array([ex] * rargs.sequence_lengths["inputs"]),
@@ -799,9 +777,9 @@ def mixture_with_runtime_preps_and_batching(state):
     }
 
   simple_to_imdb_task = (
-      dataset_providers.GrainTaskBuilder.from_task(_create_task())
+      airio.GrainTaskBuilder.from_task(_create_task())
       .set_preprocessors([
-          preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn),
+          airio.MapFnTransform(simple_to_imdb_map_fn),
       ])
       .build()
   )
@@ -813,7 +791,7 @@ def mixture_with_runtime_preps_and_batching(state):
     _ = mix.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
         runtime_preprocessors=_create_runtime_preprocessors(),
         batch_size=2,
@@ -827,7 +805,7 @@ def mixture_with_batching_only(state):
     _ = mix.get_dataset(
         sequence_lengths={"inputs": 20, "targets": 10},
         shuffle=False,
-        shard_info=airio.dataset_providers.ShardInfo(index=0, num_shards=2),
+        shard_info=airio.ShardInfo(index=0, num_shards=2),
         num_epochs=1,
         runtime_preprocessors=None,
         batch_size=2,
@@ -841,10 +819,10 @@ def mixing_with_iter_test(state):
   def test_map_fn(ex, idx):
     return {"idx": idx, "val": ex}
 
-  map_transform_idx_1 = preprocessors_lib.MapFnTransform(
+  map_transform_idx_1 = airio.MapFnTransform(
       functools.partial(test_map_fn, idx=1)
   )
-  map_transform_idx_2 = preprocessors_lib.MapFnTransform(
+  map_transform_idx_2 = airio.MapFnTransform(
       functools.partial(test_map_fn, idx=2)
   )
   # Mix datasets that produce None elements and verify that mixture length and
@@ -852,7 +830,7 @@ def mixing_with_iter_test(state):
   task_with_none = _create_task(
       source=_create_fn_src(num_elements=10),
       preprocessors=[
-          preprocessors_lib.FilterFnTransform(lambda x: x > 4),
+          airio.FilterFnTransform(lambda x: x > 4),
           map_transform_idx_1,
       ],
       task_name="test_task_with_none",
@@ -873,9 +851,7 @@ def mixing_with_iter_test(state):
 def mixing_with_iter_test_with_runtime_preps_and_batching(state):
   """Analogous to the MixtureTest with the same name."""
 
-  def simple_to_imdb_map_fn(
-      ex, rargs: preprocessors_lib.AirIOInjectedRuntimeArgs
-  ):
+  def simple_to_imdb_map_fn(ex, rargs: airio.AirIOInjectedRuntimeArgs):
     return {
         "inputs_pretokenized": f"{ex}",
         "inputs": np.array([ex] * rargs.sequence_lengths["inputs"]),
@@ -883,14 +859,14 @@ def mixing_with_iter_test_with_runtime_preps_and_batching(state):
         "targets": np.array([ex + 1] * rargs.sequence_lengths["targets"]),
     }
 
-  simple_to_imdb_prep = preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn)
+  simple_to_imdb_prep = airio.MapFnTransform(simple_to_imdb_map_fn)
 
   # Mix datasets that produce None elements and verify that mixture length and
   # mixing rate are correct.
   task_with_none = _create_task(
       source=_create_fn_src(num_elements=10),
       preprocessors=[
-          preprocessors_lib.FilterFnTransform(lambda x: x > 4),
+          airio.FilterFnTransform(lambda x: x > 4),
           simple_to_imdb_prep,
       ],
       task_name="test_task_with_none",
@@ -922,10 +898,10 @@ def mixing_with_lazy_iter_preprocessor(state):
   def test_map_fn(ex, idx):
     return {"idx": idx, "val": ex}
 
-  map_transform_idx_1 = preprocessors_lib.MapFnTransform(
+  map_transform_idx_1 = airio.MapFnTransform(
       functools.partial(test_map_fn, idx=1)
   )
-  map_transform_idx_2 = preprocessors_lib.MapFnTransform(
+  map_transform_idx_2 = airio.MapFnTransform(
       functools.partial(test_map_fn, idx=2)
   )
   # Mix tasks with LazyIter preprocessors and verify that mixture length and
@@ -933,7 +909,7 @@ def mixing_with_lazy_iter_preprocessor(state):
   task_with_iter = _create_task(
       source=_create_fn_src(num_elements=10),
       preprocessors=[
-          grain_preprocessors_lib.LazyIterTransform(
+          airio.preprocessors.LazyIterTransform(
               lambda ds, *_: TestFilterLazyIterDataset(ds, threshold=4),
               update_runtime_args=lambda x: x,
           ),
@@ -957,9 +933,7 @@ def mixing_with_lazy_iter_preprocessor(state):
 def mixing_with_lazy_iter_preprocessor_with_runtime_preps_and_batching(state):
   """Analogous to the MixtureTest with the same name."""
 
-  def simple_to_imdb_map_fn(
-      ex, rargs: preprocessors_lib.AirIOInjectedRuntimeArgs
-  ):
+  def simple_to_imdb_map_fn(ex, rargs: airio.AirIOInjectedRuntimeArgs):
     return {
         "inputs_pretokenized": f"{ex}",
         "inputs": np.array([ex] * rargs.sequence_lengths["inputs"]),
@@ -967,14 +941,14 @@ def mixing_with_lazy_iter_preprocessor_with_runtime_preps_and_batching(state):
         "targets": np.array([ex + 1] * rargs.sequence_lengths["targets"]),
     }
 
-  simple_to_imdb_prep = preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn)
+  simple_to_imdb_prep = airio.MapFnTransform(simple_to_imdb_map_fn)
 
   # Mix tasks with LazyIter preprocessors and verify that mixture length and
   # mixing rate are correct.
   task_with_none = _create_task(
       source=_create_fn_src(num_elements=10),
       preprocessors=[
-          grain_preprocessors_lib.LazyIterTransform(
+          airio.preprocessors.LazyIterTransform(
               lambda ds, *_: TestFilterLazyIterDataset(ds, threshold=4),
               update_runtime_args=lambda x: x,
           ),

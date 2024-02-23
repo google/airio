@@ -19,8 +19,7 @@ import os
 import tempfile
 from typing import Dict
 
-import airio
-from airio.pygrain import dataset_iterators
+import airio.pygrain as airio
 import google_benchmark
 import grain.python as grain
 from seqio import vocabularies
@@ -33,7 +32,7 @@ _TEST_DIR = os.path.join(
 _SENTENCEPIECE_VOCAB = vocabularies.SentencePieceVocabulary(
     os.path.join(_TEST_DIR, "sentencepiece", "sentencepiece.model")
 )
-_TOKENIZER_CONFIG = airio.tokenizer.TokenizerConfig(vocab=_SENTENCEPIECE_VOCAB)
+_TOKENIZER_CONFIG = airio.TokenizerConfig(vocab=_SENTENCEPIECE_VOCAB)
 
 
 def parse_and_preprocess(raw_example: bytes) -> Dict[str, str]:
@@ -60,9 +59,9 @@ def get_data_loader() -> grain.DataLoader:
           num_records=_SOURCE_NUM_EXAMPLES, shard_options=grain.NoSharding()
       ),
       operations=[
-          airio.preprocessors.MapFnTransform(parse_and_preprocess),
-          airio.preprocessors.MapFnTransform(
-              airio.tokenizer.Tokenizer(
+          airio.MapFnTransform(parse_and_preprocess),
+          airio.MapFnTransform(
+              airio.Tokenizer(
                   tokenizer_configs={
                       "inputs": _TOKENIZER_CONFIG,
                       "targets": _TOKENIZER_CONFIG,
@@ -77,13 +76,13 @@ def get_data_loader() -> grain.DataLoader:
 def dataset_iterator_create(state):
   data_loader = get_data_loader()
   while state:
-    dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader)
+    airio.dataset_iterators.PyGrainDatasetIteratorWrapper(data_loader)
 
 
 @google_benchmark.register
 def dataset_iterator_next(state):
   data_loader = get_data_loader()
-  iterator_wrapper = dataset_iterators.PyGrainDatasetIteratorWrapper(
+  iterator_wrapper = airio.dataset_iterators.PyGrainDatasetIteratorWrapper(
       data_loader
   )
   iterator_state = iterator_wrapper.get_state()
@@ -97,7 +96,7 @@ def dataset_iterator_next(state):
 @google_benchmark.register
 def dataset_iterator_element_spec(state):
   data_loader = get_data_loader()
-  iterator_wrapper = dataset_iterators.PyGrainDatasetIteratorWrapper(
+  iterator_wrapper = airio.dataset_iterators.PyGrainDatasetIteratorWrapper(
       data_loader
   )
   while state:
@@ -107,7 +106,7 @@ def dataset_iterator_element_spec(state):
 @google_benchmark.register
 def dataset_iterator_peek(state):
   data_loader = get_data_loader()
-  iterator_wrapper = dataset_iterators.PyGrainDatasetIteratorWrapper(
+  iterator_wrapper = airio.dataset_iterators.PyGrainDatasetIteratorWrapper(
       data_loader
   )
   while state:
@@ -117,7 +116,7 @@ def dataset_iterator_peek(state):
 @google_benchmark.register
 def dataset_iterator_peek_async(state):
   data_loader = get_data_loader()
-  iterator_wrapper = dataset_iterators.PyGrainDatasetIteratorWrapper(
+  iterator_wrapper = airio.dataset_iterators.PyGrainDatasetIteratorWrapper(
       data_loader
   )
   while state:
@@ -127,7 +126,7 @@ def dataset_iterator_peek_async(state):
 @google_benchmark.register
 def dataset_iterator_get_state(state):
   data_loader = get_data_loader()
-  iterator_wrapper = dataset_iterators.PyGrainDatasetIteratorWrapper(
+  iterator_wrapper = airio.dataset_iterators.PyGrainDatasetIteratorWrapper(
       data_loader
   )
   while state:
@@ -138,7 +137,7 @@ def dataset_iterator_get_state(state):
 def dataset_iterator_set_state(state):
   """Measures setting state."""
   data_loader = get_data_loader()
-  iterator_wrapper = dataset_iterators.PyGrainDatasetIteratorWrapper(
+  iterator_wrapper = airio.dataset_iterators.PyGrainDatasetIteratorWrapper(
       data_loader
   )
   iterator_state = iterator_wrapper.get_state()
@@ -151,7 +150,7 @@ def dataset_iterator_set_state(state):
 @google_benchmark.register
 def dataset_iterator_save(state):
   data_loader = get_data_loader()
-  iterator_wrapper = dataset_iterators.PyGrainDatasetIteratorWrapper(
+  iterator_wrapper = airio.dataset_iterators.PyGrainDatasetIteratorWrapper(
       data_loader
   )
   with tempfile.NamedTemporaryFile(delete=False) as temp_state_file:
@@ -162,7 +161,7 @@ def dataset_iterator_save(state):
 @google_benchmark.register
 def dataset_iterator_restore(state):
   data_loader = get_data_loader()
-  iterator_wrapper = dataset_iterators.PyGrainDatasetIteratorWrapper(
+  iterator_wrapper = airio.dataset_iterators.PyGrainDatasetIteratorWrapper(
       data_loader
   )
   with tempfile.NamedTemporaryFile(delete=False) as temp_state_file:

@@ -18,10 +18,8 @@ import functools
 import logging
 
 from absl import logging
-import airio
-from airio.pygrain import dataset_providers
-from airio.pygrain.common import preprocessors as ap
-from airio.pygrain.common import span_corruption as asc
+import airio.pygrain as airio
+import airio.pygrain_common as airio_common
 import babel
 from seqio import preprocessors as seqio_preprocessors
 from seqio import vocabularies
@@ -35,8 +33,8 @@ _DEFAULT_VOCAB = vocabularies.SentencePieceVocabulary(
 
 
 def get_wmt_19_ende_v003_task(
-    tokenizer_configs: dict[str, airio.tokenizer.TokenizerConfig] | None = None,
-) -> dataset_providers.GrainTask:
+    tokenizer_configs: dict[str, airio.TokenizerConfig] | None = None,
+) -> airio.GrainTask:
   """Returns an AirIO Task for WMT 19 en/de dataset."""
   # source
   builder_config = tfds.translate.wmt19.Wmt19Translate.builder_configs["de-en"]
@@ -46,25 +44,25 @@ def get_wmt_19_ende_v003_task(
   # tokenizer
   if tokenizer_configs is None:
     tokenizer_configs = {
-        "inputs": airio.tokenizer.TokenizerConfig(vocab=_DEFAULT_VOCAB),
-        "targets": airio.tokenizer.TokenizerConfig(vocab=_DEFAULT_VOCAB),
+        "inputs": airio.TokenizerConfig(vocab=_DEFAULT_VOCAB),
+        "targets": airio.TokenizerConfig(vocab=_DEFAULT_VOCAB),
     }
 
-  return dataset_providers.GrainTask(
+  return airio.GrainTask(
       "wmt19_ende_v003",
-      source=airio.data_sources.TfdsDataSource(
+      source=airio.TfdsDataSource(
           tfds_name=tfds_name, splits=["train", "validation"]
       ),
       preprocessors=[
-          airio.preprocessors.MapFnTransform(
+          airio.MapFnTransform(
               functools.partial(
                   translate,
                   source_language=builder_config.language_pair[1],
                   target_language=builder_config.language_pair[0],
               )
           ),
-          airio.preprocessors.MapFnTransform(
-              airio.tokenizer.Tokenizer(
+          airio.MapFnTransform(
+              airio.Tokenizer(
                   tokenizer_configs=tokenizer_configs,
                   copy_pretokenized=False,
               )
@@ -74,8 +72,8 @@ def get_wmt_19_ende_v003_task(
 
 
 def get_nqo_v001_task(
-    tokenizer_configs: dict[str, airio.tokenizer.TokenizerConfig] | None = None,
-) -> dataset_providers.GrainTask:
+    tokenizer_configs: dict[str, airio.TokenizerConfig] | None = None,
+) -> airio.GrainTask:
   """Create example AirIO task."""
 
   # source
@@ -85,19 +83,19 @@ def get_nqo_v001_task(
   # tokenizer
   if tokenizer_configs is None:
     tokenizer_configs = {
-        "inputs": airio.tokenizer.TokenizerConfig(vocab=_DEFAULT_VOCAB),
-        "targets": airio.tokenizer.TokenizerConfig(vocab=_DEFAULT_VOCAB),
+        "inputs": airio.TokenizerConfig(vocab=_DEFAULT_VOCAB),
+        "targets": airio.TokenizerConfig(vocab=_DEFAULT_VOCAB),
     }
 
-  return dataset_providers.GrainTask(
+  return airio.GrainTask(
       name="dummy_airio_task",
-      source=airio.data_sources.TfdsDataSource(
+      source=airio.TfdsDataSource(
           tfds_name=tfds_name, splits=["train", "validation"]
       ),
       preprocessors=[
-          airio.preprocessors.MapFnTransform(question),
-          airio.preprocessors.MapFnTransform(
-              airio.tokenizer.Tokenizer(
+          airio.MapFnTransform(question),
+          airio.MapFnTransform(
+              airio.Tokenizer(
                   tokenizer_configs=tokenizer_configs,
                   copy_pretokenized=False,
               )
@@ -196,34 +194,37 @@ def append_eos_after_trim(
 
 
 def get_c4_v220_span_corruption_task(
-    tokenizer_configs: dict[str, airio.tokenizer.TokenizerConfig] | None = None,
+    tokenizer_configs: dict[str, airio.TokenizerConfig] | None = None,
 ):
   """AirIO Task for C4 span corruption."""
   rekey_fn = functools.partial(
-      ap.rekey, key_map={"inputs": None, "targets": "text"}
+      airio_common.preprocessors.rekey,
+      key_map={"inputs": None, "targets": "text"},
   )
   vocab = _DEFAULT_VOCAB
   if tokenizer_configs is None:
     tokenizer_configs = {
-        "inputs": airio.tokenizer.TokenizerConfig(vocab=vocab, add_eos=True),
-        "targets": airio.tokenizer.TokenizerConfig(vocab=vocab, add_eos=True),
+        "inputs": airio.TokenizerConfig(vocab=vocab, add_eos=True),
+        "targets": airio.TokenizerConfig(vocab=vocab, add_eos=True),
     }
   append_eos_after_trim_fn = functools.partial(
       append_eos_after_trim, tokenizer_configs=tokenizer_configs
   )
-  return dataset_providers.GrainTask(
+  return airio.GrainTask(
       "c4_v220_span_corruption",
-      source=airio.data_sources.TfdsDataSource(
+      source=airio.TfdsDataSource(
           tfds_name="c4/en:2.2.0", splits=["train", "validation"]
       ),
       preprocessors=[
           airio.MapFnTransform(rekey_fn),
           airio.MapFnTransform(
-              airio.tokenizer.Tokenizer(
+              airio.Tokenizer(
                   tokenizer_configs=tokenizer_configs,
               )
           ),
-          asc.create_span_corruption_transform(tokenizer_configs),
+          airio_common.span_corruption.create_span_corruption_transform(
+              tokenizer_configs
+          ),
           airio.MapFnTransform(append_eos_after_trim_fn),
       ],
   )

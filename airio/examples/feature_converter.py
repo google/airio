@@ -17,9 +17,8 @@
 from typing import Dict
 
 from absl import app
-import airio
-from airio.pygrain import dataset_providers as grain_dataset_providers
-from airio.pygrain.common import feature_converters
+import airio.pygrain as airio
+import airio.pygrain_common as airio_common
 from seqio import vocabularies
 
 
@@ -27,7 +26,7 @@ DEFAULT_SPM_PATH = "gs://t5-data/vocabs/mc4.250000.100extra/sentencepiece.model"
 DEFAULT_VOCAB = vocabularies.SentencePieceVocabulary(DEFAULT_SPM_PATH)
 
 
-def create_task() -> grain_dataset_providers.GrainTask:
+def create_task() -> airio.GrainTask:
   """Create example AirIO task."""
 
   def _imdb_preprocessor(raw_example: Dict[str, bytes]) -> Dict[str, str]:
@@ -41,22 +40,18 @@ def create_task() -> grain_dataset_providers.GrainTask:
       final_example["targets"] = "invalid"
     return final_example
 
-  return grain_dataset_providers.GrainTask(
+  return airio.GrainTask(
       name="dummy_airio_task",
-      source=airio.data_sources.TfdsDataSource(
+      source=airio.TfdsDataSource(
           tfds_name="imdb_reviews/plain_text:1.0.0", splits=["train"]
       ),
       preprocessors=[
-          airio.preprocessors.MapFnTransform(_imdb_preprocessor),
-          airio.preprocessors.MapFnTransform(
-              airio.tokenizer.Tokenizer(
+          airio.MapFnTransform(_imdb_preprocessor),
+          airio.MapFnTransform(
+              airio.Tokenizer(
                   tokenizer_configs={
-                      "inputs": airio.tokenizer.TokenizerConfig(
-                          vocab=DEFAULT_VOCAB
-                      ),
-                      "targets": airio.tokenizer.TokenizerConfig(
-                          vocab=DEFAULT_VOCAB
-                      ),
+                      "inputs": airio.TokenizerConfig(vocab=DEFAULT_VOCAB),
+                      "targets": airio.TokenizerConfig(vocab=DEFAULT_VOCAB),
                   },
               )
           ),
@@ -67,14 +62,12 @@ def create_task() -> grain_dataset_providers.GrainTask:
 def main(_) -> None:
   task = create_task()
   print(f"Task name: {task.name}\n")
-  runtime_preprocessors = (
-      feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
-          pack=False,
-          use_multi_bin_packing=False,
-          passthrough_feature_keys=[],
-          pad_id=0,
-          bos_id=0,
-      )
+  runtime_preprocessors = airio_common.feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
+      pack=False,
+      use_multi_bin_packing=False,
+      passthrough_feature_keys=[],
+      pad_id=0,
+      bos_id=0,
   )
   ds = task.get_dataset(
       sequence_lengths={"inputs": 30, "targets": 5},

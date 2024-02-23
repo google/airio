@@ -16,8 +16,7 @@
 
 import os
 
-import airio
-from airio.pygrain import data_sources
+import airio.pygrain as airio
 import google_benchmark
 import numpy as np
 import tensorflow_datasets as tfds
@@ -38,14 +37,14 @@ def generate_function_data_source(split: str):
 @google_benchmark.register
 def function_data_source_create(state):
   while state:
-    airio.data_sources.FunctionDataSource(
+    airio.FunctionDataSource(
         dataset_fn=generate_function_data_source, splits=_SOURCE_SPLITS
     )
 
 
 @google_benchmark.register
 def function_data_source_get(state):
-  ds = airio.data_sources.FunctionDataSource(
+  ds = airio.FunctionDataSource(
       dataset_fn=generate_function_data_source, splits=_SOURCE_SPLITS
   )
   while state:
@@ -55,7 +54,7 @@ def function_data_source_get(state):
 
 @google_benchmark.register
 def function_data_source_num_input_examples(state):
-  ds = airio.data_sources.FunctionDataSource(
+  ds = airio.FunctionDataSource(
       dataset_fn=generate_function_data_source, splits=_SOURCE_SPLITS
   )
   while state:
@@ -65,7 +64,7 @@ def function_data_source_num_input_examples(state):
 
 @google_benchmark.register
 def function_data_source_splits(state):
-  ds = airio.data_sources.FunctionDataSource(
+  ds = airio.FunctionDataSource(
       dataset_fn=generate_function_data_source, splits=_SOURCE_SPLITS
   )
   while state:
@@ -76,17 +75,13 @@ def function_data_source_splits(state):
 def tfds_data_source_create(state):
   with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
     while state:
-      airio.data_sources.TfdsDataSource(
-          tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS
-      )
+      airio.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS)
 
 
 @google_benchmark.register
 def tfds_data_source_get(state):
   with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
-    ds = airio.data_sources.TfdsDataSource(
-        tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS
-    )
+    ds = airio.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS)
   while state:
     for split in _SOURCE_SPLITS:
       _ = ds.get_data_source(split)
@@ -95,9 +90,7 @@ def tfds_data_source_get(state):
 @google_benchmark.register
 def tfds_data_source_num_input_examples(state):
   with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
-    ds = airio.data_sources.TfdsDataSource(
-        tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS
-    )
+    ds = airio.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS)
   while state:
     for split in _SOURCE_SPLITS:
       _ = ds.num_input_examples(split)
@@ -106,9 +99,7 @@ def tfds_data_source_num_input_examples(state):
 @google_benchmark.register
 def tfds_data_source_splits(state):
   with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
-    ds = airio.data_sources.TfdsDataSource(
-        tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS
-    )
+    ds = airio.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS)
   while state:
     _ = ds.splits
 

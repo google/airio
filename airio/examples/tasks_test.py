@@ -18,9 +18,9 @@ import multiprocessing as mp  # pylint:disable=unused-import
 import os
 
 from absl.testing import absltest
-import airio
 from airio import examples
-from airio.pygrain.common import feature_converters
+import airio.pygrain as airio
+import airio.pygrain_common as airio_common
 from seqio import vocabularies
 import tensorflow_datasets as tfds
 
@@ -40,7 +40,7 @@ def _pad(
 
 
 def _get_runtime_preprocessors(pack=False):
-  return feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
+  return airio_common.feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
       pack=pack,
       use_multi_bin_packing=False,
       passthrough_feature_keys=[],
@@ -61,8 +61,8 @@ class TasksTest(absltest.TestCase):
         os.path.join(self.test_dir, "sentencepiece", "sentencepiece.model")
     )
     self.tokenizer_configs = {
-        "inputs": airio.tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),
-        "targets": airio.tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),
+        "inputs": airio.TokenizerConfig(vocab=sentencepiece_vocab),
+        "targets": airio.TokenizerConfig(vocab=sentencepiece_vocab),
     }
 
   def test_wmt_task_with_multiprocessing(self):
@@ -561,14 +561,12 @@ class TasksTest(absltest.TestCase):
       task = examples.tasks.get_c4_v220_span_corruption_task(
           tokenizer_configs=self.tokenizer_configs
       )
-    runtime_preprocessors = (
-        feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
-            pack=False,
-            use_multi_bin_packing=False,
-            passthrough_feature_keys=[],
-            pad_id=0,
-            bos_id=0,
-        )
+    runtime_preprocessors = airio_common.feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
+        pack=False,
+        use_multi_bin_packing=False,
+        passthrough_feature_keys=[],
+        pad_id=0,
+        bos_id=0,
     )
     source_sequence_length = 1024
     sequence_lengths = {

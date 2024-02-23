@@ -17,9 +17,9 @@
 import functools
 import os
 
-import airio
 from airio import examples
-from airio.pygrain.common import feature_converters
+import airio.pygrain as airio
+import airio.pygrain_common as airio_common
 import google_benchmark
 import jax
 import jax.numpy as jnp
@@ -66,8 +66,8 @@ def _get_tokenizer_configs():
       os.path.join(test_dir, "sentencepiece", "sentencepiece.model")
   )
   return {
-      "inputs": airio.tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),
-      "targets": airio.tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),
+      "inputs": airio.TokenizerConfig(vocab=sentencepiece_vocab),
+      "targets": airio.TokenizerConfig(vocab=sentencepiece_vocab),
   }
 
 
@@ -134,14 +134,12 @@ def c4_span_corruption_generated_data_benchmark(state):
     c4_task = examples.tasks.get_c4_v220_span_corruption_task(
         tokenizer_configs=_get_tokenizer_configs()
     )
-  runtime_preprocessors = (
-      feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
-          pack=False,
-          use_multi_bin_packing=False,
-          passthrough_feature_keys=[],
-          pad_id=0,
-          bos_id=0,
-      )
+  runtime_preprocessors = airio_common.feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
+      pack=False,
+      use_multi_bin_packing=False,
+      passthrough_feature_keys=[],
+      pad_id=0,
+      bos_id=0,
   )
   sequence_lengths = {"inputs": 1024, "targets": 1024}
   ds = c4_task.get_dataset(
@@ -176,14 +174,12 @@ def c4_span_corruption_from_file_benchmark(state):
   c4_task = examples.tasks.get_c4_v220_span_corruption_task(
       tokenizer_configs=_get_tokenizer_configs()
   )
-  runtime_preprocessors = (
-      feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
-          pack=False,
-          use_multi_bin_packing=False,
-          passthrough_feature_keys=[],
-          pad_id=0,
-          bos_id=0,
-      )
+  runtime_preprocessors = airio_common.feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
+      pack=False,
+      use_multi_bin_packing=False,
+      passthrough_feature_keys=[],
+      pad_id=0,
+      bos_id=0,
   )
   sequence_lengths = {"inputs": 1024, "targets": 1024}
   ds = c4_task.get_dataset(

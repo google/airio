@@ -43,7 +43,14 @@ setuptools.setup(
     author_email='no-reply@google.com',
     url='http://github.com/google/airio',
     license='Apache 2.0',
-    packages=setuptools.find_packages(),
+    py_modules=['core', 'pygrain', 'pygrain_common'],
+    packages=[
+        'airio',
+        'airio._src',
+        'airio._src.core',
+        'airio._src.pygrain',
+        'airio._src.pygrain.common',
+    ],
     include_package_data=True,
     scripts=[],
     install_requires=[
