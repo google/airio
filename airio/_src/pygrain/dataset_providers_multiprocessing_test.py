@@ -21,13 +21,14 @@ from typing import Dict, Sequence
 from unittest import mock
 
 from absl.testing import absltest
-from airio._src.core import data_sources
+from airio._src.core import data_sources as core_data_sources
 from airio._src.core import dataset_providers as core_dataset_providers
 # Import "preprocessors" as "preprocessors_lib" to prevent naming conflicts with
 # "preprocessors" attrs in this file.
 from airio._src.core import preprocessors as core_preprocessors_lib
 from airio._src.core import test_utils
 from airio._src.core import tokenizer
+from airio._src.pygrain import data_sources
 from airio._src.pygrain import dataset_providers
 from airio._src.pygrain import preprocessors as preprocessors_lib
 from airio._src.pygrain.common import feature_converters
@@ -161,13 +162,13 @@ def _create_fn_src(num_elements=5):
     del split
     return np.arange(num_elements)
 
-  return data_sources.FunctionDataSource(
+  return core_data_sources.FunctionDataSource(
       dataset_fn=_dataset_fn, splits=["train"]
   )
 
 
 def _create_task(
-    source: data_sources.DataSource | None,
+    source: core_data_sources.DataSource | None,
     preprocessors: (
         Sequence[preprocessors_lib.PyGrainAirIOPreprocessor] | None
     ) = None,

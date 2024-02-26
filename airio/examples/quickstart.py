@@ -21,7 +21,9 @@ import airio.pygrain as airio
 from seqio import vocabularies
 
 
-DEFAULT_SPM_PATH = "gs://t5-data/vocabs/mc4.250000.100extra/sentencepiece.model"
+DEFAULT_SPM_PATH = (
+    "gs://t5-data/vocabs/mc4.250000.100extra/sentencepiece.model"
+)
 DEFAULT_VOCAB = vocabularies.SentencePieceVocabulary(DEFAULT_SPM_PATH)
 
 

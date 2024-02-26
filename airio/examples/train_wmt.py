@@ -23,6 +23,7 @@ import tempfile
 from absl import app
 from airio import examples
 import airio.pygrain as airio
+from airio.pygrain_common import feature_converters
 from seqio import vocabularies
 from t5x import adafactor
 from t5x import gin_utils
@@ -74,6 +75,15 @@ def get_t5_model(**config_overrides) -> models.EncoderDecoderModel:
 
 def create_train_fn(task: airio.GrainTask):
   """Returns a callable function for training."""
+  runtime_preprocessors = (
+      feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
+          pack=True,
+          use_multi_bin_packing=False,
+          passthrough_feature_keys=[],
+          pad_id=0,
+          bos_id=0,
+      )
+  )
   train_dataset_cfg = utils.DatasetConfig(
       mixture_or_task_name=task,
       task_feature_lengths={
@@ -86,6 +96,7 @@ def create_train_fn(task: airio.GrainTask):
       pack=False,
       use_cached=False,
       seed=0,
+      runtime_preprocessors=runtime_preprocessors,
   )
   eval_dataset_cfg = utils.DatasetConfig(
       mixture_or_task_name=task,
@@ -99,6 +110,7 @@ def create_train_fn(task: airio.GrainTask):
       pack=False,
       use_cached=False,
       seed=0,
+      runtime_preprocessors=runtime_preprocessors,
   )
   partitioner = partitioning.PjitPartitioner(num_partitions=4)
   trainer_cls = functools.partial(

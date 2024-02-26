@@ -25,6 +25,7 @@ from airio._src.core import dataset_providers
 from airio._src.core import preprocessors as preprocessors_lib
 from airio._src.core import test_utils
 from airio._src.core import tokenizer
+from airio._src.pygrain import data_sources as pygrain_data_sources
 from airio._src.pygrain import dataset_providers as pygrain_dataset_providers
 import grain.python as grain
 import numpy as np
@@ -84,12 +85,14 @@ def _create_source(
     source_name: str = _SOURCE_NAME,
     splits: Sequence[str] | None = None,
     num_examples: int = _SOURCE_NUM_EXAMPLES,
-) -> data_sources.TfdsDataSource:
+) -> pygrain_data_sources.TfdsDataSource:
   """Creates a basic TfdsDataSource."""
   if splits is None:
     splits = _SOURCE_SPLITS
   with tfds.testing.mock_data(num_examples):
-    return data_sources.TfdsDataSource(tfds_name=source_name, splits=splits)
+    return pygrain_data_sources.TfdsDataSource(
+        tfds_name=source_name, splits=splits
+    )
 
 
 def _create_fn_src(num_elements=5):
@@ -211,13 +214,13 @@ class TaskTest(absltest.TestCase):
   def test_create_task_with_source_only_succeeds(self):
     task = _create_task(source=_create_source(), preprocessors=None)
     self.assertIsInstance(task.source, data_sources.DataSource)
-    self.assertIsInstance(task.source, data_sources.TfdsDataSource)
+    self.assertIsInstance(task.source, pygrain_data_sources.TfdsDataSource)
     self.assertEmpty(task.get_preprocessors())
 
   def test_create_task_with_source_and_empty_preprocessors_succeeds(self):
     task = _create_task(source=_create_source(), preprocessors=[])
     self.assertIsInstance(task.source, data_sources.DataSource)
-    self.assertIsInstance(task.source, data_sources.TfdsDataSource)
+    self.assertIsInstance(task.source, pygrain_data_sources.TfdsDataSource)
     self.assertEmpty(task.get_preprocessors())
 
   def test_create_task(self):
@@ -228,7 +231,7 @@ class TaskTest(absltest.TestCase):
         task_name="dummy_airio_task",
     )
     self.assertIsInstance(task.source, data_sources.DataSource)
-    self.assertIsInstance(task.source, data_sources.TfdsDataSource)
+    self.assertIsInstance(task.source, pygrain_data_sources.TfdsDataSource)
     self.assertEqual(task.name, "dummy_airio_task")
     self.assertEqual(task.splits, _SOURCE_SPLITS)
 
@@ -239,7 +242,9 @@ class TaskTest(absltest.TestCase):
 
   def test_none_splits(self):
     with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
-      source = data_sources.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=None)
+      source = pygrain_data_sources.TfdsDataSource(
+          tfds_name=_SOURCE_NAME, splits=None
+      )
     task = _create_task(source=source, preprocessors=_create_preprocessors())
     self.assertEmpty(task.splits)
 
@@ -355,7 +360,7 @@ class TaskBuilderTest(absltest.TestCase):
     self.assertStartsWith(
         repr(task_builder),
         "TaskBuilder(task_name=dummy_airio_task,"
-        " source=<airio._src.core.data_sources.TfdsDataSource",
+        " source=<airio._src.pygrain.data_sources.TfdsDataSource",
     )
 
 
