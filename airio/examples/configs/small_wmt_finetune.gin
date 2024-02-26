@@ -6,7 +6,7 @@ include "third_party/py/t5x/examples/t5/t5_1_1/small.gin"
 include "third_party/py/t5x/configs/runs/finetune.gin"
 
 import airio.examples.tasks
-from airio.pygrain.common import feature_converters
+import airio.pygrain_common as airio_common
 from t5x import utils
 
 MIXTURE_OR_TASK_NAME = @airio.examples.tasks.get_wmt_19_ende_v003_task()
@@ -26,12 +26,12 @@ train_script.train:
   infer_eval_dataset_cfg = None
 
 train/utils.DatasetConfig:
-  runtime_preprocessors = @feature_converters.get_t5x_enc_dec_feature_converter_preprocessors()
+  runtime_preprocessors = @airio_common.feature_converters.get_t5x_enc_dec_feature_converter_preprocessors()
   seed = 94043
   num_prefetch_threads = 16
   num_workers = 16
 
-feature_converters.get_t5x_enc_dec_feature_converter_preprocessors:
+airio_common.feature_converters.get_t5x_enc_dec_feature_converter_preprocessors:
   pack=True
   use_multi_bin_packing=False
   passthrough_feature_keys=[]
