@@ -25,7 +25,6 @@ from ._src.core import tokenizer
 # Individual members and functions.
 from ._src.core.data_sources import DataSource
 from ._src.core.data_sources import FunctionDataSource
-from ._src.core.data_sources import TfdsDataSource
 from ._src.core.dataset_iterators import AirIODatasetIterator
 from ._src.core.dataset_providers import DatasetProviderBase
 from ._src.core.dataset_providers import get_dataset
