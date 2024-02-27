@@ -17,8 +17,8 @@
 from unittest import mock
 
 from absl.testing import absltest
-from airio._src.core import data_sources as core_data_sources
 from airio._src.core import preprocessors as core_preprocessors_lib
+from airio._src.pygrain import data_sources
 from airio._src.pygrain import dataset_providers
 from airio._src.pygrain import preprocessors
 import grain.python as grain
@@ -47,16 +47,18 @@ def _lazy_iter_fn(
   return ds.map(lambda x: x + run_args.sequence_lengths["val"] + n)
 
 
+def _get_test_src(num_elements=5):
+
+  def _dataset_fn(split: str):
+    del split
+    return np.array(range(num_elements))
+
+  return data_sources.FunctionDataSource(
+      dataset_fn=_dataset_fn, splits=["train"]
+  )
+
+
 class PreprocessorsTest(absltest.TestCase):
-
-  def _get_test_src(self, num_elements=5):
-    def _dataset_fn(split: str):
-      del split
-      return np.array(range(num_elements))
-
-    return core_data_sources.FunctionDataSource(
-        dataset_fn=_dataset_fn, splits=["train"]
-    )
 
   def test_map_fn_preprocessor(self):
     def test_map_fn(ex):
@@ -64,7 +66,7 @@ class PreprocessorsTest(absltest.TestCase):
 
     task = dataset_providers.GrainTask(
         name="test_task",
-        source=self._get_test_src(),
+        source=_get_test_src(),
         preprocessors=[preprocessors.MapFnTransform(test_map_fn)],
     )
     ds = task.get_dataset(None, "train", shuffle=False)
@@ -76,7 +78,7 @@ class PreprocessorsTest(absltest.TestCase):
 
     task = dataset_providers.GrainTask(
         name="test_task",
-        source=self._get_test_src(),
+        source=_get_test_src(),
         preprocessors=[preprocessors.RandomMapFnTransform(test_random_map_fn)],
     )
     ds = task.get_dataset(None, "train", shuffle=False, seed=42)
@@ -88,7 +90,7 @@ class PreprocessorsTest(absltest.TestCase):
 
     task = dataset_providers.GrainTask(
         name="test_task",
-        source=self._get_test_src(),
+        source=_get_test_src(),
         preprocessors=[preprocessors.FilterFnTransform(test_filter_fn)],
     )
     ds = task.get_dataset(None, "train", shuffle=False, seed=42)
@@ -106,7 +108,7 @@ class PreprocessorsTest(absltest.TestCase):
 
     task = dataset_providers.GrainTask(
         name="test_task",
-        source=self._get_test_src(num_elements=0),
+        source=_get_test_src(num_elements=0),
         preprocessors=[
             preprocessors.FilterFnTransform(test_filter_fn),
             preprocessors.MapFnTransform(test_map_fn),
@@ -122,7 +124,7 @@ class PreprocessorsTest(absltest.TestCase):
 
     task = dataset_providers.GrainTask(
         name="test_task",
-        source=self._get_test_src(),
+        source=_get_test_src(),
         preprocessors=[preprocessors.FilterFnTransform(test_filter_fn)],
     )
     ds = task.get_dataset(None, "train", shuffle=False, seed=42)
@@ -137,7 +139,7 @@ class PreprocessorsTest(absltest.TestCase):
 
     task = dataset_providers.GrainTask(
         name="test_task",
-        source=self._get_test_src(),
+        source=_get_test_src(),
         preprocessors=[
             preprocessors.FilterFnTransform(test_filter_fn),
             preprocessors.MapFnTransform(test_map_fn),
@@ -219,6 +221,75 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     updated = run_args.clone()
     updated.sequence_lengths = new_seq_lens
     return updated
+
+  def test_map_fn_preprocessor(self):
+    def test_map_fn(
+        ex, run_args: core_preprocessors_lib.AirIOInjectedRuntimeArgs
+    ):
+      return ex + run_args.sequence_lengths["val"]
+
+    task = dataset_providers.GrainTask(
+        name="test_task",
+        source=_get_test_src(),
+        preprocessors=[
+            preprocessors.MapFnTransform(test_map_fn, self._runtime_args)
+        ],
+    )
+    ds = task.get_dataset({"val": 3}, "train", shuffle=False)
+    self.assertListEqual(list(ds), list(range(3, 8)))
+
+  def test_random_map_fn_preprocessor(self):
+    def test_random_map_fn(
+        ex, rng, r_args: core_preprocessors_lib.AirIOInjectedRuntimeArgs
+    ):
+      return (
+          ex
+          + r_args.sequence_lengths["val"]
+          + int(jax.random.randint(rng, [], 0, 10))
+      )
+
+    task = dataset_providers.GrainTask(
+        name="test_task",
+        source=_get_test_src(),
+        preprocessors=[
+            preprocessors.RandomMapFnTransform(
+                test_random_map_fn, self._runtime_args
+            )
+        ],
+    )
+    ds = task.get_dataset({"val": 3}, "train", shuffle=False, seed=42)
+    self.assertListEqual(list(ds), [8, 12, 10, 6, 15])
+
+  def test_filter_fn_preprocessor(self):
+    def test_filter_fn(
+        ex, rargs: core_preprocessors_lib.AirIOInjectedRuntimeArgs
+    ):
+      return ex > rargs.sequence_lengths["val"]
+
+    task = dataset_providers.GrainTask(
+        name="test_task",
+        source=_get_test_src(),
+        preprocessors=[
+            preprocessors.FilterFnTransform(test_filter_fn, self._runtime_args)
+        ],
+    )
+    ds = task.get_dataset({"val": 3}, "train", shuffle=False, seed=42)
+    self.assertListEqual(list(ds), [4])
+
+  def test_unannotated_runtime_args(self):
+    def test_map_fn(ex, run_args):
+      return ex + run_args.sequence_lengths["val"]
+
+    task = dataset_providers.GrainTask(
+        name="test_task",
+        source=_get_test_src(),
+        preprocessors=[
+            preprocessors.MapFnTransform(test_map_fn, self._runtime_args)
+        ],
+    )
+    with self.assertRaisesRegex(ValueError, "PyGrain encountered an error.*"):
+      ds = task.get_dataset(None, "train", shuffle=False)
+      _ = list(ds)
 
   def test_map_lazydataset_transform(self):
 

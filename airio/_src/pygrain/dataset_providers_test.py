@@ -118,7 +118,7 @@ def _create_fn_src(num_elements=5):
     del split
     return np.arange(num_elements)
 
-  return core_data_sources.FunctionDataSource(
+  return data_sources.FunctionDataSource(
       dataset_fn=_dataset_fn, splits=["train"]
   )
 
