@@ -25,13 +25,13 @@ from ._src.pygrain import preprocessors
 # Individual members and functions.
 from ._src.pygrain.data_sources import ArrayRecordDataSource
 from ._src.pygrain.data_sources import JsonDataSource
+from ._src.pygrain.data_sources import TfdsDataSource
 from ._src.pygrain.dataset_providers import GrainTask
 from ._src.pygrain.dataset_providers import GrainTaskBuilder
 from ._src.pygrain.dataset_providers import GrainMixture
 
 # Individual members and functions from core.
 from ._src.core.data_sources import FunctionDataSource
-from ._src.core.data_sources import TfdsDataSource
 from ._src.core.dataset_providers import ShardInfo
 from ._src.core.preprocessors import AirIOInjectedRuntimeArgs
 from ._src.core.preprocessors import FilterFnTransform

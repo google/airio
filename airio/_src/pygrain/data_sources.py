@@ -19,6 +19,7 @@ from typing import Iterable, Mapping, Union
 
 from airio._src.core import data_sources
 import grain.python as grain
+import tensorflow_datasets as tfds
 
 
 class ArrayRecordDataSource(data_sources.DataSource):
@@ -82,3 +83,46 @@ class JsonDataSource(data_sources.DataSource):
     return len(self._sources[split])
 
 
+
+
+class TfdsDataSource(data_sources.DataSource):
+  """Wrapper for tfds.data_source with multiple splits support."""
+
+  def __init__(
+      self,
+      tfds_name: str,
+      tfds_data_dir: str | None = None,
+      splits: Union[Iterable[str], Mapping[str, str]] | None = None,
+      decoders: tfds.typing.TreeDict[tfds.decode.Decoder] | None = None,
+  ):
+    self._tfds_name = tfds_name
+    self._tfds_data_dir = tfds_data_dir
+    self._decoders = decoders
+
+    if splits and isinstance(splits, str):
+      self.splits = {splits}
+    else:
+      self.splits = splits or []
+
+    self._sources = {}
+    for split in self.splits:
+      self._sources[split] = tfds.data_source(
+          self._tfds_name,
+          data_dir=self._tfds_data_dir,
+          split=split,
+          decoders=self._decoders,
+      )
+
+  def get_data_source(self, split: str):
+    if split not in self._sources:
+      raise ValueError(
+          f'Split {split} not found in {self.splits} for {self._tfds_name}.'
+      )
+    return self._sources[split]
+
+  def num_input_examples(self, split: str) -> int:
+    if split not in self._sources:
+      raise ValueError(
+          f'Split {split} not found in {self.splits} for {self._tfds_name}.'
+      )
+    return len(self._sources[split])
