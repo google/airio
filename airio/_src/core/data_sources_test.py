@@ -26,7 +26,7 @@ import multiprocessing
 
 _SOURCE_NAME = "imdb_reviews"
 _SOURCE_NUM_EXAMPLES = 3
-_SOURCE_SPLITS = {"train", "test", "unsupervised"}
+_SOURCE_SPLITS = frozenset(["train", "test", "unsupervised"])
 
 
 class DataSourceTest(absltest.TestCase):

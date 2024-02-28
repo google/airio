@@ -31,7 +31,7 @@ class ArrayRecordDataSource(data_sources.DataSource):
   ):
     self._split_to_filepattern = split_to_filepattern
 
-    self.splits = set(self._split_to_filepattern)
+    self.splits = frozenset(self._split_to_filepattern.keys())
     self._sources = {}
     for split in self.splits:
       self._sources[split] = grain.ArrayRecordDataSource(
@@ -66,7 +66,7 @@ class JsonDataSource(data_sources.DataSource):
     """
     self._split_to_filepattern = split_to_filepattern
 
-    self.splits = set(self._split_to_filepattern)
+    self.splits = frozenset(self._split_to_filepattern.keys())
     self._sources = {}
     for split in self.splits:
       elements = json.load(open(self._split_to_filepattern[split]))
@@ -100,9 +100,9 @@ class TfdsDataSource(data_sources.DataSource):
     self._decoders = decoders
 
     if splits and isinstance(splits, str):
-      self.splits = {splits}
+      self.splits = frozenset([splits])
     else:
-      self.splits = splits or []
+      self.splits = frozenset(splits or [])
 
     self._sources = {}
     for split in self.splits:

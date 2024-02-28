@@ -41,7 +41,7 @@ import tensorflow_datasets as tfds
 lazy_dataset = grain.experimental.lazy_dataset
 _SOURCE_NAME = "imdb_reviews"
 _SOURCE_NUM_EXAMPLES = 3
-_SOURCE_SPLITS = {"train", "test", "unsupervised"}
+_SOURCE_SPLITS = frozenset(["train", "test", "unsupervised"])
 
 
 class _TestFilterLazyDatasetIterator(lazy_dataset.LazyDatasetIterator):

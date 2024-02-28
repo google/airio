@@ -28,7 +28,7 @@ import multiprocessing
 
 _SOURCE_NAME = "imdb_reviews"
 _SOURCE_NUM_EXAMPLES = 3
-_SOURCE_SPLITS = {"train", "test", "unsupervised"}
+_SOURCE_SPLITS = frozenset(["train", "test", "unsupervised"])
 
 
 class ArrayRecordDataSourceTest(absltest.TestCase):
@@ -61,7 +61,7 @@ class ArrayRecordDataSourceTest(absltest.TestCase):
     )
 
   def test_create(self):
-    source = data_sources.ArrayRecordDataSource([])
+    source = data_sources.ArrayRecordDataSource({})
     self.assertIsInstance(source, core_data_sources.DataSource)
     self.assertIsInstance(source, data_sources.ArrayRecordDataSource)
 
@@ -121,7 +121,7 @@ class JsonDataSourceTest(absltest.TestCase):
     )
 
   def test_create(self):
-    source = data_sources.JsonDataSource([])
+    source = data_sources.JsonDataSource({})
     self.assertIsInstance(source, core_data_sources.DataSource)
     self.assertIsInstance(source, data_sources.JsonDataSource)
 
