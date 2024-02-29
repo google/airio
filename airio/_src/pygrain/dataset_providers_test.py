@@ -77,8 +77,8 @@ def _create_preprocessors() -> (
 ):
   tokenizer_config = _create_tokenizer_config()
   return [
-      core_preprocessors_lib.MapFnTransform(_imdb_preprocessor),
-      core_preprocessors_lib.MapFnTransform(
+      preprocessors_lib.MapFnTransform(_imdb_preprocessor),
+      preprocessors_lib.MapFnTransform(
           tokenizer.Tokenizer(
               tokenizer_configs={
                   "inputs": tokenizer_config,
@@ -226,10 +226,10 @@ class TaskTest(absltest.TestCase):
           "targets": np.array([ex + 1] * rargs.sequence_lengths["targets"]),
       }
 
-    self._map_transform_idx_1 = core_preprocessors_lib.MapFnTransform(
+    self._map_transform_idx_1 = preprocessors_lib.MapFnTransform(
         functools.partial(test_map_fn, idx=1)
     )
-    self._simple_to_imdb_prep = core_preprocessors_lib.MapFnTransform(
+    self._simple_to_imdb_prep = preprocessors_lib.MapFnTransform(
         simple_to_imdb_map_fn
     )
 
@@ -656,7 +656,7 @@ class TaskTest(absltest.TestCase):
     task_with_none = _create_task(
         source=_create_fn_src(num_elements=10),
         preprocessors=[
-            core_preprocessors_lib.FilterFnTransform(lambda x: x > 4),
+            preprocessors_lib.FilterFnTransform(lambda x: x > 4),
             self._map_transform_idx_1,
         ],
         task_name="test_task_with_none",
@@ -677,7 +677,7 @@ class TaskTest(absltest.TestCase):
     task_with_iter = _create_task(
         source=_create_fn_src(num_elements=10),
         preprocessors=[
-            core_preprocessors_lib.FilterFnTransform(lambda x: x > 4),
+            preprocessors_lib.FilterFnTransform(lambda x: x > 4),
             self._simple_to_imdb_prep,
         ],
         task_name="test_task_with_none",
@@ -952,11 +952,11 @@ class TaskTest(absltest.TestCase):
       args.sequence_lengths.update({"another_val": 7})
       return args
 
-    prep_1 = core_preprocessors_lib.MapFnTransform(
+    prep_1 = preprocessors_lib.MapFnTransform(
         lambda x: x,
         update_runtime_args=update_runtime_args_1,
     )
-    prep_2 = core_preprocessors_lib.MapFnTransform(
+    prep_2 = preprocessors_lib.MapFnTransform(
         lambda x: x,
         update_runtime_args=update_runtime_args_2,
     )
@@ -976,7 +976,6 @@ class TaskTest(absltest.TestCase):
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
   def test_task_get_dataset_with_runtime_args(self):
-
     def simple_to_imdb_map_fn(
         ex, rargs: core_preprocessors_lib.AirIOInjectedRuntimeArgs
     ):
@@ -990,9 +989,7 @@ class TaskTest(absltest.TestCase):
     simple_task = _create_task(
         task_name="test_task1",
         source=_create_fn_src(),
-        preprocessors=[
-            core_preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn)
-        ],
+        preprocessors=[preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn)],
     )
     ds = simple_task.get_dataset(
         sequence_lengths={"inputs": 20, "targets": 10}, shuffle=False
@@ -1032,7 +1029,6 @@ class TaskTest(absltest.TestCase):
     test_utils.assert_datasets_equal(list(ds), expected)
 
   def test_task_get_dataset_by_step_with_runtime_args(self):
-
     def simple_to_imdb_map_fn(
         ex, rargs: core_preprocessors_lib.AirIOInjectedRuntimeArgs
     ):
@@ -1046,9 +1042,7 @@ class TaskTest(absltest.TestCase):
     simple_task = _create_task(
         task_name="test_task1",
         source=_create_fn_src(),
-        preprocessors=[
-            core_preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn)
-        ],
+        preprocessors=[preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn)],
     )
     ds = simple_task.get_dataset_by_step(
         sequence_lengths={"inputs": 20, "targets": 10}, shuffle=False
@@ -1412,7 +1406,7 @@ class TaskTest(absltest.TestCase):
       del runtime_args, rng
       return FilterMapDataset(ds)
 
-    make_dict_prep = core_preprocessors_lib.MapFnTransform(lambda x: {"val": x})
+    make_dict_prep = preprocessors_lib.MapFnTransform(lambda x: {"val": x})
     filter_prep = preprocessors_lib.LazyMapTransform(
         prep_fn,
         update_runtime_args=lambda rargs: rargs,
@@ -1424,9 +1418,7 @@ class TaskTest(absltest.TestCase):
         preprocessors=[make_dict_prep, filter_prep],
     )
     test_task._switch_to_lazy_dataset = mock.Mock(return_value=True)
-    ds = test_task.get_dataset(
-        shuffle=False, batch_size=2
-    )
+    ds = test_task.get_dataset(shuffle=False, batch_size=2)
     ds = list(ds)
     # The none element between '2' and '4' is removed when the dataset is
     # converted to an iterator because requires_non_none_elements is True
@@ -1453,9 +1445,7 @@ class TaskTest(absltest.TestCase):
         preprocessors=[requires_non_none_prep],
     )
     test_task._switch_to_lazy_dataset = mock.Mock(return_value=True)
-    ds = test_task.get_dataset(
-        shuffle=False, batch_size=2
-    )
+    ds = test_task.get_dataset(shuffle=False, batch_size=2)
     ds = list(ds)
     expected_ds = [
         [0, 1],
@@ -1548,9 +1538,7 @@ class TaskBuilderTest(absltest.TestCase):
         preprocessors=_create_preprocessors(),
         task_name=task_name,
     )
-    new_preprocessors = [
-        core_preprocessors_lib.MapFnTransform(_imdb_preprocessor)
-    ]
+    new_preprocessors = [preprocessors_lib.MapFnTransform(_imdb_preprocessor)]
     task_builder.set_preprocessors(new_preprocessors)
     new_task = task_builder.build()
     self.assertEqual(new_task.get_preprocessors(), new_preprocessors)
@@ -1628,13 +1616,13 @@ class MixtureTest(absltest.TestCase):
         splits=_SOURCE_SPLITS,
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
-    self._map_transform_idx_1 = core_preprocessors_lib.MapFnTransform(
+    self._map_transform_idx_1 = preprocessors_lib.MapFnTransform(
         functools.partial(test_map_fn, idx=1)
     )
-    self._map_transform_idx_2 = core_preprocessors_lib.MapFnTransform(
+    self._map_transform_idx_2 = preprocessors_lib.MapFnTransform(
         functools.partial(test_map_fn, idx=2)
     )
-    self._simple_to_imdb_prep = core_preprocessors_lib.MapFnTransform(
+    self._simple_to_imdb_prep = preprocessors_lib.MapFnTransform(
         simple_to_imdb_map_fn
     )
     self._simple_task_1 = _create_task(
@@ -1653,7 +1641,7 @@ class MixtureTest(absltest.TestCase):
     self._simple_to_imdb_task = (
         dataset_providers.GrainTaskBuilder.from_task(self._simple_task_1)
         .set_preprocessors([
-            core_preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn),
+            preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn),
         ])
         .build()
     )
@@ -1669,7 +1657,7 @@ class MixtureTest(absltest.TestCase):
         .set_preprocessors(
             self._imdb_task._preprocessors
             + [
-                core_preprocessors_lib.MapFnTransform(
+                preprocessors_lib.MapFnTransform(
                     lambda x: x, update_runtime_args=update_runtime_args_fn
                 ),
             ]
@@ -1921,7 +1909,7 @@ class MixtureTest(absltest.TestCase):
         dataset_providers.GrainTaskBuilder.from_task(self._simple_task_1)
         .set_preprocessors([
             self._map_transform_idx_1,
-            core_preprocessors_lib.RandomMapFnTransform(test_random_map_fn),
+            preprocessors_lib.RandomMapFnTransform(test_random_map_fn),
         ])
         .build()
     )
@@ -1929,7 +1917,7 @@ class MixtureTest(absltest.TestCase):
         dataset_providers.GrainTaskBuilder.from_task(self._simple_task_2)
         .set_preprocessors([
             self._map_transform_idx_2,
-            core_preprocessors_lib.RandomMapFnTransform(test_random_map_fn),
+            preprocessors_lib.RandomMapFnTransform(test_random_map_fn),
         ])
         .build()
     )
@@ -2260,7 +2248,7 @@ class MixtureTest(absltest.TestCase):
     task_with_none = _create_task(
         source=_create_fn_src(num_elements=10),
         preprocessors=[
-            core_preprocessors_lib.FilterFnTransform(lambda x: x > 4),
+            preprocessors_lib.FilterFnTransform(lambda x: x > 4),
             self._map_transform_idx_1,
         ],
         task_name="test_task_with_none",
@@ -2300,7 +2288,7 @@ class MixtureTest(absltest.TestCase):
     task_with_none = _create_task(
         source=_create_fn_src(num_elements=10),
         preprocessors=[
-            core_preprocessors_lib.FilterFnTransform(lambda x: x > 4),
+            preprocessors_lib.FilterFnTransform(lambda x: x > 4),
             self._simple_to_imdb_prep,
         ],
         task_name="test_task_with_none",

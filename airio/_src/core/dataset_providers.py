@@ -297,9 +297,9 @@ def get_vocabularies(
 
   vocabulary_map = {}
   for preproc in task.get_preprocessors():
-    if isinstance(preproc, preprocessors_lib.MapFnTransform) and isinstance(
-        preproc.map_fn, tokenizer.Tokenizer
-    ):
+    if isinstance(
+        preproc, preprocessors_lib.MapFnTransform
+    ) and isinstance(preproc.map_fn, tokenizer.Tokenizer):
       tokenizer_configs = preproc.map_fn.tokenizer_configs
       for feature_name, tokenizer_config in tokenizer_configs.items():
         vocabulary_map[feature_name] = tokenizer_config.vocab

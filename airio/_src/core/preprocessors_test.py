@@ -21,6 +21,7 @@ from absl.testing import absltest
 from airio._src.core import data_sources
 from airio._src.core import preprocessors
 from airio._src.pygrain import dataset_providers as grain_dataset_providers
+from airio._src.pygrain import preprocessors as grain_preprocessors
 import jax.random
 import numpy as np
 
@@ -28,103 +29,28 @@ import numpy as np
 
 class PreprocessorsTest(absltest.TestCase):
 
-  def _get_test_src(self, num_elements=5):
-    def _dataset_fn(split: str):
-      del split
-      return np.array(range(num_elements))
+  @mock.patch.multiple(
+      preprocessors.MapFnTransform, __abstractmethods__=set()
+  )
+  def test_protocol_map_fn_transform(self):
+    transform = preprocessors.MapFnTransform
+    self.assertIsNone(transform.map(self, element=""))
 
-    return data_sources.FunctionDataSource(
-        dataset_fn=_dataset_fn, splits=["train"]
+  @mock.patch.multiple(
+      preprocessors.RandomMapFnTransform, __abstractmethods__=set()
+  )
+  def test_protocol_random_map_fn_transform(self):
+    transform = preprocessors.RandomMapFnTransform
+    self.assertIsNone(
+        transform.random_map(self, element="", rng=jax.random.PRNGKey(42))
     )
 
-  def test_map_fn_preprocessor(self):
-    def test_map_fn(ex):
-      return ex + 1
-
-    task = grain_dataset_providers.GrainTask(
-        name="test_task",
-        source=self._get_test_src(),
-        preprocessors=[preprocessors.MapFnTransform(test_map_fn)],
-    )
-    ds = task.get_dataset(None, "train", shuffle=False)
-    self.assertListEqual(list(ds), list(range(1, 6)))
-
-  def test_random_map_fn_preprocessor(self):
-    def test_random_map_fn(ex, rng):
-      return ex + int(jax.random.randint(rng, [], 0, 10))
-
-    task = grain_dataset_providers.GrainTask(
-        name="test_task",
-        source=self._get_test_src(),
-        preprocessors=[preprocessors.RandomMapFnTransform(test_random_map_fn)],
-    )
-    ds = task.get_dataset(None, "train", shuffle=False, seed=42)
-    self.assertListEqual(list(ds), [5, 9, 7, 3, 12])
-
-  def test_filter_fn_preprocessor(self):
-    def test_filter_fn(ex):
-      return ex > 2
-
-    task = grain_dataset_providers.GrainTask(
-        name="test_task",
-        source=self._get_test_src(),
-        preprocessors=[preprocessors.FilterFnTransform(test_filter_fn)],
-    )
-    ds = task.get_dataset(None, "train", shuffle=False, seed=42)
-    self.assertListEqual(list(ds), [3, 4])
-
-  def test_preprocessor_empty_source(self):
-    def test_filter_fn(ex):
-      return ex > 2
-
-    def test_map_fn(ex):
-      return ex + 1
-
-    def test_random_map_fn(ex, rng):
-      return ex + int(jax.random.randint(rng, [], 0, 10))
-
-    task = grain_dataset_providers.GrainTask(
-        name="test_task",
-        source=self._get_test_src(num_elements=0),
-        preprocessors=[
-            preprocessors.FilterFnTransform(test_filter_fn),
-            preprocessors.MapFnTransform(test_map_fn),
-            preprocessors.RandomMapFnTransform(test_random_map_fn),
-        ],
-    )
-    with self.assertRaisesRegex(ValueError, "Invalid number of records.*"):
-      _ = task.get_dataset(None, "train", shuffle=False)
-
-  def test_preprocessor_empty_preprocessed(self):
-    def test_filter_fn(ex):
-      return ex > 1000
-
-    task = grain_dataset_providers.GrainTask(
-        name="test_task",
-        source=self._get_test_src(),
-        preprocessors=[preprocessors.FilterFnTransform(test_filter_fn)],
-    )
-    ds = task.get_dataset(None, "train", shuffle=False, seed=42)
-    self.assertListEqual(list(ds), [])
-
-  def test_preprocessor_empty_intermediates(self):
-    def test_map_fn(ex):
-      return ex + 1
-
-    def test_filter_fn(ex):
-      return ex > 1000
-
-    task = grain_dataset_providers.GrainTask(
-        name="test_task",
-        source=self._get_test_src(),
-        preprocessors=[
-            preprocessors.FilterFnTransform(test_filter_fn),
-            preprocessors.MapFnTransform(test_map_fn),
-        ],
-    )
-    ds = task.get_dataset(None, "train", shuffle=False, seed=42)
-    self.assertListEqual(list(ds), [])
-
+  @mock.patch.multiple(
+      preprocessors.FilterFnTransform, __abstractmethods__=set()
+  )
+  def test_protocol_filter_fn_transform(self):
+    transform = preprocessors.FilterFnTransform
+    self.assertIsNone(transform.filter(self, element=""))
 
 
 class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
@@ -190,7 +116,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         name="test_task",
         source=self._get_test_src(),
         preprocessors=[
-            preprocessors.MapFnTransform(test_map_fn, self._runtime_args)
+            grain_preprocessors.MapFnTransform(test_map_fn, self._runtime_args)
         ],
     )
     ds = task.get_dataset({"val": 3}, "train", shuffle=False)
@@ -210,7 +136,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         name="test_task",
         source=self._get_test_src(),
         preprocessors=[
-            preprocessors.RandomMapFnTransform(
+            grain_preprocessors.RandomMapFnTransform(
                 test_random_map_fn, self._runtime_args
             )
         ],
@@ -226,7 +152,9 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         name="test_task",
         source=self._get_test_src(),
         preprocessors=[
-            preprocessors.FilterFnTransform(test_filter_fn, self._runtime_args)
+            grain_preprocessors.FilterFnTransform(
+                test_filter_fn, self._runtime_args
+            )
         ],
     )
     ds = task.get_dataset({"val": 3}, "train", shuffle=False, seed=42)
@@ -240,7 +168,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         name="test_task",
         source=self._get_test_src(),
         preprocessors=[
-            preprocessors.MapFnTransform(test_map_fn, self._runtime_args)
+            grain_preprocessors.MapFnTransform(test_map_fn, self._runtime_args)
         ],
     )
     with self.assertRaisesRegex(ValueError, "PyGrain encountered an error.*"):

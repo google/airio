@@ -27,6 +27,7 @@ from airio._src.core import test_utils
 from airio._src.core import tokenizer
 from airio._src.pygrain import data_sources as pygrain_data_sources
 from airio._src.pygrain import dataset_providers as pygrain_dataset_providers
+from airio._src.pygrain import preprocessors as pygrain_preprocessors
 import grain.python as grain
 import numpy as np
 from seqio import vocabularies
@@ -69,8 +70,8 @@ def _create_tokenizer_config() -> tokenizer.TokenizerConfig:
 def _create_preprocessors() -> Sequence[dataset_providers.AirIOPreprocessor]:
   tokenizer_config = _create_tokenizer_config()
   return [
-      preprocessors_lib.MapFnTransform(_imdb_preprocessor),
-      preprocessors_lib.MapFnTransform(
+      pygrain_preprocessors.MapFnTransform(_imdb_preprocessor),
+      pygrain_preprocessors.MapFnTransform(
           tokenizer.Tokenizer(
               tokenizer_configs={
                   "inputs": tokenizer_config,
@@ -204,10 +205,10 @@ class TaskTest(absltest.TestCase):
           "targets": np.array([ex + 1] * rargs.sequence_lengths["targets"]),
       }
 
-    self._map_transform_idx_1 = preprocessors_lib.MapFnTransform(
+    self._map_transform_idx_1 = pygrain_preprocessors.MapFnTransform(
         functools.partial(test_map_fn, idx=1)
     )
-    self._simple_to_imdb_prep = preprocessors_lib.MapFnTransform(
+    self._simple_to_imdb_prep = pygrain_preprocessors.MapFnTransform(
         simple_to_imdb_map_fn
     )
 
@@ -310,7 +311,9 @@ class TaskBuilderTest(absltest.TestCase):
         preprocessors=_create_preprocessors(),
         task_name=task_name,
     )
-    new_preprocessors = [preprocessors_lib.MapFnTransform(_imdb_preprocessor)]
+    new_preprocessors = [
+        pygrain_preprocessors.MapFnTransform(_imdb_preprocessor)
+    ]
     task_builder.set_preprocessors(new_preprocessors)
     new_task = task_builder.build()
     self.assertEqual(new_task.get_preprocessors(), new_preprocessors)
@@ -388,13 +391,13 @@ class MixtureTest(absltest.TestCase):
         splits=_SOURCE_SPLITS,
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
-    self._map_transform_idx_1 = preprocessors_lib.MapFnTransform(
+    self._map_transform_idx_1 = pygrain_preprocessors.MapFnTransform(
         functools.partial(test_map_fn, idx=1)
     )
-    self._map_transform_idx_2 = preprocessors_lib.MapFnTransform(
+    self._map_transform_idx_2 = pygrain_preprocessors.MapFnTransform(
         functools.partial(test_map_fn, idx=2)
     )
-    self._simple_to_imdb_prep = preprocessors_lib.MapFnTransform(
+    self._simple_to_imdb_prep = pygrain_preprocessors.MapFnTransform(
         simple_to_imdb_map_fn
     )
     self._simple_task_1 = _create_task(
@@ -413,7 +416,7 @@ class MixtureTest(absltest.TestCase):
     self._simple_to_imdb_task = (
         dataset_providers.TaskBuilder.from_task(self._simple_task_1)
         .set_preprocessors([
-            preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn),
+            pygrain_preprocessors.MapFnTransform(simple_to_imdb_map_fn),
         ])
         .build()
     )
@@ -643,7 +646,7 @@ class DatasetProvidersTest(absltest.TestCase):
               name=f"test_task_{i}",
               source=_create_fn_src(num_elements=3),
               preprocessors=[
-                  preprocessors_lib.MapFnTransform(
+                  pygrain_preprocessors.MapFnTransform(
                       functools.partial(test_map_fn, idx=i)
                   )
               ],
@@ -711,7 +714,9 @@ class DatasetProvidersTest(absltest.TestCase):
     )
     task = _create_task(
         source=source,
-        preprocessors=[preprocessors_lib.MapFnTransform(_imdb_preprocessor)],
+        preprocessors=[
+            pygrain_preprocessors.MapFnTransform(_imdb_preprocessor)
+        ],
     )
     vocabs_map = dataset_providers.get_vocabularies(task)
     self.assertEmpty(vocabs_map)

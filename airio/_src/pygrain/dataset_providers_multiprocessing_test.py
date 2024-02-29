@@ -121,8 +121,8 @@ def _create_preprocessors() -> (
 ):
   tokenizer_config = _create_tokenizer_config()
   return [
-      core_preprocessors_lib.MapFnTransform(_imdb_preprocessor),
-      core_preprocessors_lib.MapFnTransform(
+      preprocessors_lib.MapFnTransform(_imdb_preprocessor),
+      preprocessors_lib.MapFnTransform(
           tokenizer.Tokenizer(
               tokenizer_configs={
                   "inputs": tokenizer_config,
@@ -205,10 +205,10 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
         splits=_SOURCE_SPLITS,
         num_examples=_SOURCE_NUM_EXAMPLES,
     )
-    self._map_transform_idx_1 = core_preprocessors_lib.MapFnTransform(
+    self._map_transform_idx_1 = preprocessors_lib.MapFnTransform(
         functools.partial(test_map_fn, idx=1)
     )
-    self._simple_to_imdb_prep = core_preprocessors_lib.MapFnTransform(
+    self._simple_to_imdb_prep = preprocessors_lib.MapFnTransform(
         simple_to_imdb_map_fn
     )
     self._simple_task_1 = _create_task(
@@ -222,7 +222,7 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
     self._simple_to_imdb_task = (
         dataset_providers.GrainTaskBuilder.from_task(self._simple_task_1)
         .set_preprocessors([
-            core_preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn),
+            preprocessors_lib.MapFnTransform(simple_to_imdb_map_fn),
         ])
         .build()
     )
@@ -298,7 +298,7 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
     task_with_none = _create_task(
         source=_create_fn_src(num_elements=10),
         preprocessors=[
-            core_preprocessors_lib.FilterFnTransform(lambda x: x > 4),
+            preprocessors_lib.FilterFnTransform(lambda x: x > 4),
             self._simple_to_imdb_prep,
         ],
         task_name="test_task_with_none",
@@ -486,7 +486,7 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
     task_with_iter = _create_task(
         source=_create_fn_src(num_elements=10),
         preprocessors=[
-            core_preprocessors_lib.FilterFnTransform(lambda x: x > 4),
+            preprocessors_lib.FilterFnTransform(lambda x: x > 4),
             self._simple_to_imdb_prep,
         ],
         task_name="test_task_with_none",

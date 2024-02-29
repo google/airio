@@ -21,9 +21,9 @@ from typing import Dict
 from unittest import mock
 
 from absl.testing import absltest
-from airio._src.core import preprocessors as preprocessors_lib
 from airio._src.core import tokenizer
 from airio._src.pygrain import dataset_iterators
+from airio._src.pygrain import preprocessors
 from clu.data import dataset_iterator as clu_dataset_iterator
 import grain.python as grain
 import numpy as np
@@ -105,8 +105,8 @@ class DatasetIteratorsWithDataLoaderTest(absltest.TestCase):
             num_records=5, shard_options=grain.NoSharding()
         ),
         operations=[
-            preprocessors_lib.MapFnTransform(_parse_and_preprocess),
-            preprocessors_lib.MapFnTransform(
+            preprocessors.MapFnTransform(_parse_and_preprocess),
+            preprocessors.MapFnTransform(
                 tokenizer.Tokenizer(
                     tokenizer_configs={
                         "inputs": self.tokenizer_config,
@@ -302,9 +302,9 @@ class DatasetIteratorsWithLazyMapDatasetTest(absltest.TestCase):
             os.path.join(test_data_path, "classification.array_record@2")
         )
     )
-    ds = ds.map(preprocessors_lib.MapFnTransform(_parse_and_preprocess))
+    ds = ds.map(preprocessors.MapFnTransform(_parse_and_preprocess))
     ds = ds.map(
-        preprocessors_lib.MapFnTransform(
+        preprocessors.MapFnTransform(
             tokenizer.Tokenizer(
                 tokenizer_configs={
                     "inputs": self.tokenizer_config,
@@ -470,9 +470,9 @@ class DatasetIteratorsWithLazyIterDatasetTest(absltest.TestCase):
             os.path.join(test_data_path, "classification.array_record@2")
         )
     )
-    ds = ds.map(preprocessors_lib.MapFnTransform(_parse_and_preprocess))
+    ds = ds.map(preprocessors.MapFnTransform(_parse_and_preprocess))
     ds = ds.map(
-        preprocessors_lib.MapFnTransform(
+        preprocessors.MapFnTransform(
             tokenizer.Tokenizer(
                 tokenizer_configs={
                     "inputs": self.tokenizer_config,

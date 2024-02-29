@@ -18,7 +18,8 @@ import copy
 import dataclasses
 import functools
 import inspect
-from typing import Any, Callable, Mapping
+import typing
+from typing import Any, Callable, Mapping, Protocol
 
 import grain.python as grain
 import jax
@@ -61,8 +62,9 @@ UpdateRuntimeArgsCallable = Callable[
 
 
 @dataclasses.dataclass
-class MapFnTransform(grain.MapTransform):
-  """Grain Transform to represent AirIO map preprocessors.
+@typing.runtime_checkable
+class MapFnTransform(Protocol):
+  """Transform to represent AirIO map preprocessors.
 
   Attrs:
     map_fn: A map fn to apply.
@@ -78,15 +80,15 @@ class MapFnTransform(grain.MapTransform):
   runtime_args: AirIOInjectedRuntimeArgs | None = None
   update_runtime_args: UpdateRuntimeArgsCallable | None = None
 
-
   def map(self, element):
     """Maps a single element."""
-    return inject_runtime_args_to_fn(self.map_fn, self.runtime_args)(element)
+    ...
 
 
 @dataclasses.dataclass
-class RandomMapFnTransform(grain.RandomMapTransform):
-  """Grain Transform to represent AirIO random map preprocessors.
+@typing.runtime_checkable
+class RandomMapFnTransform(Protocol):
+  """Transform to represent AirIO random map preprocessors.
 
   Attrs:
     map_fn: A map fn to apply.
@@ -102,18 +104,15 @@ class RandomMapFnTransform(grain.RandomMapTransform):
   runtime_args: AirIOInjectedRuntimeArgs | None = None
   update_runtime_args: UpdateRuntimeArgsCallable | None = None
 
-
   def random_map(self, element, rng: np.random.Generator):
     """Maps a single element."""
-    jax_rng = jax.random.key(rng.integers(0, 2**16 - 1))
-    return inject_runtime_args_to_fn(self.map_fn, self.runtime_args)(
-        element, jax_rng
-    )
+    ...
 
 
 @dataclasses.dataclass
-class FilterFnTransform(grain.FilterTransform):
-  """Grain Transform to represent AirIO filter preprocessors.
+@typing.runtime_checkable
+class FilterFnTransform(Protocol):
+  """Transform to represent AirIO filter preprocessors.
 
   Attrs:
     filter_fn: A filter fn to apply.
@@ -129,10 +128,9 @@ class FilterFnTransform(grain.FilterTransform):
   runtime_args: AirIOInjectedRuntimeArgs | None = None
   update_runtime_args: UpdateRuntimeArgsCallable | None = None
 
-
   def filter(self, element) -> bool:
     """Filters a single element."""
-    return inject_runtime_args_to_fn(self.filter_fn, self.runtime_args)(element)
+    ...
 
 
 def inject_runtime_args_to_fn(

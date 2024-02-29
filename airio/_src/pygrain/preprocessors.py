@@ -18,7 +18,7 @@ import dataclasses
 import time
 from typing import Callable
 
-from airio._src.core import preprocessors as preprocessors_lib
+from airio._src.core import preprocessors as core_preprocessors
 from airio._src.pygrain import lazy_dataset_transforms
 import grain.python as grain
 import jax
@@ -30,6 +30,49 @@ import numpy as np
 lazy_dataset = grain.experimental.lazy_dataset
 LazyDataset = lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset
 JaxRng = jax.Array
+
+
+@dataclasses.dataclass
+class MapFnTransform(
+    core_preprocessors.MapFnTransform, grain.MapTransform
+):
+  """Grain Transform to represent AirIO map preprocessors."""
+
+
+  def map(self, element):
+    """Maps a single element."""
+    return core_preprocessors.inject_runtime_args_to_fn(
+        self.map_fn, self.runtime_args
+    )(element)
+
+
+@dataclasses.dataclass
+class RandomMapFnTransform(
+    core_preprocessors.RandomMapFnTransform, grain.RandomMapTransform
+):
+  """Grain Transform to represent AirIO random map preprocessors."""
+
+
+  def random_map(self, element, rng: np.random.Generator):
+    """Maps a single element."""
+    jax_rng = jax.random.key(rng.integers(0, 2**16 - 1))
+    return core_preprocessors.inject_runtime_args_to_fn(
+        self.map_fn, self.runtime_args
+    )(element, jax_rng)
+
+
+@dataclasses.dataclass
+class FilterFnTransform(
+    core_preprocessors.FilterFnTransform, grain.FilterTransform
+):
+  """Grain Transform to represent AirIO filter preprocessors."""
+
+
+  def filter(self, element) -> bool:
+    """Filters a single element."""
+    return core_preprocessors.inject_runtime_args_to_fn(
+        self.filter_fn, self.runtime_args
+    )(element)
 
 
 @dataclasses.dataclass
@@ -58,19 +101,19 @@ class LazyMapTransform:
   transform: Callable[
       [
           lazy_dataset.LazyMapDataset,
-          preprocessors_lib.AirIOInjectedRuntimeArgs,
+          core_preprocessors.AirIOInjectedRuntimeArgs,
           JaxRng | None,
       ],
       lazy_dataset.LazyMapDataset,
   ]
-  update_runtime_args: preprocessors_lib.UpdateRuntimeArgsCallable
+  update_runtime_args: core_preprocessors.UpdateRuntimeArgsCallable
   produces_none_elements: bool
   requires_non_none_elements: bool
 
   def __call__(
       self,
       ds: lazy_dataset.LazyMapDataset,
-      runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
+      runtime_args: core_preprocessors.AirIOInjectedRuntimeArgs,
       rng: JaxRng | None,
   ) -> lazy_dataset.LazyMapDataset:
     if not isinstance(ds, lazy_dataset.LazyMapDataset):
@@ -102,17 +145,17 @@ class LazyIterTransform:
   transform: Callable[
       [
           lazy_dataset.LazyIterDataset,
-          preprocessors_lib.AirIOInjectedRuntimeArgs,
+          core_preprocessors.AirIOInjectedRuntimeArgs,
           JaxRng | None,
       ],
       lazy_dataset.LazyIterDataset,
   ]
-  update_runtime_args: preprocessors_lib.UpdateRuntimeArgsCallable
+  update_runtime_args: core_preprocessors.UpdateRuntimeArgsCallable
 
   def __call__(
       self,
       ds: lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset,
-      runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs,
+      runtime_args: core_preprocessors.AirIOInjectedRuntimeArgs,
       rng: JaxRng | None,
   ) -> lazy_dataset.LazyIterDataset:
     if not isinstance(ds, lazy_dataset.LazyIterDataset):
@@ -126,13 +169,9 @@ class LazyIterTransform:
 # These may be extended; update LazyDatasetTransform properties when adding new
 # preprocessor types, specifically `produces_none_elements`,
 # `can_process_iter_dataset`, and `requires_non_none_elements`.
-FnTransforms = (
-    preprocessors_lib.MapFnTransform
-    | preprocessors_lib.RandomMapFnTransform
-    | preprocessors_lib.FilterFnTransform
-)
+FnTransforms = MapFnTransform | RandomMapFnTransform | FilterFnTransform
 LazyTransforms = LazyMapTransform | LazyIterTransform
-PyGrainAirIOPreprocessor = preprocessors_lib.AirIOPreprocessor | LazyTransforms
+PyGrainAirIOPreprocessor = core_preprocessors.AirIOPreprocessor | LazyTransforms
 
 
 @dataclasses.dataclass
@@ -147,7 +186,7 @@ class LazyDatasetTransform:
     # TODO(b/300938204): Remove error for other RandomMapTransforms, once
     # these can be reproducibly processed.
     if isinstance(self.transform, grain.RandomMapTransform) and not isinstance(
-        self.transform, preprocessors_lib.RandomMapFnTransform
+        self.transform, RandomMapFnTransform
     ):
       raise ValueError(
           f"{str(self.transform)} is not reproducible. Use"
@@ -155,8 +194,8 @@ class LazyDatasetTransform:
       )
 
   def get_updated_runtime_args(
-      self, runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs
-  ) -> preprocessors_lib.AirIOInjectedRuntimeArgs:
+      self, runtime_args: core_preprocessors.AirIOInjectedRuntimeArgs
+  ) -> core_preprocessors.AirIOInjectedRuntimeArgs:
     # pytype:disable=attribute-error
     if (
         hasattr(self.transform, "update_runtime_args")
@@ -200,7 +239,7 @@ class LazyDatasetTransform:
       self,
       ds: LazyDataset,
       rng: JaxRng | None = None,
-      runtime_args: preprocessors_lib.AirIOInjectedRuntimeArgs | None = None,
+      runtime_args: core_preprocessors.AirIOInjectedRuntimeArgs | None = None,
   ):
     # pytype: disable=attribute-error
     if isinstance(self.transform, FnTransforms):
@@ -208,7 +247,7 @@ class LazyDatasetTransform:
     match self.transform:
       case grain.MapTransform():
         return ds.map(self.transform)
-      case preprocessors_lib.RandomMapFnTransform():
+      case RandomMapFnTransform():
         # Special case to support reproducible stochastic transformations with
         # jax rng keys.
         # Note: LazyIterDatasets are not yet supported, but can be if needed.
@@ -219,7 +258,7 @@ class LazyDatasetTransform:
           )
         if rng is None:
           rng = jax.random.key(np.int32(time.time()))
-        map_fn = preprocessors_lib.inject_runtime_args_to_fn(
+        map_fn = core_preprocessors.inject_runtime_args_to_fn(
             self.transform.map_fn, runtime_args
         )
         return lazy_dataset_transforms.RandomMapFnLazyMapDataset(

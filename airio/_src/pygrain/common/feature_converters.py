@@ -92,9 +92,9 @@ def get_t5x_enc_dec_feature_converter_preprocessors(
   )
   pad = functools.partial(common_preprocessors.pad, pad_id=pad_id)
   preps = [
-      core_preprocessors.MapFnTransform(common_preprocessors.trim),
-      core_preprocessors.MapFnTransform(pad),
-      core_preprocessors.MapFnTransform(
+      preprocessors.MapFnTransform(common_preprocessors.trim),
+      preprocessors.MapFnTransform(pad),
+      preprocessors.MapFnTransform(
           convert_features,
           update_runtime_args=update_runtime_args,
       ),
@@ -149,9 +149,9 @@ def get_t5x_lm_feature_converter_preprocessors(
   )
   pad = functools.partial(common_preprocessors.pad, pad_id=pad_id)
   preps = [
-      core_preprocessors.MapFnTransform(common_preprocessors.trim),
-      core_preprocessors.MapFnTransform(pad),
-      core_preprocessors.MapFnTransform(
+      preprocessors.MapFnTransform(common_preprocessors.trim),
+      preprocessors.MapFnTransform(pad),
+      preprocessors.MapFnTransform(
           convert_features,
           update_runtime_args=update_runtime_args,
       ),
@@ -237,10 +237,10 @@ def get_t5x_prefix_lm_feature_converter_preprocessors(
   pad = functools.partial(common_preprocessors.pad, pad_id=pad_id)
 
   preps = [
-      core_preprocessors.MapFnTransform(
+      preprocessors.MapFnTransform(
           concat_and_add_masks, update_runtime_args=concat_task_feature_lengths
       ),
-      core_preprocessors.MapFnTransform(replace_0s),
+      preprocessors.MapFnTransform(replace_0s),
   ]
   if pack:
     packer = (
@@ -253,10 +253,10 @@ def get_t5x_prefix_lm_feature_converter_preprocessors(
     )
     preps.append(packer_prep)
   preps.extend([
-      core_preprocessors.MapFnTransform(common_preprocessors.trim),
-      core_preprocessors.MapFnTransform(pad),
-      core_preprocessors.MapFnTransform(restore_0s),
-      core_preprocessors.MapFnTransform(
+      preprocessors.MapFnTransform(common_preprocessors.trim),
+      preprocessors.MapFnTransform(pad),
+      preprocessors.MapFnTransform(restore_0s),
+      preprocessors.MapFnTransform(
           convert_features, update_runtime_args=update_runtime_args
       ),
   ])
@@ -379,7 +379,7 @@ def _update_runtime_args_for_t5x_enc_dec_features(
       pad_id=0,
       bos_id=0,
   )
-  prep = core_preprocessors.MapFnTransform(
+  prep = preprocessors.MapFnTransform(
       convert_features,
       update_runtime_args=update_runtime_args,
   )
@@ -497,7 +497,7 @@ def _update_runtime_args_for_t5x_lm_features(
       pad_id=0,
       bos_id=0,
   )
-  prep = core_preprocessors.MapFnTransform(
+  prep = preprocessors.MapFnTransform(
       convert_features,
       update_runtime_args=update_runtime_args,
   )
@@ -724,7 +724,7 @@ def _update_runtime_args_for_t5x_prefix_lm_features(
       bos_id=0,
       passthrough_feature_keys=[]
   )
-  prep = core_preprocessors.MapFnTransform(
+  prep = preprocessors.MapFnTransform(
       convert_features,
       update_runtime_args=update_runtime_args,
   )
@@ -798,7 +798,7 @@ def _concat_task_feature_lengths_for_prefix_lm(
       _concat_and_add_masks_for_prefix_lm,,
       passthrough_feature_keys=[]
   )
-  prep = core_preprocessors.MapFnTransform(
+  prep = preprocessors.MapFnTransform(
       concat_features,
       update_runtime_args=update_runtime_args,
   )
