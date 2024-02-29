@@ -15,7 +15,7 @@
 """Data Source implementations for AirIO."""
 
 import typing
-from typing import Iterable, Protocol
+from typing import Any, Iterable, Protocol
 
 import numpy as np
 
@@ -37,7 +37,7 @@ class DataSource(Protocol):
 class DatasetFnCallable(Protocol):
   """Protocol for a function that returns a numpy array based on split."""
 
-  def __call__(self, split: str) -> np.ndarray:
+  def __call__(self, split: str) -> Any:
     ...
 
 
