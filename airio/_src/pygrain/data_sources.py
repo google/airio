@@ -15,10 +15,11 @@
 """Grain-based Data Source implementations for AirIO."""
 
 import json
-from typing import Iterable, Mapping, Union
-
+import typing
+from typing import Iterable, Mapping, Protocol, Union
 from airio._src.core import data_sources
 import grain.python as grain
+import numpy as np
 import tensorflow_datasets as tfds
 
 
@@ -49,6 +50,42 @@ class ArrayRecordDataSource(data_sources.DataSource):
     return len(self._sources[split])
 
 
+
+
+@typing.runtime_checkable
+class DatasetFnCallable(Protocol):
+  """Protocol for a function that returns a numpy array based on split."""
+
+  def __call__(self, split: str) -> np.ndarray:
+    ...
+
+
+class FunctionDataSource(data_sources.DataSource):
+  """A `DataSource` that uses a function to provide the input data."""
+
+  def __init__(
+      self,
+      dataset_fn: DatasetFnCallable,
+      splits: Iterable[str],
+  ):
+    """FunctionDataSource constructor.
+
+    Args:
+      dataset_fn: a function with the signature `dataset_fn(split)' that returns
+        a numpy array.
+      splits: an iterable of applicable string split names.
+    """
+    self._dataset_fn = dataset_fn
+    self.splits = splits
+
+  def get_data_source(self, split: str) -> np.ndarray:
+    ds = self._dataset_fn(split=split)
+    return ds
+
+  def num_input_examples(self, split: str) -> int:
+    if split not in self.splits:
+      raise ValueError(f'Split {split} not found in {self.splits}.')
+    return self._dataset_fn(split=split).size
 
 
 class JsonDataSource(data_sources.DataSource):

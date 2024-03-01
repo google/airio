@@ -18,12 +18,8 @@ import inspect
 from unittest import mock
 
 from absl.testing import absltest
-from airio._src.core import data_sources
 from airio._src.core import preprocessors
-from airio._src.pygrain import dataset_providers as grain_dataset_providers
-from airio._src.pygrain import preprocessors as grain_preprocessors
 import jax.random
-import numpy as np
 
 
 
@@ -62,15 +58,6 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         split="train",
     )
 
-  def _get_test_src(self, num_elements=5):
-    def _dataset_fn(split: str):
-      del split
-      return np.array(range(num_elements))
-
-    return data_sources.FunctionDataSource(
-        dataset_fn=_dataset_fn, splits=["train"]
-    )
-
   def test_create_runtime_args_succeeds(self):
     runtime_args = preprocessors.AirIOInjectedRuntimeArgs(
         sequence_lengths={"val": 3},
@@ -107,73 +94,6 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     result = preprocessors.inject_runtime_args_to_fn(test_map_fn, runtime_args)
     result_parameters = result.__code__.co_varnames
     self.assertEqual(result_parameters, expected_parameters)
-
-  def test_map_fn_preprocessor(self):
-    def test_map_fn(ex, run_args: preprocessors.AirIOInjectedRuntimeArgs):
-      return ex + run_args.sequence_lengths["val"]
-
-    task = grain_dataset_providers.GrainTask(
-        name="test_task",
-        source=self._get_test_src(),
-        preprocessors=[
-            grain_preprocessors.MapFnTransform(test_map_fn, self._runtime_args)
-        ],
-    )
-    ds = task.get_dataset({"val": 3}, "train", shuffle=False)
-    self.assertListEqual(list(ds), list(range(3, 8)))
-
-  def test_random_map_fn_preprocessor(self):
-    def test_random_map_fn(
-        ex, rng, r_args: preprocessors.AirIOInjectedRuntimeArgs
-    ):
-      return (
-          ex
-          + r_args.sequence_lengths["val"]
-          + int(jax.random.randint(rng, [], 0, 10))
-      )
-
-    task = grain_dataset_providers.GrainTask(
-        name="test_task",
-        source=self._get_test_src(),
-        preprocessors=[
-            grain_preprocessors.RandomMapFnTransform(
-                test_random_map_fn, self._runtime_args
-            )
-        ],
-    )
-    ds = task.get_dataset({"val": 3}, "train", shuffle=False, seed=42)
-    self.assertListEqual(list(ds), [8, 12, 10, 6, 15])
-
-  def test_filter_fn_preprocessor(self):
-    def test_filter_fn(ex, rargs: preprocessors.AirIOInjectedRuntimeArgs):
-      return ex > rargs.sequence_lengths["val"]
-
-    task = grain_dataset_providers.GrainTask(
-        name="test_task",
-        source=self._get_test_src(),
-        preprocessors=[
-            grain_preprocessors.FilterFnTransform(
-                test_filter_fn, self._runtime_args
-            )
-        ],
-    )
-    ds = task.get_dataset({"val": 3}, "train", shuffle=False, seed=42)
-    self.assertListEqual(list(ds), [4])
-
-  def test_unannotated_runtime_args(self):
-    def test_map_fn(ex, run_args):
-      return ex + run_args.sequence_lengths["val"]
-
-    task = grain_dataset_providers.GrainTask(
-        name="test_task",
-        source=self._get_test_src(),
-        preprocessors=[
-            grain_preprocessors.MapFnTransform(test_map_fn, self._runtime_args)
-        ],
-    )
-    with self.assertRaisesRegex(ValueError, "PyGrain encountered an error.*"):
-      ds = task.get_dataset(None, "train", shuffle=False)
-      _ = list(ds)
 
 
 
