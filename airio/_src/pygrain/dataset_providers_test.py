@@ -1935,16 +1935,16 @@ class MixtureTest(absltest.TestCase):
     self.assertListEqual(
         list(ds),
         [
-            {"idx": 1, "val": 2, "var": 5},  # task 1 ex 2
-            {"idx": 1, "val": 1, "var": 9},  # task 1 ex 1
-            {"idx": 2, "val": 2, "var": 5},  # task 2 ex 2
-            {"idx": 1, "val": 0, "var": 13},  # task 1 ex 0
+            {"idx": 1, "val": 2, "var": 18},  # task 1 ex 2
+            {"idx": 1, "val": 1, "var": 5},   # task 1 ex 1
+            {"idx": 2, "val": 2, "var": 18},  # task 2 ex 2
+            {"idx": 1, "val": 0, "var": 5},   # task 1 ex 0
             # epoch 1 end, no overlapping examples
-            {"idx": 1, "val": 1, "var": 19},  # task 1 ex 1
-            {"idx": 2, "val": 1, "var": 9},  # task 2 ex 1
-            {"idx": 1, "val": 0, "var": 5},  # task 1 ex 0
-            {"idx": 1, "val": 2, "var": 17},  # task 1 ex 2
-            {"idx": 2, "val": 0, "var": 13},  # task 2 ex 0
+            {"idx": 1, "val": 1, "var": 8},   # task 1 ex 1
+            {"idx": 2, "val": 1, "var": 5},   # task 2 ex 1
+            {"idx": 1, "val": 0, "var": 15},  # task 1 ex 0
+            {"idx": 1, "val": 2, "var": 18},  # task 1 ex 2
+            {"idx": 2, "val": 0, "var": 5},   # task 2 ex 0
             # task 1 dataset now empty
         ],
     )

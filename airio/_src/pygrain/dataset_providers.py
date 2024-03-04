@@ -101,9 +101,9 @@ class GrainTask(core_dataset_providers.Task):
         ds = ds.to_iter_dataset(_get_read_options(num_prefetch_threads))
       if transform.produces_none_elements:
         has_none_elems = True
-      ds = transform(ds, prep_rng, runtime_args)
+      prep_rng, sub_rng = jax.random.split(prep_rng)
+      ds = transform(ds, sub_rng, runtime_args)
       runtime_args = transform.get_updated_runtime_args(runtime_args)
-      prep_rng, _ = jax.random.split(prep_rng)
     return ds, runtime_args, has_none_elems
 
   def get_lazy_dataset(
