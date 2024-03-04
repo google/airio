@@ -14,9 +14,10 @@
 
 """Grain-based Data Source implementations for AirIO."""
 
+import copy
 import json
 import typing
-from typing import Iterable, Mapping, Protocol, Union
+from typing import Iterable, Mapping, Protocol
 from airio._src.core import data_sources
 import grain.python as grain
 import numpy as np
@@ -28,16 +29,15 @@ class ArrayRecordDataSource(data_sources.DataSource):
 
   def __init__(
       self,
-      split_to_filepattern: Mapping[str, Union[str, Iterable[str]]],
+      split_to_filepattern: Mapping[str, str | Iterable[str]],
   ):
-    self._split_to_filepattern = split_to_filepattern
+    self._split_to_filepattern = copy.deepcopy(split_to_filepattern)
 
     self.splits = frozenset(self._split_to_filepattern.keys())
-    self._sources = {}
-    for split in self.splits:
-      self._sources[split] = grain.ArrayRecordDataSource(
-          self._split_to_filepattern[split],
-      )
+    self._sources = {
+        split: grain.ArrayRecordDataSource(self._split_to_filepattern[split])
+        for split in self.splits
+    }
 
   def get_data_source(self, split: str) -> grain.ArrayRecordDataSource:
     if split not in self._sources:
@@ -76,7 +76,7 @@ class FunctionDataSource(data_sources.DataSource):
       splits: an iterable of applicable string split names.
     """
     self._dataset_fn = dataset_fn
-    self.splits = splits
+    self.splits = copy.deepcopy(splits)
 
   def get_data_source(self, split: str) -> np.ndarray:
     ds = self._dataset_fn(split=split)
@@ -93,7 +93,7 @@ class JsonDataSource(data_sources.DataSource):
 
   def __init__(
       self,
-      split_to_filepattern: Mapping[str, Union[str, Iterable[str]]],
+      split_to_filepattern: Mapping[str, str | Iterable[str]],
   ):
     """JsonDataSource constructor.
 
@@ -101,13 +101,15 @@ class JsonDataSource(data_sources.DataSource):
       split_to_filepattern: a mapping of split name to file pattern(s). File
         pattern(s) can be a single string or iterable.
     """
-    self._split_to_filepattern = split_to_filepattern
+    self._split_to_filepattern = copy.deepcopy(split_to_filepattern)
 
     self.splits = frozenset(self._split_to_filepattern.keys())
-    self._sources = {}
-    for split in self.splits:
-      elements = json.load(open(self._split_to_filepattern[split]))
-      self._sources[split] = grain.InMemoryDataSource(elements=elements)
+    self._sources = {
+        split: grain.InMemoryDataSource(
+            elements=json.load(open(self._split_to_filepattern[split]))
+        )
+        for split in self.splits
+    }
 
   def get_data_source(self, split: str) -> grain.InMemoryDataSource:
     if split not in self._sources:
@@ -129,7 +131,7 @@ class TfdsDataSource(data_sources.DataSource):
       self,
       tfds_name: str,
       tfds_data_dir: str | None = None,
-      splits: Union[Iterable[str], Mapping[str, str]] | None = None,
+      splits: Iterable[str] | Mapping[str, str] | None = None,
       decoders: tfds.typing.TreeDict[tfds.decode.Decoder] | None = None,
   ):
     self._tfds_name = tfds_name
@@ -141,14 +143,15 @@ class TfdsDataSource(data_sources.DataSource):
     else:
       self.splits = frozenset(splits or [])
 
-    self._sources = {}
-    for split in self.splits:
-      self._sources[split] = tfds.data_source(
-          self._tfds_name,
-          data_dir=self._tfds_data_dir,
-          split=split,
-          decoders=self._decoders,
-      )
+    self._sources = {
+        split: tfds.data_source(
+            self._tfds_name,
+            data_dir=self._tfds_data_dir,
+            split=split,
+            decoders=self._decoders,
+        )
+        for split in self.splits
+    }
 
   def get_data_source(self, split: str):
     if split not in self._sources:

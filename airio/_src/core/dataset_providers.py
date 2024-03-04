@@ -284,7 +284,7 @@ def get_dataset(
 
 
 def get_vocabularies(
-    mixture_or_task: Union[Task, Mixture]
+    mixture_or_task: Task | Mixture,
 ) -> Mapping[str, vocabularies.Vocabulary]:
   """Returns vocabularies for all features as configured in tokenizer."""
   if isinstance(mixture_or_task, Mixture):
