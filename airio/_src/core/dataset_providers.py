@@ -20,11 +20,11 @@ import typing
 from typing import Iterable, List, Mapping, Protocol, Sequence, Union
 
 from airio._src.core import data_sources
+from airio._src.core import dataset_iterators
 # Import "preprocessors" as "preprocessors_lib" to prevent naming conflicts with
 # "preprocessors" attrs in this file.
 from airio._src.core import preprocessors as preprocessors_lib
 from airio._src.core import tokenizer
-from clu.data import dataset_iterator as clu_dataset_iterator
 from seqio import vocabularies
 import tensorflow_datasets as tfds
 
@@ -58,7 +58,7 @@ class DatasetProviderBase(Protocol):
       num_epochs: int | None = 1,
       num_prefetch_threads: int | None = None,
       num_workers: int | None = 0,
-  ) -> clu_dataset_iterator.DatasetIterator:
+  ) -> dataset_iterators.AirIODatasetIterator:
     """Returns the dataset iterator."""
     ...
 
@@ -267,7 +267,7 @@ def get_dataset(
     shard_info: ShardInfo | None = None,
     num_prefetch_threads: int | None = None,
     num_workers: int | None = 0,
-) -> clu_dataset_iterator.DatasetIterator:
+) -> dataset_iterators.AirIODatasetIterator:
   """Returns the PyGrain dataset iterator."""
   return mixture_or_task.get_dataset(
       split=split,
