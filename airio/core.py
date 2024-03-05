@@ -33,6 +33,7 @@ from ._src.core.dataset_providers import ShardInfo
 from ._src.core.dataset_providers import Task
 from ._src.core.dataset_providers import TaskBuilder
 from ._src.core.preprocessors import AirIOInjectedRuntimeArgs
+from ._src.core.preprocessors import AirIOPreprocessor
 from ._src.core.preprocessors import FilterFnTransform
 from ._src.core.preprocessors import MapFnTransform
 from ._src.core.preprocessors import RandomMapFnTransform
