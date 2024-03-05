@@ -16,7 +16,7 @@
 
 import collections
 import concurrent.futures
-from typing import Any
+from typing import Any, Mapping
 
 from clu.data import dataset_iterator as clu_dataset_iterator
 
@@ -37,12 +37,11 @@ class AirIODatasetIterator(clu_dataset_iterator.DatasetIterator):
   ) -> concurrent.futures.Future[clu_dataset_iterator.Element]:
     raise NotImplementedError()
 
-  def get_state(self) -> dict[str, Any]:
+  def get_state(self) -> Mapping[str, Any]:
     raise NotImplementedError()
 
-  def set_state(self, state: dict[str, Any]) -> None:
+  def set_state(self, state: Mapping[str, Any]) -> None:
     raise NotImplementedError()
 
   def __repr__(self) -> str:
     return f"AirIODatasetIterator(), state: {self.get_state()!r}"
-

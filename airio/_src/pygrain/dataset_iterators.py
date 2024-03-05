@@ -16,7 +16,7 @@
 
 import concurrent.futures
 import json
-from typing import Any
+from typing import Any, Mapping
 
 from airio._src.core import dataset_iterators
 from clu import asynclib
@@ -97,12 +97,12 @@ class PyGrainDatasetIteratorWrapper(dataset_iterators.AirIODatasetIterator):
       self._peek_future = self._pool(self.peek)()
     return self._peek_future
 
-  def get_state(self) -> dict[str, Any]:
+  def get_state(self) -> Mapping[str, Any]:
     if self._state_as_dict:
       return self._iterator.get_state()
     return json.loads(self._iterator.get_state().decode())
 
-  def set_state(self, state: dict[str, Any]) -> None:
+  def set_state(self, state: Mapping[str, Any]) -> None:
     if not self._state_as_dict:
       state = json.dumps(state, indent=4).encode()
     self._iterator.set_state(state)
