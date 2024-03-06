@@ -136,8 +136,9 @@ class AirIOPackDatasetMapPreprocessor:
       runtime_args: core_preprocessors.AirIOInjectedRuntimeArgs,
   ) -> core_preprocessors.AirIOInjectedRuntimeArgs:
     """Updates runtime args with new sequence lengths for subsequent preprocessors."""
-    updated = runtime_args.clone()
-    updated.sequence_lengths = self.packer.get_packed_feature_lengths()
+    updated = dataclasses.replace(
+        runtime_args, sequence_lengths=self.packer.get_packed_feature_lengths()
+    )
     return updated
 
 
@@ -173,8 +174,9 @@ class AirIOPackDatasetIterPreprocessor:
       runtime_args: core_preprocessors.AirIOInjectedRuntimeArgs,
   ) -> core_preprocessors.AirIOInjectedRuntimeArgs:
     """Updates runtime args with new sequence lengths for subsequent preprocessors."""
-    updated = runtime_args.clone()
-    updated.sequence_lengths = self.packer.get_packed_feature_lengths()
+    updated = dataclasses.replace(
+        runtime_args, sequence_lengths=self.packer.get_packed_feature_lengths()
+    )
     return updated
 
 

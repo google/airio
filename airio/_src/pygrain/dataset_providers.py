@@ -142,15 +142,16 @@ class GrainTask(core_dataset_providers.Task):
 
     # Step 3: Run preprocessors and shuffle each epoch (if needed)
     preps = self._preprocessors
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    updated_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
         sequence_lengths=sequence_lengths, split=split
     )
     preprocessed_dss = []
-    updated_runtime_args = runtime_args
     has_none_elems = False
     next_epoch_rng = jax.random.key(seed)
     for ds in dss:
-      ds_runtime_args = runtime_args.clone()
+      ds_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+          sequence_lengths=sequence_lengths, split=split
+      )
       next_epoch_rng, prep_rng = jax.random.split(next_epoch_rng)
       prep_rng, shuffle_rng = jax.random.split(prep_rng)
       ds, updated_runtime_args, has_none_elems = (
