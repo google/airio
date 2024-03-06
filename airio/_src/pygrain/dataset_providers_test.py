@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """Tests for airio.pygrain.dataset_providers."""
-
+import dataclasses
 import functools
 import os
 from typing import Dict, Sequence
@@ -945,12 +945,16 @@ class TaskTest(absltest.TestCase):
 
   def test_get_updated_runtime_args(self):
     def update_runtime_args_1(args):
-      args.sequence_lengths.update({"new_val": 5})
-      return args
+      seq_lens = dict(args.sequence_lengths)
+      seq_lens.update({"new_val": 5})
+      new_args = dataclasses.replace(args, sequence_lengths=seq_lens)
+      return new_args
 
     def update_runtime_args_2(args):
-      args.sequence_lengths.update({"another_val": 7})
-      return args
+      seq_lens = args.sequence_lengths
+      seq_lens.update({"another_val": 7})
+      new_args = dataclasses.replace(args, sequence_lengths=seq_lens)
+      return new_args
 
     prep_1 = preprocessors_lib.MapFnTransform(
         lambda x: x,

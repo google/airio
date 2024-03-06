@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """Preprocessors tests."""
-
+import dataclasses
 from unittest import mock
 
 from absl.testing import absltest
@@ -218,8 +218,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     for k, v in run_args.sequence_lengths.items():
       new_seq_lens[f"{k}_new"] = v
       new_seq_lens[k] = v + 1
-    updated = run_args.clone()
-    updated.sequence_lengths = new_seq_lens
+    updated = dataclasses.replace(run_args, sequence_lengths=new_seq_lens)
     return updated
 
   def test_map_fn_preprocessor(self):

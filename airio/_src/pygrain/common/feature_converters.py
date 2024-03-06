@@ -34,6 +34,7 @@ ds = airio.get_dataset(..., runtime_preprocessors=preps)
 """
 
 from collections.abc import Sequence
+import dataclasses
 import functools
 
 from airio._src.core import preprocessors as core_preprocessors
@@ -411,8 +412,9 @@ def _update_runtime_args_for_t5x_enc_dec_features(
     model_feature_lengths["decoder_segment_ids"] = decoder_length
     model_feature_lengths["encoder_positions"] = encoder_length
     model_feature_lengths["decoder_positions"] = decoder_length
-  updated = runtime_args.clone()
-  updated.sequence_lengths = model_feature_lengths
+  updated = dataclasses.replace(
+      runtime_args, sequence_lengths=model_feature_lengths
+  )
   return updated
 
 
@@ -520,8 +522,9 @@ def _update_runtime_args_for_t5x_lm_features(
   if packed:
     model_feature_lengths["decoder_segment_ids"] = decoder_length
     model_feature_lengths["decoder_positions"] = decoder_length
-  updated = runtime_args.clone()
-  updated.sequence_lengths = model_feature_lengths
+  updated = dataclasses.replace(
+      runtime_args, sequence_lengths=model_feature_lengths
+  )
   return updated
 
 
@@ -742,8 +745,9 @@ def _update_runtime_args_for_t5x_prefix_lm_features(
   task_feature_lengths = runtime_args.sequence_lengths
   decoder_length = task_feature_lengths["targets"]  # already concatenated.
 
-  concat_args = runtime_args.clone()
-  concat_args.sequence_lengths = {"targets": decoder_length}
+  concat_args = dataclasses.replace(
+      runtime_args, sequence_lengths={"targets": decoder_length}
+  )
   lm_model_feature_lengths = _update_runtime_args_for_t5x_lm_features(
       concat_args, packed=packed
   ).sequence_lengths
@@ -751,8 +755,9 @@ def _update_runtime_args_for_t5x_prefix_lm_features(
   model_feature_lengths["decoder_causal_attention"] = decoder_length
   for k in passthrough_feature_keys:
     model_feature_lengths[k] = task_feature_lengths[k]
-  updated_args = runtime_args.clone()
-  updated_args.sequence_lengths = model_feature_lengths
+  updated_args = dataclasses.replace(
+      runtime_args, sequence_lengths=model_feature_lengths
+  )
   return updated_args
 
 
@@ -824,8 +829,9 @@ def _concat_task_feature_lengths_for_prefix_lm(
   }
   for k in passthrough_feature_keys:
     task_lengths[k] = task_feature_lengths[k]
-  updated_args = runtime_args.clone()
-  updated_args.sequence_lengths = task_lengths
+  updated_args = dataclasses.replace(
+      runtime_args, sequence_lengths=task_lengths
+  )
   return updated_args
 
 
