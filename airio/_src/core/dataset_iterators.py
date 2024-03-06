@@ -45,3 +45,7 @@ class AirIODatasetIterator(clu_dataset_iterator.DatasetIterator):
 
   def __repr__(self) -> str:
     return f"AirIODatasetIterator(), state: {self.get_state()!r}"
+
+  @property
+  def element_spec(self) -> clu_dataset_iterator.ElementSpec:
+    raise NotImplementedError()
