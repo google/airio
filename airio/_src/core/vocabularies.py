@@ -18,14 +18,14 @@ import dataclasses
 import functools
 import hashlib
 import threading
-from typing import ClassVar, Protocol, TypeVar, Generic
+from typing import ClassVar, Generic, Protocol, TypeVar
 
 from absl import logging
-import tensorflow as tf
 
 from sentencepiece import sentencepiece_model_pb2
 import sentencepiece as sentencepiece_processor
 
+Open = open
 PAD_ID = 0
 Encoded = TypeVar("Encoded")
 Decoded = TypeVar("Decoded")
@@ -191,7 +191,7 @@ class SentencePieceVocabulary(Vocabulary[Encoded, Decoded]):
     # SeqIO preprocessors.
     with cls._load_model_lock:
       # Handle cases where SP can't load the file, but gfile can.
-      with tf.io.gfile.GFile(sentencepiece_model_file, "rb") as f:
+      with Open(sentencepiece_model_file, "rb") as f:
         sp_model = f.read()
         model = sentencepiece_model_pb2.ModelProto.FromString(sp_model)
         # Add placeholder strings for extra IDs.
