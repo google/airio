@@ -22,12 +22,11 @@ import airio.pygrain as airio
 import airio.pygrain_common as airio_common
 import babel
 from seqio import preprocessors as seqio_preprocessors
-from seqio import vocabularies
 import tensorflow_datasets as tfds
 
 _DEFAULT_EXTRA_IDS = 100
 _DEFAULT_SPM_PATH = "gs://t5-data/vocabs/cc_all.32000/sentencepiece.model"
-_DEFAULT_VOCAB = vocabularies.SentencePieceVocabulary(
+_DEFAULT_VOCAB = airio.SentencePieceVocabulary(
     _DEFAULT_SPM_PATH, _DEFAULT_EXTRA_IDS
 )
 

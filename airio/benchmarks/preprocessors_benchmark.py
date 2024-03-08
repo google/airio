@@ -22,7 +22,6 @@ import google_benchmark
 import grain.python as grain
 import jax
 import numpy as np
-from seqio import vocabularies
 
 
 lazy_dataset = grain.experimental.lazy_dataset
@@ -31,7 +30,7 @@ _SOURCE_NUM_EXAMPLES = 5
 _TEST_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "test_data"
 )
-_SENTENCEPIECE_VOCAB = vocabularies.SentencePieceVocabulary(
+_SENTENCEPIECE_VOCAB = airio.SentencePieceVocabulary(
     os.path.join(_TEST_DIR, "sentencepiece", "sentencepiece.model")
 )
 _TOKENIZER_CONFIG = airio.TokenizerConfig(vocab=_SENTENCEPIECE_VOCAB)

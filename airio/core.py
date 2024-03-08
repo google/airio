@@ -37,8 +37,8 @@ from ._src.core.preprocessors import AirIOPreprocessor
 from ._src.core.preprocessors import FilterFnTransform
 from ._src.core.preprocessors import MapFnTransform
 from ._src.core.preprocessors import RandomMapFnTransform
-from ._src.core.tokenizer import Tokenizer
 from ._src.core.tokenizer import TokenizerConfig
+from ._src.core.vocabularies import Vocabulary
 
 # Version number.
 from .version import __version__

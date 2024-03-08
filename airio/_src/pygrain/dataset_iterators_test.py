@@ -21,9 +21,10 @@ from typing import Dict
 from unittest import mock
 
 from absl.testing import absltest
-from airio._src.core import tokenizer
+from airio._src.core import tokenizer as core_tokenizer
 from airio._src.pygrain import dataset_iterators
 from airio._src.pygrain import preprocessors
+from airio._src.pygrain import tokenizer
 from clu.data import dataset_iterator as clu_dataset_iterator
 import grain.python as grain
 import numpy as np
@@ -92,7 +93,9 @@ class DatasetIteratorsWithDataLoaderTest(absltest.TestCase):
     sentencepiece_vocab = vocabularies.SentencePieceVocabulary(
         os.path.join(self.test_dir, "sentencepiece", "sentencepiece.model")
     )
-    self.tokenizer_config = tokenizer.TokenizerConfig(vocab=sentencepiece_vocab)
+    self.tokenizer_config = core_tokenizer.TokenizerConfig(
+        vocab=sentencepiece_vocab
+    )
     self.expected_data = _get_expected_data()
 
   def _get_dummy_data_loader(self) -> grain.DataLoader:
@@ -292,7 +295,9 @@ class DatasetIteratorsWithLazyMapDatasetTest(absltest.TestCase):
     sentencepiece_vocab = vocabularies.SentencePieceVocabulary(
         os.path.join(self.test_dir, "sentencepiece", "sentencepiece.model")
     )
-    self.tokenizer_config = tokenizer.TokenizerConfig(vocab=sentencepiece_vocab)
+    self.tokenizer_config = core_tokenizer.TokenizerConfig(
+        vocab=sentencepiece_vocab
+    )
     self.expected_data = _get_expected_data()
 
   def _get_dummy_lazy_map_dataset(self) -> lazy_dataset.LazyMapDataset:
@@ -460,7 +465,9 @@ class DatasetIteratorsWithLazyIterDatasetTest(absltest.TestCase):
     sentencepiece_vocab = vocabularies.SentencePieceVocabulary(
         os.path.join(self.test_dir, "sentencepiece", "sentencepiece.model")
     )
-    self.tokenizer_config = tokenizer.TokenizerConfig(vocab=sentencepiece_vocab)
+    self.tokenizer_config = core_tokenizer.TokenizerConfig(
+        vocab=sentencepiece_vocab
+    )
     self.expected_data = _get_expected_data()
 
   def _get_dummy_lazy_iter_dataset(self) -> lazy_dataset.LazyMapDataset:

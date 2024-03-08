@@ -18,13 +18,12 @@ from typing import Dict
 
 from absl import app
 import airio.pygrain as airio
-from seqio import vocabularies
 
 
 DEFAULT_SPM_PATH = (
     "gs://t5-data/vocabs/mc4.250000.100extra/sentencepiece.model"
 )
-DEFAULT_VOCAB = vocabularies.SentencePieceVocabulary(DEFAULT_SPM_PATH)
+DEFAULT_VOCAB = airio.SentencePieceVocabulary(DEFAULT_SPM_PATH)
 RECORDS_TO_INSPECT = 2
 
 

@@ -21,7 +21,6 @@ from absl.testing import absltest
 from airio import examples
 import airio.pygrain as airio
 import airio.pygrain_common as airio_common
-from seqio import vocabularies
 import tensorflow_datasets as tfds
 
 
@@ -57,7 +56,7 @@ class TasksTest(absltest.TestCase):
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "test_data",
     )
-    sentencepiece_vocab = vocabularies.SentencePieceVocabulary(
+    sentencepiece_vocab = airio.SentencePieceVocabulary(
         os.path.join(self.test_dir, "sentencepiece", "sentencepiece.model")
     )
     self.tokenizer_configs = {

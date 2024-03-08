@@ -19,8 +19,8 @@ from unittest import mock
 
 from absl.testing import absltest
 from airio._src.core import tokenizer
-import numpy as np
 from seqio import vocabularies
+
 
 
 _TEST_DATA_DIR = os.path.join(
@@ -32,79 +32,32 @@ class TokenizerTest(absltest.TestCase):
 
   def setUp(self):
     super().setUp()
+    self.sentencepiece_vocab = vocabularies.SentencePieceVocabulary(
+        os.path.join(_TEST_DATA_DIR, "sentencepiece", "sentencepiece.model")
+    )
+
+  def test_tokenizer_config_properties(self):
+    tokenizer_config = tokenizer.TokenizerConfig(vocab=self.sentencepiece_vocab)
+    self.assertEqual(tokenizer_config.vocabulary, self.sentencepiece_vocab)
+    self.assertEqual(tokenizer_config.add_eos, True)
+
+  @mock.patch.object(
+      dm_usage_logging, "log_event", autospec=True, return_value=[]
+  )
+  def test_telemetry_create_config(self, mock_log_event):
     sentencepiece_vocab = vocabularies.SentencePieceVocabulary(
         os.path.join(_TEST_DATA_DIR, "sentencepiece", "sentencepiece.model")
     )
-    self.tokenizer_configs = {
-        "inputs": tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),
-        "targets": tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),
-    }
-
-  def test_tokenize(self):
-    orig_example = {
-        "inputs": "imdb ebc   ahgjefjhfe",
-        "targets": "positive",
-    }
-    tokenizer_obj = tokenizer.Tokenizer(
-        tokenizer_configs=self.tokenizer_configs
-    )
-    tokenized_example = tokenizer_obj(orig_example)
-    expected_example = {
-        "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
-        "inputs": np.array(
-            [3, 8, 14, 21, 2, 3, 4, 2, 13, 3, 5, 20, 2, 4, 2, 20, 2, 4]
+    _ = tokenizer.TokenizerConfig(vocab=sentencepiece_vocab)
+    expected = [
+        mock.call(
+            dm_usage_logging.Event.AIRIO,
+            "airio._src.core.tokenizer.TokenizerConfig",
+            tag_2="__init__",
+            tag_3="",
         ),
-        "targets_pretokenized": "positive",
-        "targets": np.array([3, 15, 7, 6, 8, 24, 8, 25, 4]),
-    }
-    for feature, value in tokenized_example.items():
-      if isinstance(value, np.ndarray):
-        np.testing.assert_allclose(value, expected_example[feature])
-      else:
-        self.assertEqual(value, expected_example[feature])
-
-  def test_tokenize_feature_not_in_config(self):
-    orig_example = {
-        "metadata": "sequence metadata",
-    }
-    tokenizer_obj = tokenizer.Tokenizer(
-        tokenizer_configs=self.tokenizer_configs
-    )
-    tokenized_example = tokenizer_obj(orig_example)
-    for feature, value in tokenized_example.items():
-      if isinstance(value, np.ndarray):
-        np.testing.assert_allclose(value, orig_example[feature])
-      else:
-        self.assertEqual(value, orig_example[feature])
-
-  def test_tokenize_do_not_copy_pretokenized(self):
-    orig_example = {
-        "inputs": "imdb ebc   ahgjefjhfe",
-        "targets": "positive",
-    }
-    tokenizer_obj = tokenizer.Tokenizer(
-        tokenizer_configs=self.tokenizer_configs,
-        copy_pretokenized=False,
-    )
-    tokenized_example = tokenizer_obj(orig_example)
-    expected_example = {
-        "inputs": np.array(
-            [3, 8, 14, 21, 2, 3, 4, 2, 13, 3, 5, 20, 2, 4, 2, 20, 2, 4]
-        ),
-        "targets": np.array([3, 15, 7, 6, 8, 24, 8, 25, 4]),
-    }
-    for feature, value in tokenized_example.items():
-      if isinstance(value, np.ndarray):
-        np.testing.assert_allclose(value, expected_example[feature])
-      else:
-        self.assertEqual(value, expected_example[feature])
-
-  def test_tokenize_empty(self):
-    tokenizer_obj = tokenizer.Tokenizer(
-        tokenizer_configs=self.tokenizer_configs
-    )
-    tokenized_example = tokenizer_obj({})
-    self.assertEmpty(tokenized_example)
+    ]
+    mock_log_event.assert_has_calls(expected, any_order=True)
 
 
 if __name__ == "__main__":

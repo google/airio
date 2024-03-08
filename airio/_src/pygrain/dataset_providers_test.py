@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Tests for airio.pygrain.dataset_providers."""
+
 import dataclasses
 import functools
 import os
@@ -26,10 +27,11 @@ from airio._src.core import dataset_providers as core_dataset_providers
 # "preprocessors" attrs in this file.
 from airio._src.core import preprocessors as core_preprocessors_lib
 from airio._src.core import test_utils
-from airio._src.core import tokenizer
+from airio._src.core import tokenizer as core_tokenizer
 from airio._src.pygrain import data_sources
 from airio._src.pygrain import dataset_providers
 from airio._src.pygrain import preprocessors as preprocessors_lib
+from airio._src.pygrain import tokenizer
 from airio._src.pygrain.common import feature_converters
 import grain.python as grain
 import jax
@@ -68,8 +70,8 @@ def _create_sentencepiece_vocab() -> vocabularies.SentencePieceVocabulary:
   return sentencepiece_vocab
 
 
-def _create_tokenizer_config() -> tokenizer.TokenizerConfig:
-  return tokenizer.TokenizerConfig(vocab=_create_sentencepiece_vocab())
+def _create_tokenizer_config() -> core_tokenizer.TokenizerConfig:
+  return core_tokenizer.TokenizerConfig(vocab=_create_sentencepiece_vocab())
 
 
 def _create_preprocessors() -> (
@@ -1940,15 +1942,15 @@ class MixtureTest(absltest.TestCase):
         list(ds),
         [
             {"idx": 1, "val": 2, "var": 18},  # task 1 ex 2
-            {"idx": 1, "val": 1, "var": 5},   # task 1 ex 1
+            {"idx": 1, "val": 1, "var": 5},  # task 1 ex 1
             {"idx": 2, "val": 2, "var": 18},  # task 2 ex 2
-            {"idx": 1, "val": 0, "var": 5},   # task 1 ex 0
+            {"idx": 1, "val": 0, "var": 5},  # task 1 ex 0
             # epoch 1 end, no overlapping examples
-            {"idx": 1, "val": 1, "var": 8},   # task 1 ex 1
-            {"idx": 2, "val": 1, "var": 5},   # task 2 ex 1
+            {"idx": 1, "val": 1, "var": 8},  # task 1 ex 1
+            {"idx": 2, "val": 1, "var": 5},  # task 2 ex 1
             {"idx": 1, "val": 0, "var": 15},  # task 1 ex 0
             {"idx": 1, "val": 2, "var": 18},  # task 1 ex 2
-            {"idx": 2, "val": 0, "var": 5},   # task 2 ex 0
+            {"idx": 2, "val": 0, "var": 5},  # task 2 ex 0
             # task 1 dataset now empty
         ],
     )

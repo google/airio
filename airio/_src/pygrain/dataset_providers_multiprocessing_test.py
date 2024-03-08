@@ -27,10 +27,11 @@ from airio._src.core import dataset_providers as core_dataset_providers
 # "preprocessors" attrs in this file.
 from airio._src.core import preprocessors as core_preprocessors_lib
 from airio._src.core import test_utils
-from airio._src.core import tokenizer
+from airio._src.core import tokenizer as core_tokenizer
 from airio._src.pygrain import data_sources
 from airio._src.pygrain import dataset_providers
 from airio._src.pygrain import preprocessors as preprocessors_lib
+from airio._src.pygrain import tokenizer
 from airio._src.pygrain.common import feature_converters
 import grain.python as grain
 import numpy as np
@@ -112,8 +113,8 @@ def _create_sentencepiece_vocab() -> vocabularies.SentencePieceVocabulary:
   return sentencepiece_vocab
 
 
-def _create_tokenizer_config() -> tokenizer.TokenizerConfig:
-  return tokenizer.TokenizerConfig(vocab=_create_sentencepiece_vocab())
+def _create_tokenizer_config() -> core_tokenizer.TokenizerConfig:
+  return core_tokenizer.TokenizerConfig(vocab=_create_sentencepiece_vocab())
 
 
 def _create_preprocessors() -> (

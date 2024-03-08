@@ -33,9 +33,12 @@ from ._src.pygrain.dataset_providers import GrainMixture
 from ._src.pygrain.preprocessors import FilterFnTransform
 from ._src.pygrain.preprocessors import MapFnTransform
 from ._src.pygrain.preprocessors import RandomMapFnTransform
+from ._src.pygrain.tokenizer import Tokenizer
+from ._src.pygrain.vocabularies import SentencePieceVocabulary
 
 # Individual members and functions from core.
 from ._src.core.dataset_providers import ShardInfo
 from ._src.core.preprocessors import AirIOInjectedRuntimeArgs
-from ._src.core.tokenizer import Tokenizer
 from ._src.core.tokenizer import TokenizerConfig
+from ._src.core.vocabularies import Vocabulary
+

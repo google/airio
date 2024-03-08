@@ -28,6 +28,7 @@ from airio._src.core import tokenizer
 from airio._src.pygrain import data_sources as pygrain_data_sources
 from airio._src.pygrain import dataset_providers as pygrain_dataset_providers
 from airio._src.pygrain import preprocessors as pygrain_preprocessors
+from airio._src.pygrain import tokenizer as pygrain_tokenizer
 import grain.python as grain
 import numpy as np
 from seqio import vocabularies
@@ -72,7 +73,7 @@ def _create_preprocessors() -> Sequence[dataset_providers.AirIOPreprocessor]:
   return [
       pygrain_preprocessors.MapFnTransform(_imdb_preprocessor),
       pygrain_preprocessors.MapFnTransform(
-          tokenizer.Tokenizer(
+          pygrain_tokenizer.Tokenizer(
               tokenizer_configs={
                   "inputs": tokenizer_config,
                   "targets": tokenizer_config,

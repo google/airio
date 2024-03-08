@@ -13,12 +13,14 @@
 # limitations under the License.
 
 """Tokenizer-specific classes."""
-
 import dataclasses
-from typing import Mapping
+import typing
+from typing import Generic, Mapping, Protocol, TypeVar
 
-import numpy as np
-from seqio import vocabularies
+from airio._src.core import vocabularies
+
+Inp = TypeVar("Inp")
+Out = TypeVar("Out")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -27,33 +29,21 @@ class TokenizerConfig:
 
   vocab: vocabularies.Vocabulary
   add_eos: bool = True
-  dtype: np.dtype = np.int_
-  rank: int = 1
+
 
   @property
   def vocabulary(self) -> vocabularies.Vocabulary:
     return self.vocab
 
 
+@typing.runtime_checkable
 @dataclasses.dataclass(frozen=True)
-class Tokenizer:
+class Tokenizer(Generic[Inp, Out], Protocol):
   """Tokenizer class for AirIO tasks/mixtures."""
 
   tokenizer_configs: Mapping[str, TokenizerConfig]
   copy_pretokenized: bool = True
+  with_eos: bool = False
 
-  def __call__(self, orig_example) -> ...:
-    final_example = {}
-    for feature_name, feature_value in orig_example.items():
-      if feature_name not in self.tokenizer_configs:
-        final_example[feature_name] = feature_value
-        continue
-
-      if self.copy_pretokenized:
-        final_example[f"{feature_name}_pretokenized"] = feature_value
-
-      tokenizer_config = self.tokenizer_configs[feature_name]
-      encoded_val = tokenizer_config.vocab.encode(feature_value)
-      final_example[feature_name] = np.asarray(encoded_val)
-
-    return final_example
+  def __call__(self, orig_example: Inp) -> Out:
+    ...

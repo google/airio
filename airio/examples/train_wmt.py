@@ -24,7 +24,6 @@ from absl import app
 from airio import examples
 import airio.pygrain as airio
 from airio.pygrain_common import feature_converters
-from seqio import vocabularies
 from t5x import adafactor
 from t5x import gin_utils
 from t5x import models
@@ -36,7 +35,7 @@ from t5x.examples.t5 import network
 
 _DEFAULT_EXTRA_IDS = 100
 _DEFAULT_SPM_PATH = "gs://t5-data/vocabs/cc_all.32000/sentencepiece.model"
-_DEFAULT_VOCAB = vocabularies.SentencePieceVocabulary(
+_DEFAULT_VOCAB = airio.SentencePieceVocabulary(
     _DEFAULT_SPM_PATH, _DEFAULT_EXTRA_IDS
 )
 _EVAL_STEPS = 2
@@ -61,7 +60,7 @@ def get_t5_model(**config_overrides) -> models.EncoderDecoderModel:
       logits_via_embedding=False,
   )
   tiny_config = dataclasses.replace(tiny_config, **config_overrides)
-  return models.EncoderDecoderModel(
+  return models.EncoderDecoderModel(  # pytype: disable=wrong-arg-types
       module=network.Transformer(tiny_config),
       input_vocabulary=_DEFAULT_VOCAB,
       output_vocabulary=_DEFAULT_VOCAB,

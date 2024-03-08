@@ -24,7 +24,6 @@ import google_benchmark
 import jax
 import jax.numpy as jnp
 import numpy as np
-from seqio import vocabularies
 import tensorflow_datasets as tfds
 
 partial = functools.partial
@@ -62,7 +61,7 @@ def _get_tokenizer_configs():
       os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
       "test_data",
   )
-  sentencepiece_vocab = vocabularies.SentencePieceVocabulary(
+  sentencepiece_vocab = airio.SentencePieceVocabulary(
       os.path.join(test_dir, "sentencepiece", "sentencepiece.model")
   )
   return {

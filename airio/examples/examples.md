@@ -13,8 +13,8 @@ preprocessing steps. It performs the following actions:
 
 1. Load the [IMDB reviews][imdb_reviews] dataset.
 2. Map the raw data to a format suitable for training.
-3. Tokenize the text using SeqIO's
-[`SentencePieceVocabulary`][seqio_vocabularies].
+3. Tokenize the text using AirIO's
+[`SentencePieceVocabulary`][airio_vocabularies].
 
 The task's `get_dataset()` method is called, to demonstrate the contents of
 each record after fully processing all steps.
@@ -27,8 +27,8 @@ preprocessing steps. It performs the following actions:
 
 1. Load the [IMDB reviews][imdb_reviews] dataset.
 2. Map the raw data to a format suitable for training.
-3. Tokenize the text using SeqIO's
-[`SentencePieceVocabulary`][seqio_vocabularies].
+3. Tokenize the text using AirIO's
+[`SentencePieceVocabulary`][airio_vocabularies].
 
 The task's `get_dataset_by_step()` method is called, to demonstrate the contents
 of each record after each individual processing step.
@@ -56,5 +56,5 @@ The training example demonstrates training with T5X on the [WMT][wmt] data set.
 [quickstart_py]: https://github.com/google/airio/tree/main/airio/examples/quickstart.py
 [train_wmt_ipynb]: https://github.com/google/airio/tree/main/airio/examples/train_wmt.ipynb
 [train_wmt_py]: https://github.com/google/airio/tree/main/airio/examples/train_wmt.py
-[seqio_vocabularies]: https://github.com/google/seqio/blob/main/seqio/vocabularies.py
+[airio_vocabularies]: https://github.com/google/airio/blob/main/airio/_src/pygrain/vocabularies.py
 [wmt]: https://www.tensorflow.org/datasets/catalog/wmt19_translate
