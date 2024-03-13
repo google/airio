@@ -25,10 +25,10 @@ from airio._src.core import tokenizer as core_tokenizer
 from airio._src.pygrain import dataset_iterators
 from airio._src.pygrain import preprocessors
 from airio._src.pygrain import tokenizer
+from airio._src.pygrain import vocabularies
 from clu.data import dataset_iterator as clu_dataset_iterator
 import grain.python as grain
 import numpy as np
-from seqio import vocabularies
 
 
 lazy_dataset = grain.experimental.lazy_dataset

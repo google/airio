@@ -19,7 +19,7 @@ from unittest import mock
 
 from absl.testing import absltest
 from airio._src.core import tokenizer
-from seqio import vocabularies
+from airio._src.pygrain import vocabularies
 
 
 

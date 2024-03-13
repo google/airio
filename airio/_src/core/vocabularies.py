@@ -18,6 +18,7 @@ import dataclasses
 import functools
 import hashlib
 import threading
+import typing
 from typing import ClassVar, Generic, Protocol, TypeVar
 
 from absl import logging
@@ -31,6 +32,7 @@ Encoded = TypeVar("Encoded")
 Decoded = TypeVar("Decoded")
 
 
+@typing.runtime_checkable
 class Vocabulary(Generic[Encoded, Decoded], Protocol):
   """Abstract class for vocabularies.
 
@@ -77,7 +79,8 @@ class Vocabulary(Generic[Encoded, Decoded], Protocol):
     ...
 
 
-class SentencePieceVocabulary(Vocabulary[Encoded, Decoded]):
+@typing.runtime_checkable
+class SentencePieceVocabulary(Vocabulary[Encoded, Decoded], Protocol):
   """Wrapper around sentencepiece_processor.
 
   Assumes the model was built using flags to reserve ID=0 for padding, ID=1 for
@@ -188,7 +191,7 @@ class SentencePieceVocabulary(Vocabulary[Encoded, Decoded]):
     # SentencePieceProcessor::LoadFromSerializedProto is not thread-safe.
     # Without a lock, users may randomly see SIGSEGV on
     # sentencepiece::ModelInterface::pad_piece when using the vocabulary in
-    # SeqIO preprocessors.
+    # preprocessors.
     with cls._load_model_lock:
       # Handle cases where SP can't load the file, but gfile can.
       with Open(sentencepiece_model_file, "rb") as f:
@@ -302,8 +305,8 @@ class SentencePieceVocabulary(Vocabulary[Encoded, Decoded]):
 
   def encode(self, s: Decoded):
     """Tokenizes string to an int sequence, without adding EOS."""
-    raise NotImplementedError()
+    ...
 
   def decode(self, ids: Encoded):
     """Detokenizes int32 iterable to a string, up through first EOS."""
-    raise NotImplementedError()
+    ...

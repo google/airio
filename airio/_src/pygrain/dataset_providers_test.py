@@ -32,11 +32,12 @@ from airio._src.pygrain import data_sources
 from airio._src.pygrain import dataset_providers
 from airio._src.pygrain import preprocessors as preprocessors_lib
 from airio._src.pygrain import tokenizer
+from airio._src.pygrain import vocabularies
+
 from airio._src.pygrain.common import feature_converters
 import grain.python as grain
 import jax
 import numpy as np
-from seqio import vocabularies
 import tensorflow_datasets as tfds
 
 

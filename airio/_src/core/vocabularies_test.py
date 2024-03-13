@@ -14,6 +14,7 @@
 
 import os
 import pickle
+from typing import Protocol
 from absl.testing import absltest
 from absl.testing import parameterized
 from airio._src.core import vocabularies
@@ -40,7 +41,7 @@ class VocabularyTest(absltest.TestCase):
   TEST_STR = "Testing."
   TEST_IDS = [84, 101, 115, 116, 105, 110, 103, 46]
 
-  class AsciiTestVocab(vocabularies.Vocabulary):
+  class AsciiTestVocab(vocabularies.Vocabulary, Protocol):
 
     def __init__(self, extra_ids=0, use_eos=True, use_unk=True):
       self._extra_ids = extra_ids
@@ -72,10 +73,10 @@ class VocabularyTest(absltest.TestCase):
       return self.base_vocab_size + self._extra_ids
 
     def encode(self, s):
-      raise NotImplementedError()
+      ...
 
     def decode(self, ids):
-      raise NotImplementedError()
+      ...
 
   class PyAsciiTestVocab(AsciiTestVocab):
 
@@ -145,14 +146,16 @@ class VocabularyTest(absltest.TestCase):
     return _apply(lambda x: x.decode("UTF-8"), results)
 
   def test_properties(self):
-    test_vocab = self.AsciiTestVocab(use_eos=False, use_unk=True, extra_ids=10)
+    test_vocab = self.PyAsciiTestVocab(
+        use_eos=False, use_unk=True, extra_ids=10
+    )
     self.assertEqual(test_vocab.extra_ids, 10)
     self.assertEqual(test_vocab.pad_id, 0)
     self.assertIsNone(test_vocab.eos_id)
     self.assertEqual(test_vocab.unk_id, 2)
     self.assertEqual(test_vocab.vocab_size, 128 + 10)
 
-    test_vocab = self.AsciiTestVocab(use_eos=True, use_unk=False)
+    test_vocab = self.TfAsciiTestVocab(use_eos=True, use_unk=False)
     self.assertEqual(test_vocab.extra_ids, 0)
     self.assertEqual(test_vocab.pad_id, 0)
     self.assertEqual(test_vocab.eos_id, 1)

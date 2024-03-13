@@ -29,9 +29,10 @@ from airio._src.pygrain import data_sources as pygrain_data_sources
 from airio._src.pygrain import dataset_providers as pygrain_dataset_providers
 from airio._src.pygrain import preprocessors as pygrain_preprocessors
 from airio._src.pygrain import tokenizer as pygrain_tokenizer
+from airio._src.pygrain import vocabularies
+
 import grain.python as grain
 import numpy as np
-from seqio import vocabularies
 import tensorflow_datasets as tfds
 
 
