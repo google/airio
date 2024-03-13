@@ -20,8 +20,8 @@ from unittest import mock
 from absl.testing import absltest
 from airio._src.core import tokenizer as core_tokenizer
 from airio._src.pygrain import tokenizer
+from airio._src.pygrain import vocabularies
 import numpy as np
-from seqio import vocabularies
 
 
 _TEST_DATA_DIR = os.path.join(
