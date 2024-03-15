@@ -302,6 +302,18 @@ class TfdsDataSourceTest(absltest.TestCase):
       source = data_sources.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=None)
     self.assertEmpty(source.splits)
 
+  def test_splits_map(self):
+    with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
+      source = data_sources.TfdsDataSource(
+          tfds_name=_SOURCE_NAME,
+          splits={"my_split": "train", "my_other_split": "test"},
+      )
+    expected_splits = frozenset(["my_split", "my_other_split"])
+    self.assertEqual(source.splits, expected_splits)
+    for split in expected_splits:
+      data_source = source.get_data_source(split)
+      self.assertLen(data_source, 3)
+
 
 
 if __name__ == "__main__":

@@ -142,15 +142,18 @@ class TfdsDataSource(data_sources.DataSource):
       self.splits = frozenset([splits])
     else:
       self.splits = frozenset(splits or [])
+    self.splits_map = (
+        splits if isinstance(splits, Mapping) else {s: s for s in self.splits}
+    )
 
     self._sources = {
-        split: tfds.data_source(
+        split_name: tfds.data_source(
             self._tfds_name,
             data_dir=self._tfds_data_dir,
-            split=split,
+            split=split_val,
             decoders=self._decoders,
         )
-        for split in self.splits
+        for split_name, split_val in self.splits_map.items()
     }
 
   def get_data_source(self, split: str):
