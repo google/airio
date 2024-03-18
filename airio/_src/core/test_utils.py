@@ -17,11 +17,12 @@
 from typing import Any, Mapping, Sequence
 
 from absl.testing import absltest
+from airio._src.core import dataset_iterators
 import numpy as np
 
 
 def assert_datasets_equal(
-    dataset: np.ndarray,
+    dataset: np.ndarray | dataset_iterators.AirIODatasetIterator,
     expected: Sequence[Mapping[str, Any]],
 ):
   """Tests whether the entire dataset == expected or [expected].
