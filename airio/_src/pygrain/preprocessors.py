@@ -171,7 +171,7 @@ class LazyIterTransform:
 # `can_process_iter_dataset`, and `requires_non_none_elements`.
 FnTransforms = MapFnTransform | RandomMapFnTransform | FilterFnTransform
 LazyTransforms = LazyMapTransform | LazyIterTransform
-PyGrainAirIOPreprocessor = core_preprocessors.AirIOPreprocessor | LazyTransforms
+PyGrainAirIOPreprocessor = grain.Transformation | LazyTransforms
 
 
 @dataclasses.dataclass

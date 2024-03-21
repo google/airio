@@ -26,10 +26,8 @@ from airio._src.core import dataset_iterators
 from airio._src.core import preprocessors as preprocessors_lib
 from airio._src.core import tokenizer
 from airio._src.core import vocabularies
+import grain.python as grain
 import tensorflow_datasets as tfds
-
-
-AirIOPreprocessor = preprocessors_lib.AirIOPreprocessor
 
 
 @dataclasses.dataclass(frozen=True)
@@ -50,7 +48,7 @@ class DatasetProviderBase(Protocol):
       self,
       sequence_lengths: Mapping[str, int] | None = None,
       split: str = tfds.Split.TRAIN,
-      runtime_preprocessors: Sequence[AirIOPreprocessor] | None = None,
+      runtime_preprocessors: Sequence[grain.Transformation] | None = None,
       batch_size: int | None = None,
       shuffle: bool = True,
       seed: int | None = 0,
@@ -77,7 +75,7 @@ class Task(DatasetProviderBase, Protocol):
       self,
       name: str,
       source: data_sources.DataSource,
-      preprocessors: Sequence[AirIOPreprocessor] | None = None,
+      preprocessors: Sequence[grain.Transformation] | None = None,
   ):
     self.name = name
     self.source = source
@@ -86,7 +84,7 @@ class Task(DatasetProviderBase, Protocol):
         list(preprocessors) if preprocessors is not None else []
     )
 
-  def get_preprocessors(self) -> List[AirIOPreprocessor]:
+  def get_preprocessors(self) -> List[grain.Transformation]:
     if self._preprocessors is None:
       raise ValueError("Preprocessors have not been set on this task.")
     return list(self._preprocessors)
@@ -185,7 +183,7 @@ class TaskBuilder(Protocol):
       self,
       task_name: str,
       source: data_sources.DataSource | None = None,
-      preprocessors: Sequence[AirIOPreprocessor] | None = None,
+      preprocessors: Sequence[grain.Transformation] | None = None,
   ):
     """Constructor for TaskBuilder.
 
@@ -227,7 +225,7 @@ class TaskBuilder(Protocol):
     return self
 
   def set_preprocessors(
-      self, preprocessors: Sequence[AirIOPreprocessor]
+      self, preprocessors: Sequence[grain.Transformation]
   ) -> "TaskBuilder":
     self._preprocessors = list(preprocessors)
     return self
@@ -259,7 +257,7 @@ def get_dataset(
     mixture_or_task: Task | Mixture,
     sequence_lengths: Mapping[str, int] | None = None,
     split: str = "train",
-    runtime_preprocessors: Sequence[AirIOPreprocessor] | None = None,
+    runtime_preprocessors: Sequence[grain.Transformation] | None = None,
     batch_size: int | None = None,
     shuffle: bool = False,
     num_epochs: int | None = 1,

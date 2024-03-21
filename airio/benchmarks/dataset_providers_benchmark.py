@@ -23,6 +23,7 @@ import airio.core as airio_core
 import airio.pygrain as airio
 import airio.pygrain_common as airio_common
 import google_benchmark
+import grain.python as grain
 import jax
 import numpy as np
 import tensorflow_datasets as tfds
@@ -52,9 +53,7 @@ def _imdb_preprocessor(raw_example: Dict[str, str]) -> Dict[str, str]:
   return final_example
 
 
-def _create_preprocessors() -> (
-    Sequence[airio_core.preprocessors.AirIOPreprocessor]
-):
+def _create_preprocessors() -> Sequence[grain.Transformation]:
   return [
       airio.MapFnTransform(_imdb_preprocessor),
       airio.MapFnTransform(
@@ -68,9 +67,7 @@ def _create_preprocessors() -> (
   ]
 
 
-def _create_runtime_preprocessors() -> (
-    Sequence[airio_core.preprocessors.AirIOPreprocessor]
-):
+def _create_runtime_preprocessors() -> Sequence[grain.Transformation]:
   return airio_common.feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
       pack=False,
       use_multi_bin_packing=False,
@@ -102,9 +99,7 @@ def _create_fn_src(num_elements=5):
 
 def _create_task(
     source: airio_core.DataSource | None = None,
-    preprocessors: (
-        Sequence[airio_core.preprocessors.AirIOPreprocessor] | None
-    ) = None,
+    preprocessors: Sequence[grain.Transformation] | None = None,
     task_name: str = "dummy_airio_task",
     num_elements: int = _SOURCE_NUM_EXAMPLES,
     idx: int = 1,

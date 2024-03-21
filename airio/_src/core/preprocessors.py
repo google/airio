@@ -20,16 +20,12 @@ import inspect
 import typing
 from typing import Any, Callable, Mapping, Protocol
 
-import grain.python as grain
 import jax
 import numpy as np
 
 # TODO(b/294122943): Implement flat_map.
 
 JaxRng = jax.Array
-
-
-AirIOPreprocessor = grain.Transformation
 
 
 @dataclasses.dataclass(frozen=True)

@@ -69,7 +69,7 @@ def _create_tokenizer_config() -> tokenizer.TokenizerConfig:
   return tokenizer.TokenizerConfig(vocab=_create_sentencepiece_vocab())
 
 
-def _create_preprocessors() -> Sequence[dataset_providers.AirIOPreprocessor]:
+def _create_preprocessors() -> Sequence[grain.Transformation]:
   tokenizer_config = _create_tokenizer_config()
   return [
       pygrain_preprocessors.MapFnTransform(_imdb_preprocessor),
@@ -110,7 +110,7 @@ def _create_fn_src(num_elements=5):
 
 def _create_task(
     source: data_sources.DataSource | None,
-    preprocessors: Sequence[dataset_providers.AirIOPreprocessor] | None = None,
+    preprocessors: Sequence[grain.Transformation] | None = None,
     task_name: str = "dummy_airio_task",
 ) -> dataset_providers.Task:
   """Create example AirIO task."""
@@ -123,7 +123,7 @@ def _create_task(
 
 def _create_task_builder(
     source: data_sources.DataSource | None,
-    preprocessors: Sequence[dataset_providers.AirIOPreprocessor] | None = None,
+    preprocessors: Sequence[grain.Transformation] | None = None,
     task_name: str = "dummy_airio_task",
 ) -> dataset_providers.TaskBuilder:
   return dataset_providers.TaskBuilder(
