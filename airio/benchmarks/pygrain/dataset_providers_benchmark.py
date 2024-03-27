@@ -33,7 +33,7 @@ _SOURCE_NAME = "imdb_reviews"
 _SOURCE_NUM_EXAMPLES = 3
 _SOURCE_SPLITS = ("train", "test", "unsupervised")
 _TEST_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "test_data"
+    os.path.dirname(os.path.abspath(__file__)), "../../test_data"
 )
 _SENTENCEPIECE_VOCAB = airio.SentencePieceVocabulary(
     os.path.join(_TEST_DIR, "sentencepiece", "sentencepiece.model")

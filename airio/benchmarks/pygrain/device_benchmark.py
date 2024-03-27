@@ -58,8 +58,8 @@ _sum_of_squares_dx_jit = jax.jit(_sum_of_squares_dx)
 
 def _get_tokenizer_configs():
   test_dir = os.path.join(
-      os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-      "test_data",
+      os.path.dirname(os.path.abspath(__file__)),
+      "../../test_data",
   )
   sentencepiece_vocab = airio.SentencePieceVocabulary(
       os.path.join(test_dir, "sentencepiece", "sentencepiece.model")
