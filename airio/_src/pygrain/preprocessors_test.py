@@ -13,11 +13,11 @@
 # limitations under the License.
 
 """Preprocessors tests."""
-import dataclasses
 from unittest import mock
 
 from absl.testing import absltest
 from airio._src.core import preprocessors as core_preprocessors_lib
+from airio._src.core import test_utils
 from airio._src.pygrain import data_sources
 from airio._src.pygrain import dataset_providers
 from airio._src.pygrain import preprocessors
@@ -208,7 +208,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
 
   def setUp(self):
     super().setUp()
-    self._runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    self._runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"val": 3},
         split="train",
     )
@@ -218,7 +218,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     for k, v in run_args.sequence_lengths.items():
       new_seq_lens[f"{k}_new"] = v
       new_seq_lens[k] = v + 1
-    updated = dataclasses.replace(run_args, sequence_lengths=new_seq_lens)
+    updated = run_args.replace(sequence_lengths=new_seq_lens)
     return updated
 
   def test_map_fn_preprocessor(self):
@@ -319,9 +319,8 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     updated_runtime_args = lazy_dataset_transform.get_updated_runtime_args(
         self._runtime_args
     )
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = self._runtime_args.replace(
         sequence_lengths={"val": 4, "val_new": 3},
-        split="train",
     )
     self.assertListEqual(list(ds), list(range(3, 8)))
     self.assertEqual(updated_runtime_args, expected_runtime_args)
@@ -367,9 +366,8 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     updated_runtime_args = lazy_dataset_transform.get_updated_runtime_args(
         self._runtime_args
     )
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"val": 4, "val_new": 3},
-        split="train",
+    expected_runtime_args = self._runtime_args.replace(
+        sequence_lengths={"val": 4, "val_new": 3}
     )
     self.assertListEqual(list(ds), [8, 7, 8, 15, 16])
     self.assertEqual(updated_runtime_args, expected_runtime_args)
@@ -403,16 +401,15 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     updated_runtime_args = lazy_dataset_transform.get_updated_runtime_args(
         self._runtime_args
     )
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"val": 4, "val_new": 3},
-        split="train",
+    expected_runtime_args = self._runtime_args.replace(
+        sequence_lengths={"val": 4, "val_new": 3}
     )
     self.assertListEqual(list(ds), [4])
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
   def test_lazy_map_transform(self):
-    run_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"val": 3}, split="unused"
+    run_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"val": 3}
     )
     transform = preprocessors.LazyMapTransform(
         _lazy_map_fn,
@@ -423,16 +420,15 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(range(10))
     ds = transform(ds, run_args, rng=None)
     updated_runtime_args = transform.update_runtime_args(run_args)
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"val": 4, "val_new": 3},
-        split="unused",
+    expected_runtime_args = run_args.replace(
+        sequence_lengths={"val": 4, "val_new": 3}
     )
     self.assertListEqual(list(ds), list(range(3, 13)))
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
   def test_lazy_map_transform_with_rng(self):
-    run_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"val": 3}, split="unused"
+    run_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"val": 3}
     )
     transform = preprocessors.LazyMapTransform(
         _lazy_map_fn,
@@ -443,9 +439,8 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(range(10))
     ds = transform(ds, run_args, rng=jax.random.key(42))
     updated_runtime_args = transform.update_runtime_args(run_args)
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = run_args.replace(
         sequence_lengths={"val": 4, "val_new": 3},
-        split="unused",
     )
     self.assertListEqual(list(ds), [7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
     self.assertEqual(updated_runtime_args, expected_runtime_args)
@@ -471,8 +466,8 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
           ds, threshold=runtime_args.sequence_lengths["val"]
       )
 
-    run_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"val": 3}, split="unused"
+    run_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"val": 3}
     )
     transform = preprocessors.LazyMapTransform(
         lazy_map_fn_with_nones,
@@ -483,16 +478,15 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(range(10))
     ds = transform(ds, run_args, rng=None)
     updated_runtime_args = transform.update_runtime_args(run_args)
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"val": 4, "val_new": 3},
-        split="unused",
+    expected_runtime_args = run_args.replace(
+        sequence_lengths={"val": 4, "val_new": 3}
     )
     self.assertListEqual(list(ds), list(range(4, 10)))
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
   def test_lazy_iter_transform(self):
-    run_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"val": 3}, split="unused"
+    run_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"val": 3}
     )
     transform = preprocessors.LazyIterTransform(
         _lazy_map_fn,
@@ -502,16 +496,15 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     ds = ds.to_iter_dataset()
     ds = transform(ds, run_args, rng=None)
     updated_runtime_args = transform.update_runtime_args(run_args)
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = run_args.replace(
         sequence_lengths={"val": 4, "val_new": 3},
-        split="unused",
     )
     self.assertListEqual(list(ds), list(range(3, 13)))
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
   def test_lazy_iter_transform_with_rng(self):
-    run_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"val": 3}, split="unused"
+    run_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"val": 3}
     )
     transform = preprocessors.LazyIterTransform(
         _lazy_map_fn,
@@ -521,16 +514,15 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     ds = ds.to_iter_dataset()
     ds = transform(ds, run_args, rng=jax.random.key(42))
     updated_runtime_args = transform.update_runtime_args(run_args)
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = run_args.replace(
         sequence_lengths={"val": 4, "val_new": 3},
-        split="unused",
     )
     self.assertListEqual(list(ds), [7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
   def test_lazy_iter_transform_on_map_dataset_fails(self):
-    run_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"val": 3}, split="unused"
+    run_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"val": 3}
     )
     transform = preprocessors.LazyIterTransform(
         _lazy_map_fn,
@@ -575,8 +567,8 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     )
 
   def test_lazy_iter_transform_on_iter_dataset(self):
-    run_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"val": 3}, split="unused"
+    run_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"val": 3}
     )
     transform = preprocessors.LazyIterTransform(
         _lazy_map_fn,
@@ -594,8 +586,8 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     transform = preprocessors.RandomMapFnTransform(test_random_map_fn)
     ds = lazy_dataset.SourceLazyMapDataset(range(10))
     ds = ds.to_iter_dataset()
-    run_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"val": 3}, split="unused"
+    run_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"val": 3}
     )
     with self.assertRaisesRegex(
         ValueError, "RandomMapFnTransform is not yet supported.*"
@@ -611,8 +603,8 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     )
     ds = lazy_dataset.SourceLazyMapDataset(range(10))
     ds = ds.to_iter_dataset()
-    run_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"val": 3}, split="unused"
+    run_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"val": 3}
     )
     with self.assertRaisesRegex(
         ValueError, "Cannot apply LazyMapDataset transform.*"

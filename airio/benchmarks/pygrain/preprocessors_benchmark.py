@@ -64,6 +64,7 @@ def _get_runtime_args():
   return airio.AirIOInjectedRuntimeArgs(
       sequence_lengths={"val": 3},
       split="train",
+      batch_size=None,
   )
 
 
@@ -72,10 +73,7 @@ def _update_runtime_args(run_args):
   for k, v in run_args.sequence_lengths.items():
     new_seq_lens[f"{k}_new"] = v
     new_seq_lens[k] = v + 1
-  return airio.AirIOInjectedRuntimeArgs(
-      sequence_lengths=new_seq_lens,
-      split=run_args.split,
-  )
+  return run_args.replace(sequence_lengths=new_seq_lens)
 
 
 @google_benchmark.register
