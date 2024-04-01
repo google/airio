@@ -34,7 +34,11 @@ class AirIOInjectedRuntimeArgs:
 
   sequence_lengths: Mapping[str, int]
   split: str
+  batch_size: int | None
 
+
+  def replace(self, **kwargs):
+    return dataclasses.replace(self, **kwargs)
 
 
 MapFnCallable = (

@@ -16,6 +16,7 @@
 
 from absl.testing import absltest
 from airio._src.core import preprocessors as core_preprocessors_lib
+from airio._src.core import test_utils
 from airio._src.pygrain import preprocessors as preprocessors_lib
 from airio._src.pygrain.common import feature_converters
 import grain.python as grain
@@ -174,8 +175,8 @@ class EncDecFeatureConverterTest(absltest.TestCase):
     x = [{"inputs": [9, 4, 3, 8, 1], "targets": [3, 9, 4, 1]}]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 7, "targets": 5}, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 7, "targets": 5},
     )
 
     preps = feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
@@ -212,9 +213,8 @@ class EncDecFeatureConverterTest(absltest.TestCase):
     }]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 7, "targets": 5, "passthrough": 3},
-        split="unused",
     )
 
     preps = feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
@@ -226,7 +226,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
     )
     ds, runtime_args = self._apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={
             "encoder_input_tokens": 7,
             "decoder_target_tokens": 5,
@@ -234,7 +234,6 @@ class EncDecFeatureConverterTest(absltest.TestCase):
             "decoder_loss_weights": 5,
             "passthrough": 3,
         },
-        split="unused",
     )
     self.assertEqual(runtime_args, expected_runtime_args)
     expected = {
@@ -257,9 +256,8 @@ class EncDecFeatureConverterTest(absltest.TestCase):
     x = [{"inputs": [9, 4, 3, 8, 1], "targets": [3, 9, 4, 5, 1]}]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 5, "targets": 5},
-        split="unused",
     )
 
     preps = feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
@@ -294,9 +292,8 @@ class EncDecFeatureConverterTest(absltest.TestCase):
     x = [{"inputs": [9, 4, 3, 8, 4, 5, 1], "targets": [3, 9, 4, 7, 8, 1]}]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 5, "targets": 8},
-        split="unused",
     )
     preps = feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
         pack=False,
@@ -330,9 +327,8 @@ class EncDecFeatureConverterTest(absltest.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 10, "targets": 7},
-        split="unused",
     )
 
     preps = feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
@@ -344,7 +340,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
     )
     ds, runtime_args = self._apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={
             "encoder_input_tokens": 10,
             "decoder_target_tokens": 7,
@@ -355,7 +351,6 @@ class EncDecFeatureConverterTest(absltest.TestCase):
             "encoder_positions": 10,
             "decoder_positions": 7,
         },
-        split="unused",
     )
     self.assertEqual(runtime_args, expected_runtime_args)
     expected = {
@@ -384,9 +379,8 @@ class EncDecFeatureConverterTest(absltest.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 7, "targets": 3},
-        split="unused",
     )
 
     preps = feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
@@ -448,9 +442,8 @@ class EncDecFeatureConverterTest(absltest.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 10, "targets": 7},
-        split="unused",
     )
 
     preps = feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
@@ -489,9 +482,8 @@ class EncDecFeatureConverterTest(absltest.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 10, "targets": 7},
-        split="unused",
     )
 
     preps = feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
@@ -544,9 +536,8 @@ class LMFeatureConverter(absltest.TestCase):
     x = [{"targets": [3, 9, 1]}]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"targets": 5},
-        split="unused",
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"targets": 5}
     )
 
     preps = feature_converters.get_t5x_lm_feature_converter_preprocessors(
@@ -555,13 +546,12 @@ class LMFeatureConverter(absltest.TestCase):
     ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={
             "decoder_target_tokens": 5,
             "decoder_input_tokens": 5,
             "decoder_loss_weights": 5,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
@@ -583,9 +573,8 @@ class LMFeatureConverter(absltest.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"targets": 6},
-        split="unused",
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"targets": 6}
     )
 
     preps = feature_converters.get_t5x_lm_feature_converter_preprocessors(
@@ -594,7 +583,7 @@ class LMFeatureConverter(absltest.TestCase):
     ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={
             "decoder_target_tokens": 6,
             "decoder_input_tokens": 6,
@@ -602,7 +591,6 @@ class LMFeatureConverter(absltest.TestCase):
             "decoder_segment_ids": 6,
             "decoder_positions": 6,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
@@ -626,9 +614,8 @@ class LMFeatureConverter(absltest.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"targets": 5},
-        split="unused",
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"targets": 5}
     )
 
     preps = feature_converters.get_t5x_lm_feature_converter_preprocessors(
@@ -637,7 +624,7 @@ class LMFeatureConverter(absltest.TestCase):
     ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={
             "decoder_target_tokens": 5,
             "decoder_input_tokens": 5,
@@ -645,7 +632,6 @@ class LMFeatureConverter(absltest.TestCase):
             "decoder_segment_ids": 5,
             "decoder_positions": 5,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
@@ -681,9 +667,8 @@ class LMFeatureConverter(absltest.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"targets": 6},
-        split="unused",
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"targets": 6}
     )
 
     preps = feature_converters.get_t5x_lm_feature_converter_preprocessors(
@@ -692,7 +677,7 @@ class LMFeatureConverter(absltest.TestCase):
     ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={
             "decoder_target_tokens": 6,
             "decoder_input_tokens": 6,
@@ -700,7 +685,6 @@ class LMFeatureConverter(absltest.TestCase):
             "decoder_segment_ids": 6,
             "decoder_positions": 6,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
@@ -724,9 +708,8 @@ class LMFeatureConverter(absltest.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"targets": 6},
-        split="unused",
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"targets": 6}
     )
 
     preps = feature_converters.get_t5x_lm_feature_converter_preprocessors(
@@ -735,7 +718,7 @@ class LMFeatureConverter(absltest.TestCase):
     ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={
             "decoder_target_tokens": 6,
             "decoder_input_tokens": 6,
@@ -743,7 +726,6 @@ class LMFeatureConverter(absltest.TestCase):
             "decoder_segment_ids": 6,
             "decoder_positions": 6,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
@@ -787,9 +769,8 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
 
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 5, "targets": 4},
-        split="unused",
     )
     preps = (
         feature_converters.get_t5x_prefix_lm_feature_converter_preprocessors(
@@ -803,14 +784,13 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     )
     ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
 
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={
             "decoder_target_tokens": 9,
             "decoder_input_tokens": 9,
             "decoder_loss_weights": 9,
             "decoder_causal_attention": 9,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
@@ -838,9 +818,8 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
 
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 5, "targets": 4, "passthrough": 7},
-        split="unused",
     )
     preps = (
         feature_converters.get_t5x_prefix_lm_feature_converter_preprocessors(
@@ -854,7 +833,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     )
     ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
 
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={
             "decoder_target_tokens": 9,
             "decoder_input_tokens": 9,
@@ -862,7 +841,6 @@ class PrefixLMFeatureConverter(absltest.TestCase):
             "decoder_causal_attention": 9,
             "passthrough": 7,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
@@ -886,9 +864,8 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
 
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 5, "targets": 4},
-        split="unused",
     )
     preps = (
         feature_converters.get_t5x_prefix_lm_feature_converter_preprocessors(
@@ -902,14 +879,13 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     )
     ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
 
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={
             "decoder_target_tokens": 9,
             "decoder_input_tokens": 9,
             "decoder_loss_weights": 9,
             "decoder_causal_attention": 9,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
@@ -933,9 +909,8 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
 
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 10, "targets": 4},
-        split="unused",
     )
     preps = (
         feature_converters.get_t5x_prefix_lm_feature_converter_preprocessors(
@@ -949,14 +924,13 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     )
     ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
 
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={
             "decoder_target_tokens": 14,
             "decoder_input_tokens": 14,
             "decoder_loss_weights": 14,
             "decoder_causal_attention": 14,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
@@ -984,9 +958,8 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
 
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 8, "targets": 7},
-        split="unused",
     )
     preps = (
         feature_converters.get_t5x_prefix_lm_feature_converter_preprocessors(
@@ -1001,7 +974,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={
             "decoder_target_tokens": 15,
             "decoder_input_tokens": 15,
@@ -1010,7 +983,6 @@ class PrefixLMFeatureConverter(absltest.TestCase):
             "decoder_positions": 15,
             "decoder_causal_attention": 15,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
@@ -1051,9 +1023,8 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
 
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 5, "targets": 4},
-        split="unused",
     )
     preps = (
         feature_converters.get_t5x_prefix_lm_feature_converter_preprocessors(
@@ -1067,14 +1038,13 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     )
     ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
 
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={
             "decoder_target_tokens": 9,
             "decoder_input_tokens": 9,
             "decoder_loss_weights": 9,
             "decoder_causal_attention": 9,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
@@ -1102,9 +1072,8 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
 
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 8, "targets": 7},
-        split="unused",
     )
     preps = (
         feature_converters.get_t5x_prefix_lm_feature_converter_preprocessors(
@@ -1119,7 +1088,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={
             "decoder_target_tokens": 15,
             "decoder_input_tokens": 15,
@@ -1128,7 +1097,6 @@ class PrefixLMFeatureConverter(absltest.TestCase):
             "decoder_positions": 15,
             "decoder_causal_attention": 15,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
@@ -1175,9 +1143,8 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
 
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 4, "targets": 3},
-        split="unused",
     )
 
     preps = (
@@ -1192,7 +1159,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     )
     ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
 
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={
             "decoder_target_tokens": 7,
             "decoder_input_tokens": 7,
@@ -1201,7 +1168,6 @@ class PrefixLMFeatureConverter(absltest.TestCase):
             "decoder_positions": 7,
             "decoder_causal_attention": 7,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
@@ -1239,9 +1205,8 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
 
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 4, "targets": 3},
-        split="unused",
     )
     preps = (
         feature_converters.get_t5x_prefix_lm_feature_converter_preprocessors(
@@ -1255,7 +1220,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     )
     ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
 
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={
             "decoder_target_tokens": 7,
             "decoder_input_tokens": 7,
@@ -1264,7 +1229,6 @@ class PrefixLMFeatureConverter(absltest.TestCase):
             "decoder_positions": 7,
             "decoder_causal_attention": 7,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
@@ -1326,9 +1290,8 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
 
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 8, "targets": 7},
-        split="unused",
     )
     preps = (
         feature_converters.get_t5x_prefix_lm_feature_converter_preprocessors(
@@ -1343,7 +1306,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={
             "decoder_target_tokens": 15,
             "decoder_input_tokens": 15,
@@ -1352,7 +1315,6 @@ class PrefixLMFeatureConverter(absltest.TestCase):
             "decoder_positions": 15,
             "decoder_causal_attention": 15,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
@@ -1423,9 +1385,8 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
 
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 7, "targets": 7},
-        split="unused",
     )
     preps = (
         feature_converters.get_t5x_prefix_lm_feature_converter_preprocessors(
@@ -1440,7 +1401,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
     ds, updated_runtime_args = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={
             "decoder_target_tokens": 14,
             "decoder_input_tokens": 14,
@@ -1449,7 +1410,6 @@ class PrefixLMFeatureConverter(absltest.TestCase):
             "decoder_positions": 14,
             "decoder_causal_attention": 14,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 

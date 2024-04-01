@@ -19,6 +19,7 @@ from unittest import mock
 
 from absl.testing import absltest
 from airio._src.core import preprocessors
+from airio._src.core import test_utils
 import jax.random
 
 
@@ -53,15 +54,16 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
 
   def setUp(self):
     super().setUp()
-    self._runtime_args = preprocessors.AirIOInjectedRuntimeArgs(
+    self._runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"val": 3},
         split="train",
     )
 
   def test_create_runtime_args_succeeds(self):
-    runtime_args = preprocessors.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"val": 3},
         split="train",
+        batch_size=None,
     )
     self.assertIsInstance(runtime_args, preprocessors.AirIOInjectedRuntimeArgs)
 
@@ -70,7 +72,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
       del args
       return ex + 1
 
-    runtime_args = preprocessors.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"val": 3},
         split="train",
     )
@@ -78,7 +80,8 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     inspect_result = inspect.signature(result).parameters
     result_args = inspect_result["args"]
     expected_injected_args = (
-        "AirIOInjectedRuntimeArgs(sequence_lengths={'val': 3}, split='train')"
+        "AirIOInjectedRuntimeArgs(sequence_lengths={'val': 3}, split='train',"
+        " batch_size=None)"
     )
     self.assertTrue(str(result_args).endswith(expected_injected_args))
 
@@ -87,7 +90,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
       return ex + 1
 
     expected_parameters = test_map_fn.__code__.co_varnames
-    runtime_args = preprocessors.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"val": 3},
         split="train",
     )
