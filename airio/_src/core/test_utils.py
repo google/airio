@@ -18,6 +18,7 @@ from typing import Any, Mapping, Sequence
 
 from absl.testing import absltest
 from airio._src.core import dataset_iterators
+from airio._src.core import preprocessors
 import numpy as np
 
 
@@ -56,3 +57,26 @@ def assert_datasets_equal(
 
   for actual_ex, expected_ex in zip(actual, expected):
     _compare_dict(actual_ex, expected_ex)
+
+
+def create_airio_injected_runtime_args(
+    *,
+    sequence_lengths: Mapping[str, int] | None = None,
+    split: str | None = None,
+    batch_size: int | None = None,
+) -> preprocessors.AirIOInjectedRuntimeArgs:
+  """Creates an AirIOInjectedRuntimeArgs instance with reasonable defaults."""
+  # Note: Update defaults when adding new fields to
+  # AirIOInjectedRuntimeArgs.
+  defaults = {
+      "sequence_lengths": None,
+      "split": "unused",
+      "batch_size": None,
+  }
+  provided = {
+      "sequence_lengths": sequence_lengths,
+      "split": split,
+      "batch_size": batch_size,
+  }
+  args = {k: provided[k] if provided[k] else defaults[k] for k in defaults}
+  return preprocessors.AirIOInjectedRuntimeArgs(**args)

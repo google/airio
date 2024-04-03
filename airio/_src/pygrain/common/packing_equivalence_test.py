@@ -17,7 +17,7 @@
 import functools
 
 from absl.testing import absltest
-from airio._src.core import preprocessors as core_preprocessors
+from airio._src.core import test_utils
 from airio._src.pygrain.common import packing
 from airio._src.pygrain.common import preprocessors
 import grain.python as grain
@@ -88,8 +88,8 @@ class PackingEquivalenceTest(absltest.TestCase):
     # is slow and expensive.
     examples = list(ds.as_numpy_iterator())
     packed_airio_ds = lazy_dataset.SourceLazyMapDataset(examples)
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"targets": 1024}, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"targets": 1024}
     )
     unused_rng = None
     packed_airio_ds = packing.NoamPackMapPreprocessor(
@@ -164,8 +164,8 @@ class PackingEquivalenceTest(absltest.TestCase):
     # is slow and expensive.
     examples = list(ds.as_numpy_iterator())
     packed_airio_ds = lazy_dataset.SourceLazyMapDataset(examples)
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths=feature_lengths, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths=feature_lengths
     )
     unused_rng = None
     pack_prep = packing.SingleBinTruePackMapPreprocessor
@@ -259,8 +259,8 @@ class PackingEquivalenceTest(absltest.TestCase):
     # is slow and expensive.
     examples = list(ds.as_numpy_iterator())
     packed_airio_ds = lazy_dataset.SourceLazyMapDataset(examples)
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths=feature_lengths, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths=feature_lengths
     )
     unused_rng = None
     pack_prep = packing.MultiBinTruePackMapPreprocessor

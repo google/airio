@@ -145,13 +145,23 @@ class FunctionDataSourceTest(absltest.TestCase):
     with self.assertRaisesRegex(ValueError, "Split nonexistent not found in"):
       source.get_data_source("nonexistent")
 
-  def test_num_input_examples(self):
+  def test_num_input_examples_from_dataset(self):
     source = self._create_data_source(
         num_examples=_SOURCE_NUM_EXAMPLES,
         splits=_SOURCE_SPLITS,
     )
     for split in _SOURCE_SPLITS:
       self.assertEqual(source.num_input_examples(split), _SOURCE_NUM_EXAMPLES)
+
+  def test_num_input_examples_from_property(self):
+    num_examples = {k: 50 for k in _SOURCE_SPLITS}
+    source = data_sources.FunctionDataSource(
+        dataset_fn=lambda _: np.arange(_SOURCE_NUM_EXAMPLES),
+        splits=_SOURCE_SPLITS,
+        num_examples=num_examples,
+    )
+    for split in _SOURCE_SPLITS:
+      self.assertEqual(source.num_input_examples(split), 50)
 
   def test_num_input_examples_nonexistent_split(self):
     source = self._create_data_source(splits=_SOURCE_SPLITS)

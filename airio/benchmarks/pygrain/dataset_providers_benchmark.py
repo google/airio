@@ -450,7 +450,7 @@ def task_get_updated_runtime_args(state):
       "test", source=_create_source(), preprocessors=[prep_1, prep_2]
   )
   runtime_args = airio.AirIOInjectedRuntimeArgs(
-      sequence_lengths={"val": 3}, split="train"
+      sequence_lengths={"val": 3}, split="train", batch_size=None
   )
   while state:
     _ = task.get_updated_runtime_args(runtime_args, runtime_preprocessors=None)
@@ -552,9 +552,7 @@ def mixture_runtime_args_updated_by_task(state):
   """Analogous to the MixtureTest with the same name."""
 
   def update_runtime_args_fn(rargs):
-    return airio.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 20, "targets": 10}, split=rargs.split
-    )
+    return rargs.replace(sequence_lengths={"inputs": 20, "targets": 10})
 
   task = _create_task(
       source=_create_source(), preprocessors=_create_preprocessors()

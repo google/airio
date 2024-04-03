@@ -143,14 +143,18 @@ class GrainTask(core_dataset_providers.Task):
     # Step 3: Run preprocessors and shuffle each epoch (if needed)
     preps = self._preprocessors
     updated_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths=sequence_lengths, split=split
+        sequence_lengths=sequence_lengths,
+        split=split,
+        batch_size=batch_size,
     )
     preprocessed_dss = []
     has_none_elems = False
     next_epoch_rng = jax.random.key(seed)
     for ds in dss:
       ds_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-          sequence_lengths=sequence_lengths, split=split
+          sequence_lengths=sequence_lengths,
+          split=split,
+          batch_size=batch_size,
       )
       next_epoch_rng, prep_rng = jax.random.split(next_epoch_rng)
       prep_rng, shuffle_rng = jax.random.split(prep_rng)
@@ -258,7 +262,9 @@ class GrainTask(core_dataset_providers.Task):
 
     # Add runtime args
     runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths=sequence_lengths, split=split
+        sequence_lengths=sequence_lengths,
+        split=split,
+        batch_size=batch_size,
     )
     for op in ops:
       if isinstance(op, preprocessors_lib.FnTransforms):
@@ -378,7 +384,9 @@ class GrainTask(core_dataset_providers.Task):
 
     # Apply all transformations, one by one.
     runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths=sequence_lengths, split=split
+        sequence_lengths=sequence_lengths,
+        split=split,
+        batch_size=batch_size,
     )
     accumulated_ops = []
     for op in all_ops:
@@ -519,7 +527,9 @@ class GrainMixture(core_dataset_providers.Mixture):
     # args must match, or mixing won't work (compute all updated runtime args
     # and add a check here in the future if helpful).
     runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths=sequence_lengths, split=split
+        sequence_lengths=sequence_lengths,
+        split=split,
+        batch_size=batch_size,
     )
     if isinstance(self.leaf_tasks[0], GrainTask):
       runtime_args = self.leaf_tasks[0].get_updated_runtime_args(

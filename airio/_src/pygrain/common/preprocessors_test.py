@@ -16,7 +16,7 @@
 
 from absl.testing import absltest
 from absl.testing import parameterized
-from airio._src.core import preprocessors as core_preprocessors
+from airio._src.core import test_utils
 from airio._src.pygrain.common import constants
 from airio._src.pygrain.common import preprocessors
 import grain.python as grain
@@ -33,8 +33,8 @@ class TrimPreprocessorsTest(parameterized.TestCase):
     input_examples = [{"inputs": list(range(i))} for i in range(10)]
     ds = lazy_dataset.SourceLazyMapDataset(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": length}, split="test"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": length}
     )
     ds = ds.map(lambda x: preprocessors.trim(x, runtime_args))
     for i, d in enumerate(ds):
@@ -46,8 +46,8 @@ class TrimPreprocessorsTest(parameterized.TestCase):
     input_examples = [{"inputs": [[i, i]] * i} for i in range(10)]
     ds = lazy_dataset.SourceLazyMapDataset(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": length}, split="test"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": length}
     )
     ds = ds.map(lambda x: preprocessors.trim(x, runtime_args))
     for i, d in enumerate(ds):
@@ -62,8 +62,8 @@ class TrimPreprocessorsTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": length, "targets": 2 * length}, split="test"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": length, "targets": 2 * length},
     )
     ds = ds.map(lambda x: preprocessors.trim(x, runtime_args))
     for i, d in enumerate(ds):
@@ -79,9 +79,8 @@ class TrimPreprocessorsTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"to_trim": 5, "not_to_trim": constants.SKIP_FEATURE},
-        split="test",
     )
     ds = ds.map(lambda x: preprocessors.trim(x, runtime_args))
     for i, d in enumerate(ds):
@@ -95,8 +94,8 @@ class TrimPreprocessorsTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"to_trim": 5}, split="test"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"to_trim": 5}
     )
     ds = ds.map(lambda x: preprocessors.trim(x, runtime_args))
     for i, d in enumerate(ds):
@@ -116,8 +115,8 @@ class TrimPreprocessorsTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": [1, 1, 4], "targets": [2, 1]}, split="test"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": [1, 1, 4], "targets": [2, 1]},
     )
     ds = ds.map(lambda x: preprocessors.trim(x, runtime_args))
     expected = [
@@ -147,9 +146,8 @@ class TrimPreprocessorsTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": [1, 1, 4, 5], "targets": [2, 1]},
-        split="test",
     )
     ds = ds.map(lambda x: preprocessors.trim(x, runtime_args))
     with self.assertRaisesRegex(ValueError, "Rank mismatch:.*"):
@@ -162,8 +160,8 @@ class PadPreprocessorsTest(absltest.TestCase):
     input_examples = [{"inputs": list(range(i))} for i in range(10)]
     ds = lazy_dataset.SourceLazyMapDataset(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 10}, split="test"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 10}
     )
     ds = ds.map(lambda x: preprocessors.pad(x, runtime_args))
     for i, d in enumerate(ds):
@@ -176,8 +174,8 @@ class PadPreprocessorsTest(absltest.TestCase):
     input_examples = [{"inputs": [[i, i]] * i} for i in range(1, 10)]
     ds = lazy_dataset.SourceLazyMapDataset(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 10}, split="test"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 10}
     )
     ds = ds.map(lambda x: preprocessors.pad(x, runtime_args))
     for i, d in zip(range(1, 10), ds):
@@ -191,8 +189,8 @@ class PadPreprocessorsTest(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 10, "targets": 20}, split="test"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 10, "targets": 20},
     )
     ds = ds.map(lambda x: preprocessors.pad(x, runtime_args))
     for i, d in enumerate(ds):
@@ -207,8 +205,8 @@ class PadPreprocessorsTest(absltest.TestCase):
     input_examples = [{"inputs": list(range(i))} for i in range(10)]
     ds = lazy_dataset.SourceLazyMapDataset(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 5}, split="test"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 5}
     )
     ds = ds.map(lambda x: preprocessors.pad(x, runtime_args))
     with self.assertRaisesRegex(ValueError, "Length of feature 'inputs'.*"):
@@ -221,9 +219,8 @@ class PadPreprocessorsTest(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"to_pad": 10, "not_to_pad": constants.SKIP_FEATURE},
-        split="test",
     )
     ds = ds.map(lambda x: preprocessors.pad(x, runtime_args))
     for i, d in enumerate(ds):
@@ -239,8 +236,8 @@ class PadPreprocessorsTest(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"to_pad": 10}, split="test"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"to_pad": 10}
     )
     ds = ds.map(lambda x: preprocessors.pad(x, runtime_args))
     for i, d in enumerate(ds):
@@ -262,8 +259,8 @@ class PadPreprocessorsTest(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": [2, 1, 5], "targets": [3, 3]}, split="test"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": [2, 1, 5], "targets": [3, 3]},
     )
     ds = ds.map(lambda x: preprocessors.pad(x, runtime_args))
     expected = [
@@ -293,8 +290,8 @@ class PadPreprocessorsTest(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": [2, 1, 5], "targets": [3, 3]}, split="test"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": [2, 1, 5], "targets": [3, 3]},
     )
     ds = ds.map(lambda x: preprocessors.pad(x, runtime_args))
     with self.assertRaisesRegex(ValueError, "Shape of feature 'inputs'.*"):
@@ -313,9 +310,8 @@ class PadPreprocessorsTest(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
+    runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": [1, 1, 4, 5], "targets": [2, 1]},
-        split="test",
     )
     ds = ds.map(lambda x: preprocessors.pad(x, runtime_args))
     with self.assertRaisesRegex(ValueError, "Rank mismatch:.*"):

@@ -67,6 +67,7 @@ class FunctionDataSource(data_sources.DataSource):
       self,
       dataset_fn: DatasetFnCallable,
       splits: Iterable[str],
+      num_examples: Mapping[str, int] | None = None,
   ):
     """FunctionDataSource constructor.
 
@@ -74,9 +75,13 @@ class FunctionDataSource(data_sources.DataSource):
       dataset_fn: a function with the signature `dataset_fn(split)' that returns
         a numpy array.
       splits: an iterable of applicable string split names.
+      num_examples: An optional mapping of split name to the number of examples
+        in the split. If not provided, will be inferred from the underlying
+        TfGrain data source.
     """
     self._dataset_fn = dataset_fn
     self.splits = copy.deepcopy(splits)
+    self._num_examples = num_examples
 
   def get_data_source(self, split: str) -> np.ndarray:
     ds = self._dataset_fn(split=split)
@@ -85,7 +90,11 @@ class FunctionDataSource(data_sources.DataSource):
   def num_input_examples(self, split: str) -> int:
     if split not in self.splits:
       raise ValueError(f'Split {split} not found in {self.splits}.')
-    return self._dataset_fn(split=split).size
+    return (
+        self._num_examples[split]
+        if self._num_examples
+        else self._dataset_fn(split=split).size
+    )
 
 
 class JsonDataSource(data_sources.DataSource):
