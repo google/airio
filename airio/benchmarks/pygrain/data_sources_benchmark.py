@@ -16,95 +16,217 @@
 
 import os
 
-import airio.pygrain as airio
+import airio.pygrain
 import google_benchmark
 import numpy as np
 import tensorflow_datasets as tfds
+
+import multiprocessing
 
 _SOURCE_NAME = "imdb_reviews"
 _SOURCE_NUM_EXAMPLES = 3
 _SOURCE_SPLITS = ("train", "test", "unsupervised")
 
 
-def generate_function_data_source(split: str):
+def _create_array_record_data_source() -> airio.pygrain.ArrayRecordDataSource:
+  """Creates a basic ArrayRecordDataSource."""
+  split_to_filepattern = {
+      split: os.path.join(_TEST_DATA_DIR, "classification.array_record@2")
+      for split in _SOURCE_SPLITS
+  }
+  return airio.pygrain.ArrayRecordDataSource(
+      split_to_filepattern=split_to_filepattern,
+  )
+
+
+
+
+def _generate_function_data_source(split: str):
+  """Generates a simple dataset for testing.
+
+  Args:
+    split: must be one of ("train", "test", "unsupervised").
+
+  Returns:
+    A dataset with 3 records.
+  """
   if split not in _SOURCE_SPLITS:
     raise ValueError(f"Split {split} not found in {_SOURCE_SPLITS}.")
   return np.array(range(_SOURCE_NUM_EXAMPLES))
 
 
+def _create_json_data_source() -> airio.pygrain.JsonDataSource:
+  """Creates a basic JsonDataSource."""
+  split_to_filepattern = {
+      split: os.path.join(_TEST_DATA_DIR, "classification.json")
+      for split in _SOURCE_SPLITS
+  }
+  return airio.pygrain.JsonDataSource(
+      split_to_filepattern=split_to_filepattern,
+  )
+
+
 
 
 @google_benchmark.register
-def function_data_source_create(state):
+def array_record_data_source_create(state: google_benchmark.State) -> None:
+  """Measures creating an array record data source."""
   while state:
-    airio.FunctionDataSource(
-        dataset_fn=generate_function_data_source, splits=_SOURCE_SPLITS
+    _create_array_record_data_source()
+
+
+@google_benchmark.register
+def array_record_data_source_get(state: google_benchmark.State) -> None:
+  """Measures getting an array record data source."""
+  ds = _create_array_record_data_source()
+  while state:
+    for split in _SOURCE_SPLITS:
+      ds.get_data_source(split)
+
+
+@google_benchmark.register
+def array_record_data_source_num_input_examples(
+    state: google_benchmark.State,
+) -> None:
+  """Measures getting number of input examples for an array record data source."""
+  ds = _create_array_record_data_source()
+  while state:
+    for split in _SOURCE_SPLITS:
+      ds.num_input_examples(split)
+
+
+@google_benchmark.register
+def array_record_data_source_splits(state: google_benchmark.State) -> None:
+  """Measures getting splits for an array record data source."""
+  ds = _create_array_record_data_source()
+  while state:
+    _ = ds.splits
+
+
+
+
+@google_benchmark.register
+def function_data_source_create(state: google_benchmark.State) -> None:
+  """Measures creating a basic function data source."""
+  while state:
+    airio.pygrain.FunctionDataSource(
+        dataset_fn=_generate_function_data_source, splits=_SOURCE_SPLITS
     )
 
 
 @google_benchmark.register
-def function_data_source_get(state):
-  ds = airio.FunctionDataSource(
-      dataset_fn=generate_function_data_source, splits=_SOURCE_SPLITS
+def function_data_source_get(state: google_benchmark.State) -> None:
+  """Measures getting a basic function data source."""
+  ds = airio.pygrain.FunctionDataSource(
+      dataset_fn=_generate_function_data_source, splits=_SOURCE_SPLITS
   )
   while state:
     for split in _SOURCE_SPLITS:
-      _ = ds.get_data_source(split)
+      ds.get_data_source(split)
 
 
 @google_benchmark.register
-def function_data_source_num_input_examples(state):
-  ds = airio.FunctionDataSource(
-      dataset_fn=generate_function_data_source, splits=_SOURCE_SPLITS
+def function_data_source_num_input_examples(
+    state: google_benchmark.State,
+) -> None:
+  """Measures getting number of input examples for a function data source."""
+  ds = airio.pygrain.FunctionDataSource(
+      dataset_fn=_generate_function_data_source, splits=_SOURCE_SPLITS
   )
   while state:
     for split in _SOURCE_SPLITS:
-      _ = ds.num_input_examples(split)
+      ds.num_input_examples(split)
 
 
 @google_benchmark.register
-def function_data_source_splits(state):
-  ds = airio.FunctionDataSource(
-      dataset_fn=generate_function_data_source, splits=_SOURCE_SPLITS
+def function_data_source_splits(state: google_benchmark.State) -> None:
+  """Measures getting splits for a function data source."""
+  ds = airio.pygrain.FunctionDataSource(
+      dataset_fn=_generate_function_data_source, splits=_SOURCE_SPLITS
   )
   while state:
     _ = ds.splits
 
 
 @google_benchmark.register
-def tfds_data_source_create(state):
+def json_data_source_create(state: google_benchmark.State) -> None:
+  """Measures creating a json data source."""
+  while state:
+    _create_json_data_source()
+
+
+@google_benchmark.register
+def json_data_source_get(state: google_benchmark.State) -> None:
+  """Measures getting a json data source."""
+  ds = _create_json_data_source()
+  while state:
+    for split in _SOURCE_SPLITS:
+      ds.get_data_source(split)
+
+
+@google_benchmark.register
+def json_data_source_num_input_examples(state: google_benchmark.State) -> None:
+  """Measures getting number of input examples for a json data source."""
+  ds = _create_json_data_source()
+  while state:
+    for split in _SOURCE_SPLITS:
+      ds.num_input_examples(split)
+
+
+@google_benchmark.register
+def json_data_source_splits(state: google_benchmark.State) -> None:
+  """Measures getting splits for a json data source."""
+  ds = _create_json_data_source()
+  while state:
+    _ = ds.splits
+
+
+
+
+@google_benchmark.register
+def tfds_data_source_create(state: google_benchmark.State) -> None:
+  """Measures creating a basic TFDS data source."""
   with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
     while state:
-      airio.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS)
+      airio.pygrain.TfdsDataSource(
+          tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS
+      )
 
 
 @google_benchmark.register
-def tfds_data_source_get(state):
+def tfds_data_source_get(state: google_benchmark.State) -> None:
+  """Measures getting a basic TFDS data source."""
   with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
-    ds = airio.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS)
+    ds = airio.pygrain.TfdsDataSource(
+        tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS
+    )
   while state:
     for split in _SOURCE_SPLITS:
-      _ = ds.get_data_source(split)
+      ds.get_data_source(split)
 
 
 @google_benchmark.register
-def tfds_data_source_num_input_examples(state):
+def tfds_data_source_num_input_examples(state: google_benchmark.State) -> None:
+  """Measures getting number of input examples for a TFDS data source."""
   with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
-    ds = airio.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS)
+    ds = airio.pygrain.TfdsDataSource(
+        tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS
+    )
   while state:
     for split in _SOURCE_SPLITS:
-      _ = ds.num_input_examples(split)
+      ds.num_input_examples(split)
 
 
 @google_benchmark.register
-def tfds_data_source_splits(state):
+def tfds_data_source_splits(state: google_benchmark.State) -> None:
+  """Measures getting splits for a TFDS data source."""
   with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
-    ds = airio.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS)
+    ds = airio.pygrain.TfdsDataSource(
+        tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS
+    )
   while state:
     _ = ds.splits
-
-
 
 
 if __name__ == "__main__":
-  google_benchmark.main()
+  multiprocessing.handle_main(google_benchmark.main)

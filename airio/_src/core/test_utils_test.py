@@ -15,6 +15,7 @@
 """Tests for asserts."""
 
 from absl.testing import absltest
+from airio._src.core import preprocessors
 from airio._src.core import test_utils
 import numpy as np
 
@@ -101,6 +102,42 @@ class TestUtilsTest(absltest.TestCase):
               {'float_key1': 0.301, 'float_key2': 0.499},
           ],
       )
+
+  def test_create_airio_injected_runtime_args(self):
+    self.assertEqual(
+        test_utils.create_airio_injected_runtime_args(),
+        preprocessors.AirIOInjectedRuntimeArgs(
+            sequence_lengths=None, split='unused', batch_size=None
+        ),
+    )
+    self.assertEqual(
+        test_utils.create_airio_injected_runtime_args(
+            sequence_lengths={'val': 2}
+        ),
+        preprocessors.AirIOInjectedRuntimeArgs(
+            sequence_lengths={'val': 2}, split='unused', batch_size=None
+        ),
+    )
+    self.assertEqual(
+        test_utils.create_airio_injected_runtime_args(split='train'),
+        preprocessors.AirIOInjectedRuntimeArgs(
+            sequence_lengths=None, split='train', batch_size=None
+        ),
+    )
+    self.assertEqual(
+        test_utils.create_airio_injected_runtime_args(batch_size=5),
+        preprocessors.AirIOInjectedRuntimeArgs(
+            sequence_lengths=None, split='unused', batch_size=5
+        ),
+    )
+    self.assertEqual(
+        test_utils.create_airio_injected_runtime_args(
+            sequence_lengths={'val': 2}, split='train', batch_size=5
+        ),
+        preprocessors.AirIOInjectedRuntimeArgs(
+            sequence_lengths={'val': 2}, split='train', batch_size=5
+        ),
+    )
 
 
 if __name__ == '__main__':

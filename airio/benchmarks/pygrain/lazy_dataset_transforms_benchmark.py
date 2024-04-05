@@ -23,18 +23,18 @@ lazy_dataset = grain.experimental.lazy_dataset
 
 
 @google_benchmark.register
-def length(state):
+def length(state: google_benchmark.State) -> None:
   parent_lens = [4, 5, 4, 1]
   datasets = []
   for data_len in parent_lens:
     datasets.append(lazy_dataset.RangeLazyMapDataset(data_len))
   ds = airio.lazy_dataset_transforms.ConcatLazyMapDataset(datasets)
   while state:
-    _ = len(ds)
+    len(ds)
 
 
 @google_benchmark.register
-def get_item(state):
+def get_item(state: google_benchmark.State) -> None:
   parents = [
       lazy_dataset.RangeLazyMapDataset(5),
       lazy_dataset.RangeLazyMapDataset(5, 9),
@@ -48,7 +48,7 @@ def get_item(state):
 
 
 @google_benchmark.register
-def iter_items(state):
+def iter_items(state: google_benchmark.State) -> None:
   """Analogous to the ConcatLazyMapDatasetTest with the same name."""
   parents = [
       lazy_dataset.RangeLazyMapDataset(5),
@@ -60,11 +60,11 @@ def iter_items(state):
   ds = airio.lazy_dataset_transforms.ConcatLazyMapDataset(parents)
   ds_iter = iter(ds)
   while state:
-    _ = list(ds_iter)
+    list(ds_iter)
 
 
 @google_benchmark.register
-def length_reproducible(state):
+def length_reproducible(state: google_benchmark.State) -> None:
   """Analogous to the RandomMapFnLazyMapDatasetTest with the same name."""
 
   def random_map_fn(ex, rng):
@@ -75,11 +75,11 @@ def length_reproducible(state):
       ds, random_map_fn, jax.random.PRNGKey(42)
   )
   while state:
-    _ = len(ds)
+    len(ds)
 
 
 @google_benchmark.register
-def get_item_reproducible(state):
+def get_item_reproducible(state: google_benchmark.State) -> None:
   """Analogous to the RandomMapFnLazyMapDatasetTest with the same name."""
 
   def random_map_fn(ex, rng):
@@ -95,7 +95,7 @@ def get_item_reproducible(state):
 
 
 @google_benchmark.register
-def iter_items_reproducible(state):
+def iter_items_reproducible(state: google_benchmark.State) -> None:
   """Analogous to the RandomMapFnLazyMapDatasetTest with the same name."""
 
   def random_map_fn(ex, rng):
@@ -107,7 +107,7 @@ def iter_items_reproducible(state):
       ds1 = airio.lazy_dataset_transforms.RandomMapFnLazyMapDataset(
           ds, random_map_fn, jax.random.PRNGKey(42)
       )
-      _ = list(ds1)
+      list(ds1)
 
 
 if __name__ == "__main__":

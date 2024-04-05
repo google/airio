@@ -13,8 +13,6 @@
 # limitations under the License.
 
 """Tests for airio.pygrain.dataset_providers."""
-
-import dataclasses
 import functools
 import os
 from typing import Dict, Sequence
@@ -950,13 +948,13 @@ class TaskTest(absltest.TestCase):
     def update_runtime_args_1(args):
       seq_lens = dict(args.sequence_lengths)
       seq_lens.update({"new_val": 5})
-      new_args = dataclasses.replace(args, sequence_lengths=seq_lens)
+      new_args = args.replace(sequence_lengths=seq_lens)
       return new_args
 
     def update_runtime_args_2(args):
       seq_lens = args.sequence_lengths
       seq_lens.update({"another_val": 7})
-      new_args = dataclasses.replace(args, sequence_lengths=seq_lens)
+      new_args = args.replace(sequence_lengths=seq_lens)
       return new_args
 
     prep_1 = preprocessors_lib.MapFnTransform(
@@ -970,15 +968,14 @@ class TaskTest(absltest.TestCase):
     task = dataset_providers.GrainTask(
         "test", source=_create_source(), preprocessors=[prep_1, prep_2]
     )
-    runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"val": 3}, split="train"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"val": 3}
     )
     updated_runtime_args = task.get_updated_runtime_args(
         runtime_args, runtime_preprocessors=None
     )
-    expected_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = runtime_args.replace(
         sequence_lengths={"val": 3, "new_val": 5, "another_val": 7},
-        split="train",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
@@ -1655,8 +1652,8 @@ class MixtureTest(absltest.TestCase):
 
   def test_mixture_runtime_args_updated_by_task(self):
     def update_runtime_args_fn(rargs):
-      return core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-          sequence_lengths={"inputs": 20, "targets": 10}, split=rargs.split
+      return rargs.replace(
+          sequence_lengths={"inputs": 20, "targets": 10}
       )
 
     task_with_runtime_args_update = (

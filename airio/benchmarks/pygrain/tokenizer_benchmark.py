@@ -22,64 +22,73 @@ import google_benchmark
 _TEST_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "../../test_data"
 )
-_SENTENCEPIECE_VOCAB = airio.SentencePieceVocabulary(
-    os.path.join(_TEST_DIR, "sentencepiece", "sentencepiece.model")
-)
-_TOKENIZER_CONFIG = airio.TokenizerConfig(vocab=_SENTENCEPIECE_VOCAB)
 
 
 @google_benchmark.register
-def tokenize(state):
-  """Analogous to the TokenizerTest with the same name."""
+def tokenize(state: google_benchmark.State) -> None:
+  """Measure tokenization."""
+  tokenizer_config = airio.TokenizerConfig(
+      vocab=airio.SentencePieceVocabulary(
+          os.path.join(_TEST_DIR, "sentencepiece", "sentencepiece.model")
+      )
+  )
+  tokenizer_obj = airio.Tokenizer(
+      tokenizer_configs={
+          "inputs": tokenizer_config,
+          "targets": tokenizer_config,
+      }
+  )
   orig_example = {
       "inputs": "imdb ebc   ahgjefjhfe",
       "targets": "positive",
   }
-  tokenizer_configs = {
-      "inputs": _TOKENIZER_CONFIG,
-      "targets": _TOKENIZER_CONFIG,
-  }
-  tokenizer_obj = airio.Tokenizer(tokenizer_configs=tokenizer_configs)
   tokenized_example = tokenizer_obj(orig_example)
   while state:
-    _ = tokenized_example.items()
+    tokenized_example.items()
 
 
 @google_benchmark.register
-def tokenize_do_not_copy_pretokenized(state):
-  """Analogous to the TokenizerTest with the same name."""
-  orig_example = {
-      "inputs": "imdb ebc   ahgjefjhfe",
-      "targets": "positive",
-  }
-  tokenizer_configs = {
-      "inputs": _TOKENIZER_CONFIG,
-      "targets": _TOKENIZER_CONFIG,
-  }
+def tokenize_do_not_copy_pretokenized(state: google_benchmark.State) -> None:
+  """Measure tokenization without copying pretokenized."""
+  tokenizer_config = airio.TokenizerConfig(
+      vocab=airio.SentencePieceVocabulary(
+          os.path.join(_TEST_DIR, "sentencepiece", "sentencepiece.model")
+      )
+  )
   tokenizer_obj = airio.Tokenizer(
-      tokenizer_configs=tokenizer_configs,
+      tokenizer_configs={
+          "inputs": tokenizer_config,
+          "targets": tokenizer_config,
+      },
       copy_pretokenized=False,
   )
-  tokenized_example = tokenizer_obj(orig_example)
-  while state:
-    _ = tokenized_example.items()
-
-
-@google_benchmark.register
-def tokenize_empty(state):
-  """Analogous to the TokenizerTest with the same name."""
   orig_example = {
       "inputs": "imdb ebc   ahgjefjhfe",
       "targets": "positive",
   }
-  tokenizer_configs = {
-      "inputs": _TOKENIZER_CONFIG,
-      "targets": _TOKENIZER_CONFIG,
-  }
-  tokenizer_obj = airio.Tokenizer(tokenizer_configs=tokenizer_configs)
   tokenized_example = tokenizer_obj(orig_example)
   while state:
-    _ = tokenized_example.items()
+    tokenized_example.items()
+
+
+@google_benchmark.register
+def tokenize_empty(state: google_benchmark.State) -> None:
+  """Measure tokenization with empty input."""
+  tokenizer_config = airio.TokenizerConfig(
+      vocab=airio.SentencePieceVocabulary(
+          os.path.join(_TEST_DIR, "sentencepiece", "sentencepiece.model")
+      )
+  )
+  tokenizer_obj = airio.Tokenizer(
+      tokenizer_configs={
+          "inputs": tokenizer_config,
+          "targets": tokenizer_config,
+      },
+      copy_pretokenized=False,
+  )
+  tokenized_example = tokenizer_obj({})
+  while state:
+    tokenized_example.items()
 
 
 if __name__ == "__main__":
