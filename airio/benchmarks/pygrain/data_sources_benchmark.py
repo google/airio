@@ -21,6 +21,8 @@ import google_benchmark
 import numpy as np
 import tensorflow_datasets as tfds
 
+import multiprocessing
+
 _SOURCE_NAME = "imdb_reviews"
 _SOURCE_NUM_EXAMPLES = 3
 _SOURCE_SPLITS = ("train", "test", "unsupervised")
@@ -51,6 +53,17 @@ def _generate_function_data_source(split: str):
   if split not in _SOURCE_SPLITS:
     raise ValueError(f"Split {split} not found in {_SOURCE_SPLITS}.")
   return np.array(range(_SOURCE_NUM_EXAMPLES))
+
+
+def _create_json_data_source() -> airio.pygrain.JsonDataSource:
+  """Creates a basic JsonDataSource."""
+  split_to_filepattern = {
+      split: os.path.join(_TEST_DATA_DIR, "classification.json")
+      for split in _SOURCE_SPLITS
+  }
+  return airio.pygrain.JsonDataSource(
+      split_to_filepattern=split_to_filepattern,
+  )
 
 
 
@@ -135,6 +148,39 @@ def function_data_source_splits(state: google_benchmark.State) -> None:
     _ = ds.splits
 
 
+@google_benchmark.register
+def json_data_source_create(state: google_benchmark.State) -> None:
+  """Measures creating a json data source."""
+  while state:
+    _create_json_data_source()
+
+
+@google_benchmark.register
+def json_data_source_get(state: google_benchmark.State) -> None:
+  """Measures getting a json data source."""
+  ds = _create_json_data_source()
+  while state:
+    for split in _SOURCE_SPLITS:
+      ds.get_data_source(split)
+
+
+@google_benchmark.register
+def json_data_source_num_input_examples(state: google_benchmark.State) -> None:
+  """Measures getting number of input examples for a json data source."""
+  ds = _create_json_data_source()
+  while state:
+    for split in _SOURCE_SPLITS:
+      ds.num_input_examples(split)
+
+
+@google_benchmark.register
+def json_data_source_splits(state: google_benchmark.State) -> None:
+  """Measures getting splits for a json data source."""
+  ds = _create_json_data_source()
+  while state:
+    _ = ds.splits
+
+
 
 
 @google_benchmark.register
@@ -183,4 +229,4 @@ def tfds_data_source_splits(state: google_benchmark.State) -> None:
 
 
 if __name__ == "__main__":
-  google_benchmark.main()
+  multiprocessing.handle_main(google_benchmark.main)
