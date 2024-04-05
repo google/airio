@@ -19,7 +19,7 @@ import json
 
 from absl.testing import absltest
 from absl.testing import parameterized
-from airio._src.core import preprocessors as core_preprocessors
+from airio._src.core import test_utils
 from airio._src.pygrain.common import packing
 from airio._src.pygrain.common import preprocessors
 import grain.python as grain
@@ -352,8 +352,8 @@ class MultiBinPackingMapTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 4}, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 4}
     )
     packer = packing.MultiBinPacker(
         num_partial_examples=10,
@@ -368,13 +368,12 @@ class MultiBinPackingMapTest(parameterized.TestCase):
     ds_iter = iter(ds)
 
     # Verify updated runtime args
-    expected_updated_runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
+    expected_updated_runtime_args = runtime_args.replace(
         sequence_lengths={
             "inputs": 4,
             "inputs_segment_ids": 4,
             "inputs_positions": 4,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_updated_runtime_args)
 
@@ -482,8 +481,8 @@ class MultiBinPackingMapTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 4}, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 4}
     )
     packer = packing.MultiBinPacker(
         num_partial_examples=10,
@@ -810,8 +809,8 @@ class NoamPackingMapTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 4}, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 4}
     )
     packer = packing.NoamPacker()  # feature_lengths will be set before packing.
     transform = packing.AirIOPackDatasetMapPreprocessor(
@@ -823,9 +822,8 @@ class NoamPackingMapTest(parameterized.TestCase):
     ds_iter = iter(ds)
 
     # Verify updated runtime args
-    expected_updated_runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 4},
-        split="unused",
+    expected_updated_runtime_args = runtime_args.replace(
+        sequence_lengths={"inputs": 4}
     )
     self.assertEqual(updated_runtime_args, expected_updated_runtime_args)
 
@@ -860,8 +858,8 @@ class NoamPackingMapTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 2}, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 2}
     )
     packer = packing.NoamPacker()  # feature_lengths will be set before packing.
     transform = packing.AirIOPackDatasetMapPreprocessor(
@@ -898,8 +896,8 @@ class NoamPackingMapTest(parameterized.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 4}, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 4}
     )
     packer = packing.NoamPacker()  # feature_lengths will be set before packing.
     packing_preprocessor = packing.AirIOPackDatasetMapPreprocessor(
@@ -1301,8 +1299,8 @@ class MultiBinPackingIterTest(parameterized.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 4}, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 4}
     )
     packer = packing.MultiBinPacker(
         num_partial_examples=10,
@@ -1314,13 +1312,12 @@ class MultiBinPackingIterTest(parameterized.TestCase):
     updated_runtime_args = transform.update_runtime_args(runtime_args)
 
     # Verify updated runtime args
-    expected_updated_runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
+    expected_updated_runtime_args = runtime_args.replace(
         sequence_lengths={
             "inputs": 4,
             "inputs_segment_ids": 4,
             "inputs_positions": 4,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_updated_runtime_args)
 
@@ -1366,8 +1363,8 @@ class MultiBinPackingIterTest(parameterized.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 4}, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 4}
     )
     packer = packing.MultiBinPacker(
         num_partial_examples=10,
@@ -1723,8 +1720,8 @@ class NoamPackingIterTest(parameterized.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 4}, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 4}
     )
     packer = packing.NoamPacker()  # feature_lengths will be set before packing.
     transform = packing.AirIOPackDatasetIterPreprocessor(packer=packer)
@@ -1733,9 +1730,8 @@ class NoamPackingIterTest(parameterized.TestCase):
     updated_runtime_args = transform.update_runtime_args(runtime_args)
 
     # Verify updated runtime args
-    expected_updated_runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 4},
-        split="unused",
+    expected_updated_runtime_args = runtime_args.replace(
+        sequence_lengths={"inputs": 4}
     )
     self.assertEqual(updated_runtime_args, expected_updated_runtime_args)
 
@@ -1769,8 +1765,8 @@ class NoamPackingIterTest(parameterized.TestCase):
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 4}, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 4}
     )
     packer = packing.NoamPacker()  # feature_lengths will be set before packing.
     packing_preprocessor = packing.AirIOPackDatasetIterPreprocessor(
@@ -1866,8 +1862,8 @@ class CommonPackersTest(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 4}, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 4}
     )
     unused_rng = None
     ds = packing.NoamPackMapPreprocessor(ds, runtime_args, unused_rng)
@@ -1897,8 +1893,8 @@ class CommonPackersTest(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 4}, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 4}
     )
     unused_rng = None
     ds = packing.SingleBinTruePackMapPreprocessor(ds, runtime_args, unused_rng)
@@ -1931,13 +1927,12 @@ class CommonPackersTest(absltest.TestCase):
             "inputs_positions": [0, 1, 0],
         },
     ]
-    expected_runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={
             "inputs": 4,
             "inputs_segment_ids": 4,
             "inputs_positions": 4,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
     for actual, expected in zip(ds_iter, expected_elements, strict=True):
@@ -1956,8 +1951,8 @@ class CommonPackersTest(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 4}, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 4}
     )
     unused_rng = None
     ds = packing.MultiBinTruePackMapPreprocessor(ds, runtime_args, unused_rng)
@@ -1990,13 +1985,12 @@ class CommonPackersTest(absltest.TestCase):
             "inputs_positions": [0, 1],
         },
     ]
-    expected_runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={
             "inputs": 4,
             "inputs_segment_ids": 4,
             "inputs_positions": 4,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
     for actual, expected in zip(ds_iter, expected_elements, strict=True):
@@ -2014,8 +2008,8 @@ class CommonPackersTest(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 4}, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 4}
     )
     unused_rng = None
     ds = packing.NoamPackIterPreprocessor(ds, runtime_args, unused_rng)
@@ -2044,8 +2038,8 @@ class CommonPackersTest(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 4}, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 4}
     )
     unused_rng = None
     ds = packing.SingleBinTruePackIterPreprocessor(ds, runtime_args, unused_rng)
@@ -2077,13 +2071,12 @@ class CommonPackersTest(absltest.TestCase):
             "inputs_positions": [0, 1, 0],
         },
     ]
-    expected_runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={
             "inputs": 4,
             "inputs_segment_ids": 4,
             "inputs_positions": 4,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
     for actual, expected in zip(ds, expected_elements, strict=True):
@@ -2102,8 +2095,8 @@ class CommonPackersTest(absltest.TestCase):
     ]
     ds = lazy_dataset.SourceLazyMapDataset(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 4}, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 4}
     )
     unused_rng = None
     ds = packing.MultiBinTruePackIterPreprocessor(ds, runtime_args, unused_rng)
@@ -2135,13 +2128,12 @@ class CommonPackersTest(absltest.TestCase):
             "inputs_positions": [0, 1],
         },
     ]
-    expected_runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
+    expected_runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={
             "inputs": 4,
             "inputs_segment_ids": 4,
             "inputs_positions": 4,
         },
-        split="unused",
     )
     self.assertEqual(updated_runtime_args, expected_runtime_args)
     for actual, expected in zip(ds, expected_elements, strict=True):

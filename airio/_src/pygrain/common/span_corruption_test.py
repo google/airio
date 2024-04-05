@@ -20,7 +20,7 @@ import os
 from typing import Any, Callable
 
 from absl.testing import absltest
-from airio._src.core import preprocessors as core_preprocessors
+from airio._src.core import test_utils
 from airio._src.core import tokenizer
 from airio._src.pygrain import lazy_dataset_transforms
 from airio._src.pygrain.common import packing
@@ -155,8 +155,8 @@ class SpanCorruptionTest(absltest.TestCase):
         "inputs": tokenizer.TokenizerConfig(vocab=test_vocab, add_eos=True),
         "targets": tokenizer.TokenizerConfig(vocab=test_vocab, add_eos=True),
     }
-    runtime_args = core_preprocessors.AirIOInjectedRuntimeArgs(
-        sequence_lengths={"inputs": 1024, "targets": 1024}, split="unused"
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"inputs": 1024, "targets": 1024},
     )
     examples = list(src_ds.as_numpy_iterator())
     unused_seed = 1  # overridden by mocked fn to match seqio seed distribution
