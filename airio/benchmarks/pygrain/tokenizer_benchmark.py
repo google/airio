@@ -68,16 +68,12 @@ def tokenize_do_not_copy_pretokenized(state):
 @google_benchmark.register
 def tokenize_empty(state):
   """Analogous to the TokenizerTest with the same name."""
-  orig_example = {
-      "inputs": "imdb ebc   ahgjefjhfe",
-      "targets": "positive",
-  }
   tokenizer_configs = {
       "inputs": _TOKENIZER_CONFIG,
       "targets": _TOKENIZER_CONFIG,
   }
   tokenizer_obj = airio.Tokenizer(tokenizer_configs=tokenizer_configs)
-  tokenized_example = tokenizer_obj(orig_example)
+  tokenized_example = tokenizer_obj({})
   while state:
     _ = tokenized_example.items()
 
