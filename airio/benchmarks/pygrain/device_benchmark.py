@@ -32,7 +32,7 @@ partial = functools.partial
 _SOURCE_NUM_EXAMPLES = 1000
 
 
-def requires_tpu(num_devices_required):
+def requires_tpu(num_devices_required: int):
   """Helper to skip benchmarks that require TPUs."""
 
   def helper1(f):
@@ -56,23 +56,25 @@ _sum_of_squares_dx = jax.grad(_sum_of_squares)
 _sum_of_squares_dx_jit = jax.jit(_sum_of_squares_dx)
 
 
-def _get_tokenizer_configs():
+def _get_tokenizer_configs() -> dict[str, airio.TokenizerConfig]:
   test_dir = os.path.join(
       os.path.dirname(os.path.abspath(__file__)),
       "../../test_data",
   )
-  sentencepiece_vocab = airio.SentencePieceVocabulary(
-      os.path.join(test_dir, "sentencepiece", "sentencepiece.model")
+  tokenizer_config = airio.TokenizerConfig(
+      vocab=airio.SentencePieceVocabulary(
+          os.path.join(test_dir, "sentencepiece", "sentencepiece.model")
+      )
   )
   return {
-      "inputs": airio.TokenizerConfig(vocab=sentencepiece_vocab),
-      "targets": airio.TokenizerConfig(vocab=sentencepiece_vocab),
+      "inputs": tokenizer_config,
+      "targets": tokenizer_config,
   }
 
 
 @google_benchmark.register
 @requires_tpu(2)
-def wmt_generated_data_benchmark(state):
+def wmt_generated_data_benchmark(state: google_benchmark.State) -> None:
   """Loads a generated WMT dataset onto TPUs and performs a simple calculation."""
   with tfds.testing.mock_data(num_examples=_SOURCE_NUM_EXAMPLES):
     wmt_task = examples.tasks.get_wmt_19_ende_v003_task(
@@ -98,7 +100,7 @@ def wmt_generated_data_benchmark(state):
 
 @google_benchmark.register
 @requires_tpu(2)
-def wmt_from_file_benchmark(state):
+def wmt_from_file_benchmark(state: google_benchmark.State) -> None:
   """Loads a WMT dataset from file onto TPUs and performs a simple calculation."""
   wmt_task = examples.tasks.get_wmt_19_ende_v003_task(
       tokenizer_configs=_get_tokenizer_configs()
@@ -127,7 +129,9 @@ def wmt_from_file_benchmark(state):
 
 @google_benchmark.register
 @requires_tpu(2)
-def c4_span_corruption_generated_data_benchmark(state):
+def c4_span_corruption_generated_data_benchmark(
+    state: google_benchmark.State,
+) -> None:
   """Loads a generated C4 dataset onto TPUs and performs a simple calculation."""
   with tfds.testing.mock_data(num_examples=_SOURCE_NUM_EXAMPLES):
     c4_task = examples.tasks.get_c4_v220_span_corruption_task(
@@ -168,7 +172,9 @@ def c4_span_corruption_generated_data_benchmark(state):
 
 @google_benchmark.register
 @requires_tpu(2)
-def c4_span_corruption_from_file_benchmark(state):
+def c4_span_corruption_from_file_benchmark(
+    state: google_benchmark.State,
+) -> None:
   """Loads a C4 dataset from file onto TPUs and performs a simple calculation."""
   c4_task = examples.tasks.get_c4_v220_span_corruption_task(
       tokenizer_configs=_get_tokenizer_configs()

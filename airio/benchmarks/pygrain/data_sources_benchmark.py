@@ -35,7 +35,7 @@ def generate_function_data_source(split: str):
 
 
 @google_benchmark.register
-def function_data_source_create(state):
+def function_data_source_create(state: google_benchmark.State) -> None:
   while state:
     airio.FunctionDataSource(
         dataset_fn=generate_function_data_source, splits=_SOURCE_SPLITS
@@ -43,27 +43,29 @@ def function_data_source_create(state):
 
 
 @google_benchmark.register
-def function_data_source_get(state):
+def function_data_source_get(state: google_benchmark.State) -> None:
   ds = airio.FunctionDataSource(
       dataset_fn=generate_function_data_source, splits=_SOURCE_SPLITS
   )
   while state:
     for split in _SOURCE_SPLITS:
-      _ = ds.get_data_source(split)
+      ds.get_data_source(split)
 
 
 @google_benchmark.register
-def function_data_source_num_input_examples(state):
+def function_data_source_num_input_examples(
+    state: google_benchmark.State,
+) -> None:
   ds = airio.FunctionDataSource(
       dataset_fn=generate_function_data_source, splits=_SOURCE_SPLITS
   )
   while state:
     for split in _SOURCE_SPLITS:
-      _ = ds.num_input_examples(split)
+      ds.num_input_examples(split)
 
 
 @google_benchmark.register
-def function_data_source_splits(state):
+def function_data_source_splits(state: google_benchmark.State) -> None:
   ds = airio.FunctionDataSource(
       dataset_fn=generate_function_data_source, splits=_SOURCE_SPLITS
   )
@@ -72,32 +74,32 @@ def function_data_source_splits(state):
 
 
 @google_benchmark.register
-def tfds_data_source_create(state):
+def tfds_data_source_create(state: google_benchmark.State) -> None:
   with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
     while state:
       airio.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS)
 
 
 @google_benchmark.register
-def tfds_data_source_get(state):
+def tfds_data_source_get(state: google_benchmark.State) -> None:
   with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
     ds = airio.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS)
   while state:
     for split in _SOURCE_SPLITS:
-      _ = ds.get_data_source(split)
+      ds.get_data_source(split)
 
 
 @google_benchmark.register
-def tfds_data_source_num_input_examples(state):
+def tfds_data_source_num_input_examples(state: google_benchmark.State) -> None:
   with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
     ds = airio.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS)
   while state:
     for split in _SOURCE_SPLITS:
-      _ = ds.num_input_examples(split)
+      ds.num_input_examples(split)
 
 
 @google_benchmark.register
-def tfds_data_source_splits(state):
+def tfds_data_source_splits(state: google_benchmark.State) -> None:
   with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
     ds = airio.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS)
   while state:

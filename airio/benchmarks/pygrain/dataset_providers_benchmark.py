@@ -15,9 +15,10 @@
 """Microbenchmarks for AirIO dataset_providers functions."""
 
 
+from collections.abc import Mapping
 import functools
 import os
-from typing import Dict, Sequence
+from typing import Sequence
 
 import airio.core as airio_core
 import airio.pygrain as airio
@@ -32,16 +33,9 @@ import tensorflow_datasets as tfds
 _SOURCE_NAME = "imdb_reviews"
 _SOURCE_NUM_EXAMPLES = 3
 _SOURCE_SPLITS = ("train", "test", "unsupervised")
-_TEST_DIR = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "../../test_data"
-)
-_SENTENCEPIECE_VOCAB = airio.SentencePieceVocabulary(
-    os.path.join(_TEST_DIR, "sentencepiece", "sentencepiece.model")
-)
-_TOKENIZER_CONFIG = airio.TokenizerConfig(vocab=_SENTENCEPIECE_VOCAB)
 
 
-def _imdb_preprocessor(raw_example: Dict[str, str]) -> Dict[str, str]:
+def _imdb_preprocessor(raw_example: Mapping[str, str]) -> dict[str, str]:
   final_example = {"inputs": "imdb " + raw_example["text"]}
   raw_label = str(raw_example["label"])
   if raw_label == "0":
@@ -53,14 +47,22 @@ def _imdb_preprocessor(raw_example: Dict[str, str]) -> Dict[str, str]:
   return final_example
 
 
-def _create_preprocessors() -> Sequence[grain.Transformation]:
+def _create_preprocessors() -> list[grain.Transformation]:
+  test_dir = os.path.join(
+      os.path.dirname(os.path.abspath(__file__)), "../../test_data"
+  )
+  tokenizer_config = airio.TokenizerConfig(
+      vocab=airio.SentencePieceVocabulary(
+          os.path.join(test_dir, "sentencepiece", "sentencepiece.model")
+      )
+  )
   return [
       airio.MapFnTransform(_imdb_preprocessor),
       airio.MapFnTransform(
           airio.Tokenizer(
               tokenizer_configs={
-                  "inputs": _TOKENIZER_CONFIG,
-                  "targets": _TOKENIZER_CONFIG,
+                  "inputs": tokenizer_config,
+                  "targets": tokenizer_config,
               },
           )
       ),
@@ -190,7 +192,7 @@ class TestFilterLazyIterDataset(
 
 
 @google_benchmark.register
-def task_create(state):
+def task_create(state: google_benchmark.State) -> None:
   source = _create_source()
   while state:
     airio.GrainTask(
@@ -201,7 +203,7 @@ def task_create(state):
 
 
 @google_benchmark.register
-def task_create_with_preprocessors(state):
+def task_create_with_preprocessors(state: google_benchmark.State) -> None:
   source = _create_source()
   preprocessors = _create_preprocessors()
   while state:
@@ -213,31 +215,33 @@ def task_create_with_preprocessors(state):
 
 
 @google_benchmark.register
-def task_num_input_examples(state):
+def task_num_input_examples(state: google_benchmark.State) -> None:
   task = _create_task(
       source=_create_source(), preprocessors=_create_preprocessors()
   )
   while state:
-    _ = task.num_input_examples(split="train")
+    task.num_input_examples(split="train")
 
 
 @google_benchmark.register
-def task_get_dataset(state):
+def task_get_dataset(state: google_benchmark.State) -> None:
   task = _create_task(
       source=_create_source(), preprocessors=_create_preprocessors()
   )
   while state:
-    _ = task.get_dataset(split="train", shuffle=False)
+    task.get_dataset(split="train", shuffle=False)
 
 
 @google_benchmark.register
-def task_get_dataset_with_runtime_preps_without_batching(state):
+def task_get_dataset_with_runtime_preps_without_batching(
+    state: google_benchmark.State,
+) -> None:
   task = _create_task(
       source=_create_source(), preprocessors=_create_preprocessors()
   )
   runtime_preprocessors = _create_runtime_preprocessors()
   while state:
-    _ = task.get_dataset(
+    task.get_dataset(
         split="train",
         runtime_preprocessors=runtime_preprocessors,
         shuffle=False,
@@ -245,14 +249,16 @@ def task_get_dataset_with_runtime_preps_without_batching(state):
 
 
 @google_benchmark.register
-def task_get_dataset_batched_with_sequence_lengths(state):
+def task_get_dataset_batched_with_sequence_lengths(
+    state: google_benchmark.State,
+) -> None:
   task = _create_task(
       source=_create_source(), preprocessors=_create_preprocessors()
   )
   sequence_lengths = {"inputs": 20, "targets": 10}
   runtime_preprocessors = _create_runtime_preprocessors()
   while state:
-    _ = task.get_dataset(
+    task.get_dataset(
         sequence_lengths=sequence_lengths,
         split="train",
         runtime_preprocessors=runtime_preprocessors,
@@ -262,16 +268,16 @@ def task_get_dataset_batched_with_sequence_lengths(state):
 
 
 @google_benchmark.register
-def task_get_dataset_with_shard_info(state):
+def task_get_dataset_with_shard_info(state: google_benchmark.State) -> None:
   task = _create_task(
       source=_create_source(), preprocessors=_create_preprocessors()
   )
   while state:
-    _ = task.get_dataset(shard_info=airio.ShardInfo(index=0, num_shards=1))
+    task.get_dataset(shard_info=airio.ShardInfo(index=0, num_shards=1))
 
 
 @google_benchmark.register
-def task_get_dataset_with_lazy_iter_prep(state):
+def task_get_dataset_with_lazy_iter_prep(state: google_benchmark.State) -> None:
   """Analogous to the DatasetProvidersTest with the same name."""
 
   def test_map_fn(ex, idx):
@@ -292,11 +298,13 @@ def task_get_dataset_with_lazy_iter_prep(state):
       task_name="test_task_with_iter",
   )
   while state:
-    _ = task_with_iter.get_dataset(shuffle=False)
+    task_with_iter.get_dataset(shuffle=False)
 
 
 @google_benchmark.register
-def task_get_dataset_with_lazy_iter_prep_with_runtime_preps_and_batching(state):
+def task_get_dataset_with_lazy_iter_prep_with_runtime_preps_and_batching(
+    state: google_benchmark.State,
+) -> None:
   """Analogous to the DatasetProvidersTest with the same name."""
 
   def simple_to_imdb_map_fn(ex, rargs: airio.AirIOInjectedRuntimeArgs):
@@ -322,7 +330,7 @@ def task_get_dataset_with_lazy_iter_prep_with_runtime_preps_and_batching(state):
   )
   sequence_lengths = {"inputs": 2, "targets": 1}
   while state:
-    _ = task_with_iter.get_dataset(
+    task_with_iter.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
         runtime_preprocessors=_create_runtime_preprocessors(),
@@ -331,7 +339,7 @@ def task_get_dataset_with_lazy_iter_prep_with_runtime_preps_and_batching(state):
 
 
 @google_benchmark.register
-def task_get_dataset_with_none_elements(state):
+def task_get_dataset_with_none_elements(state: google_benchmark.State) -> None:
   """Analogous to the DatasetProvidersTest with the same name."""
 
   def test_map_fn(ex, idx):
@@ -349,11 +357,13 @@ def task_get_dataset_with_none_elements(state):
       task_name="test_task_with_none",
   )
   while state:
-    _ = task_with_none.get_dataset(shuffle=False)
+    task_with_none.get_dataset(shuffle=False)
 
 
 @google_benchmark.register
-def task_get_dataset_with_none_elements_with_runtime_preps_and_batching(state):
+def task_get_dataset_with_none_elements_with_runtime_preps_and_batching(
+    state: google_benchmark.State,
+) -> None:
   """Analogous to the DatasetProvidersTest with the same name."""
 
   def simple_to_imdb_map_fn(ex, rargs: airio.AirIOInjectedRuntimeArgs):
@@ -376,7 +386,7 @@ def task_get_dataset_with_none_elements_with_runtime_preps_and_batching(state):
   sequence_lengths = {"inputs": 2, "targets": 1}
   runtime_preprocessors = _create_runtime_preprocessors()
   while state:
-    _ = task_with_iter.get_dataset(
+    task_with_iter.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
         runtime_preprocessors=runtime_preprocessors,
@@ -385,23 +395,27 @@ def task_get_dataset_with_none_elements_with_runtime_preps_and_batching(state):
 
 
 @google_benchmark.register
-def task_get_dataset_by_step_without_runtime_preps(state):
+def task_get_dataset_by_step_without_runtime_preps(
+    state: google_benchmark.State,
+) -> None:
   task = _create_task(
       source=_create_source(), preprocessors=_create_preprocessors()
   )
   while state:
-    _ = task.get_dataset_by_step(num_records=1)
+    task.get_dataset_by_step(num_records=1)
 
 
 @google_benchmark.register
-def task_get_dataset_by_step_with_runtime_preps(state):
+def task_get_dataset_by_step_with_runtime_preps(
+    state: google_benchmark.State,
+) -> None:
   task = _create_task(
       source=_create_source(), preprocessors=_create_preprocessors()
   )
   sequence_lengths = {"inputs": 20, "targets": 10}
   runtime_preprocessors = _create_runtime_preprocessors()
   while state:
-    _ = task.get_dataset_by_step(
+    task.get_dataset_by_step(
         num_records=1,
         sequence_lengths=sequence_lengths,
         batch_size=2,
@@ -411,23 +425,25 @@ def task_get_dataset_by_step_with_runtime_preps(state):
 
 
 @google_benchmark.register
-def task_get_dataset_by_step_without_transformations(state):
+def task_get_dataset_by_step_without_transformations(
+    state: google_benchmark.State,
+) -> None:
   task = _create_task(source=_create_source(), preprocessors=[])
   while state:
-    _ = task.get_dataset_by_step(num_records=1)
+    task.get_dataset_by_step(num_records=1)
 
 
 @google_benchmark.register
-def function_get_dataset(state):
+def function_get_dataset(state: google_benchmark.State) -> None:
   task = _create_task(
       source=_create_source(), preprocessors=_create_preprocessors()
   )
   while state:
-    _ = airio_core.dataset_providers.get_dataset(task)
+    airio_core.dataset_providers.get_dataset(task)
 
 
 @google_benchmark.register
-def task_get_updated_runtime_args(state):
+def task_get_updated_runtime_args(state: google_benchmark.State) -> None:
   """Analogous to the DatasetProvidersTest with the same name."""
 
   def update_runtime_args_1(args):
@@ -453,36 +469,36 @@ def task_get_updated_runtime_args(state):
       sequence_lengths={"val": 3}, split="train"
   )
   while state:
-    _ = task.get_updated_runtime_args(runtime_args, runtime_preprocessors=None)
+    task.get_updated_runtime_args(runtime_args, runtime_preprocessors=None)
 
 
 @google_benchmark.register
-def function_get_vocabularies(state):
+def function_get_vocabularies(state: google_benchmark.State) -> None:
   task = _create_task(source=_create_source(), preprocessors=[])
   while state:
-    _ = airio_core.dataset_providers.get_vocabularies(task)
+    airio_core.dataset_providers.get_vocabularies(task)
 
 
 @google_benchmark.register
-def task_builder_from_task(state):
+def task_builder_from_task(state: google_benchmark.State) -> None:
   task = _create_task(source=_create_source(), preprocessors=[])
   while state:
-    _ = airio.GrainTaskBuilder.from_task(task)
+    airio.GrainTaskBuilder.from_task(task)
 
 
 @google_benchmark.register
-def task_builder_build(state):
+def task_builder_build(state: google_benchmark.State) -> None:
   task_builder = airio.GrainTaskBuilder(
       task_name="dummy_airio_task",
       source=_create_source(),
       preprocessors=_create_preprocessors(),
   )
   while state:
-    _ = task_builder.build()
+    task_builder.build()
 
 
 @google_benchmark.register
-def task_get_dataset_with_runtime_args(state):
+def task_get_dataset_with_runtime_args(state: google_benchmark.State) -> None:
   """Analogous to the DatasetProvidersTest with the same name."""
 
   def simple_to_imdb_map_fn(ex, rargs: airio.AirIOInjectedRuntimeArgs):
@@ -498,13 +514,15 @@ def task_get_dataset_with_runtime_args(state):
       preprocessors=[airio.MapFnTransform(simple_to_imdb_map_fn)],
   )
   while state:
-    _ = simple_task.get_dataset(
+    simple_task.get_dataset(
         sequence_lengths={"inputs": 20, "targets": 10}, shuffle=False
     )
 
 
 @google_benchmark.register
-def task_get_dataset_by_step_with_runtime_args(state):
+def task_get_dataset_by_step_with_runtime_args(
+    state: google_benchmark.State,
+) -> None:
   """Analogous to the DatasetProvidersTest with the same name."""
 
   def simple_to_imdb_map_fn(ex, rargs: airio.AirIOInjectedRuntimeArgs):
@@ -520,7 +538,7 @@ def task_get_dataset_by_step_with_runtime_args(state):
       preprocessors=[airio.MapFnTransform(simple_to_imdb_map_fn)],
   )
   while state:
-    _ = simple_task.get_dataset_by_step(
+    simple_task.get_dataset_by_step(
         sequence_lengths={"inputs": 20, "targets": 10}, shuffle=False
     )
 
@@ -548,7 +566,7 @@ def task_get_dataset_by_step_with_runtime_args(state):
 
 
 @google_benchmark.register
-def mixture_runtime_args_updated_by_task(state):
+def mixture_runtime_args_updated_by_task(state: google_benchmark.State) -> None:
   """Analogous to the MixtureTest with the same name."""
 
   def update_runtime_args_fn(rargs):
@@ -577,7 +595,7 @@ def mixture_runtime_args_updated_by_task(state):
       proportions=[1.0],
   )
   while state:
-    _ = mix.get_dataset(
+    mix.get_dataset(
         sequence_lengths={"xyz": 5, "abc": 7},  # will be updated
         shuffle=False,
         shard_info=airio.ShardInfo(index=0, num_shards=2),
@@ -587,27 +605,27 @@ def mixture_runtime_args_updated_by_task(state):
 
 
 @google_benchmark.register
-def simple_mixture(state):
+def simple_mixture(state: google_benchmark.State) -> None:
   mix = _create_mixture()
   while state:
-    _ = mix.get_dataset(shuffle=False)
+    mix.get_dataset(shuffle=False)
 
 
 @google_benchmark.register
-def mixture_sharding(state):
+def mixture_sharding(state: google_benchmark.State) -> None:
   mix = _create_mixture()
   while state:
-    _ = mix.get_dataset(
+    mix.get_dataset(
         shuffle=False,
         shard_info=airio.ShardInfo(index=0, num_shards=2),
     )
 
 
 @google_benchmark.register
-def mixture_shuffling(state):
+def mixture_shuffling(state: google_benchmark.State) -> None:
   mix = _create_mixture()
   while state:
-    _ = mix.get_dataset(
+    mix.get_dataset(
         shuffle=True,
         seed=42,
         shard_info=airio.ShardInfo(index=0, num_shards=2),
@@ -615,10 +633,10 @@ def mixture_shuffling(state):
 
 
 @google_benchmark.register
-def multi_epoch(state):
+def multi_epoch(state: google_benchmark.State) -> None:
   mix = _create_mixture()
   while state:
-    _ = mix.get_dataset(
+    mix.get_dataset(
         shuffle=True,
         seed=42,
         shard_info=airio.ShardInfo(index=0, num_shards=2),
@@ -627,7 +645,9 @@ def multi_epoch(state):
 
 
 @google_benchmark.register
-def multi_epoch_with_stochastic_preprocessor(state):
+def multi_epoch_with_stochastic_preprocessor(
+    state: google_benchmark.State,
+) -> None:
   """Analogous to the MixtureTest with the same name."""
 
   def test_random_map_fn(ex, rng):
@@ -664,7 +684,7 @@ def multi_epoch_with_stochastic_preprocessor(state):
   )
   mix = _create_mixture(tasks=[task1, task2])
   while state:
-    _ = mix.get_lazy_dataset(
+    mix.get_lazy_dataset(
         None,
         "train",
         shuffle=True,
@@ -675,10 +695,10 @@ def multi_epoch_with_stochastic_preprocessor(state):
 
 
 @google_benchmark.register
-def indefinite_repeat(state):
+def indefinite_repeat(state: google_benchmark.State) -> None:
   mix = _create_mixture()
   while state:
-    _ = mix.get_dataset(
+    mix.get_dataset(
         shuffle=False,
         shard_info=airio.ShardInfo(index=0, num_shards=2),
         num_epochs=None,
@@ -686,7 +706,9 @@ def indefinite_repeat(state):
 
 
 @google_benchmark.register
-def mixture_with_different_sources_and_preprocessors(state):
+def mixture_with_different_sources_and_preprocessors(
+    state: google_benchmark.State,
+) -> None:
   """Analogous to the MixtureTest with the same name."""
   imdb_task = _create_task(
       source=_create_source(), preprocessors=_create_preprocessors()
@@ -711,7 +733,7 @@ def mixture_with_different_sources_and_preprocessors(state):
       tasks=[imdb_task, simple_to_imdb_task], proportions=[1.0, 1.0]
   )
   while state:
-    _ = mix.get_dataset(
+    mix.get_dataset(
         sequence_lengths={"inputs": 20, "targets": 10},
         shuffle=False,
         shard_info=airio.ShardInfo(index=0, num_shards=2),
@@ -720,7 +742,7 @@ def mixture_with_different_sources_and_preprocessors(state):
 
 
 @google_benchmark.register
-def mixture_with_runtime_preps(state):
+def mixture_with_runtime_preps(state: google_benchmark.State) -> None:
   """Analogous to the MixtureTest with the same name."""
   imdb_task = _create_task(
       source=_create_source(), preprocessors=_create_preprocessors()
@@ -746,7 +768,7 @@ def mixture_with_runtime_preps(state):
   )
   sequence_lengths = {"inputs": 20, "targets": 10}
   while state:
-    _ = mix.get_dataset(
+    mix.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
         shard_info=airio.ShardInfo(index=0, num_shards=2),
@@ -756,7 +778,9 @@ def mixture_with_runtime_preps(state):
 
 
 @google_benchmark.register
-def mixture_with_runtime_preps_and_batching(state):
+def mixture_with_runtime_preps_and_batching(
+    state: google_benchmark.State,
+) -> None:
   """Analogous to the MixtureTest with the same name."""
   imdb_task = _create_task(
       source=_create_source(), preprocessors=_create_preprocessors()
@@ -782,7 +806,7 @@ def mixture_with_runtime_preps_and_batching(state):
   )
   sequence_lengths = {"inputs": 20, "targets": 10}
   while state:
-    _ = mix.get_dataset(
+    mix.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
         shard_info=airio.ShardInfo(index=0, num_shards=2),
@@ -793,10 +817,10 @@ def mixture_with_runtime_preps_and_batching(state):
 
 
 @google_benchmark.register
-def mixture_with_batching_only(state):
+def mixture_with_batching_only(state: google_benchmark.State) -> None:
   mix = _create_mixture(proportions=[1.0, 1.0])
   while state:
-    _ = mix.get_dataset(
+    mix.get_dataset(
         sequence_lengths={"inputs": 20, "targets": 10},
         shuffle=False,
         shard_info=airio.ShardInfo(index=0, num_shards=2),
@@ -807,7 +831,7 @@ def mixture_with_batching_only(state):
 
 
 @google_benchmark.register
-def mixing_with_iter_test(state):
+def mixing_with_iter_test(state: google_benchmark.State) -> None:
   """Analogous to the MixtureTest with the same name."""
 
   def test_map_fn(ex, idx):
@@ -838,11 +862,13 @@ def mixing_with_iter_test(state):
       tasks=[task_with_none, ordinary_task], proportions=[1.0, 1.0]
   )
   while state:
-    _ = mix.get_dataset(shuffle=False)
+    mix.get_dataset(shuffle=False)
 
 
 @google_benchmark.register
-def mixing_with_iter_test_with_runtime_preps_and_batching(state):
+def mixing_with_iter_test_with_runtime_preps_and_batching(
+    state: google_benchmark.State,
+) -> None:
   """Analogous to the MixtureTest with the same name."""
 
   def simple_to_imdb_map_fn(ex, rargs: airio.AirIOInjectedRuntimeArgs):
@@ -877,7 +903,7 @@ def mixing_with_iter_test_with_runtime_preps_and_batching(state):
   )
   sequence_lengths = {"inputs": 2, "targets": 1}
   while state:
-    _ = mix.get_dataset(
+    mix.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
         runtime_preprocessors=_create_runtime_preprocessors(),
@@ -886,7 +912,7 @@ def mixing_with_iter_test_with_runtime_preps_and_batching(state):
 
 
 @google_benchmark.register
-def mixing_with_lazy_iter_preprocessor(state):
+def mixing_with_lazy_iter_preprocessor(state: google_benchmark.State) -> None:
   """Analogous to the MixtureTest with the same name."""
 
   def test_map_fn(ex, idx):
@@ -920,11 +946,13 @@ def mixing_with_lazy_iter_preprocessor(state):
       tasks=[task_with_iter, ordinary_task], proportions=[1.0, 1.0]
   )
   while state:
-    _ = mix.get_dataset(shuffle=False)
+    mix.get_dataset(shuffle=False)
 
 
 @google_benchmark.register
-def mixing_with_lazy_iter_preprocessor_with_runtime_preps_and_batching(state):
+def mixing_with_lazy_iter_preprocessor_with_runtime_preps_and_batching(
+    state: google_benchmark.State,
+) -> None:
   """Analogous to the MixtureTest with the same name."""
 
   def simple_to_imdb_map_fn(ex, rargs: airio.AirIOInjectedRuntimeArgs):
@@ -962,7 +990,7 @@ def mixing_with_lazy_iter_preprocessor_with_runtime_preps_and_batching(state):
   )
   sequence_lengths = {"inputs": 2, "targets": 1}
   while state:
-    _ = mix.get_dataset(
+    mix.get_dataset(
         sequence_lengths=sequence_lengths,
         shuffle=False,
         runtime_preprocessors=_create_runtime_preprocessors(),
