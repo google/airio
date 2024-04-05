@@ -16,7 +16,7 @@
 
 import os
 
-import airio.pygrain as airio
+import airio.pygrain
 import google_benchmark
 import numpy as np
 import tensorflow_datasets as tfds
@@ -26,7 +26,15 @@ _SOURCE_NUM_EXAMPLES = 3
 _SOURCE_SPLITS = ("train", "test", "unsupervised")
 
 
-def generate_function_data_source(split: str):
+def _generate_function_data_source(split: str):
+  """Generates a simple dataset for testing.
+
+  Args:
+    split: must be one of ("train", "test", "unsupervised").
+
+  Returns:
+    A dataset with 3 records.
+  """
   if split not in _SOURCE_SPLITS:
     raise ValueError(f"Split {split} not found in {_SOURCE_SPLITS}.")
   return np.array(range(_SOURCE_NUM_EXAMPLES))
@@ -36,16 +44,18 @@ def generate_function_data_source(split: str):
 
 @google_benchmark.register
 def function_data_source_create(state: google_benchmark.State) -> None:
+  """Measures creating a basic function data source."""
   while state:
-    airio.FunctionDataSource(
-        dataset_fn=generate_function_data_source, splits=_SOURCE_SPLITS
+    airio.pygrain.FunctionDataSource(
+        dataset_fn=_generate_function_data_source, splits=_SOURCE_SPLITS
     )
 
 
 @google_benchmark.register
 def function_data_source_get(state: google_benchmark.State) -> None:
-  ds = airio.FunctionDataSource(
-      dataset_fn=generate_function_data_source, splits=_SOURCE_SPLITS
+  """Measures getting a basic function data source."""
+  ds = airio.pygrain.FunctionDataSource(
+      dataset_fn=_generate_function_data_source, splits=_SOURCE_SPLITS
   )
   while state:
     for split in _SOURCE_SPLITS:
@@ -56,8 +66,9 @@ def function_data_source_get(state: google_benchmark.State) -> None:
 def function_data_source_num_input_examples(
     state: google_benchmark.State,
 ) -> None:
-  ds = airio.FunctionDataSource(
-      dataset_fn=generate_function_data_source, splits=_SOURCE_SPLITS
+  """Measures getting number of input examples for a function data source."""
+  ds = airio.pygrain.FunctionDataSource(
+      dataset_fn=_generate_function_data_source, splits=_SOURCE_SPLITS
   )
   while state:
     for split in _SOURCE_SPLITS:
@@ -66,8 +77,9 @@ def function_data_source_num_input_examples(
 
 @google_benchmark.register
 def function_data_source_splits(state: google_benchmark.State) -> None:
-  ds = airio.FunctionDataSource(
-      dataset_fn=generate_function_data_source, splits=_SOURCE_SPLITS
+  """Measures getting splits for a function data source."""
+  ds = airio.pygrain.FunctionDataSource(
+      dataset_fn=_generate_function_data_source, splits=_SOURCE_SPLITS
   )
   while state:
     _ = ds.splits
@@ -75,15 +87,21 @@ def function_data_source_splits(state: google_benchmark.State) -> None:
 
 @google_benchmark.register
 def tfds_data_source_create(state: google_benchmark.State) -> None:
+  """Measures creating a basic TFDS data source."""
   with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
     while state:
-      airio.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS)
+      airio.pygrain.TfdsDataSource(
+          tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS
+      )
 
 
 @google_benchmark.register
 def tfds_data_source_get(state: google_benchmark.State) -> None:
+  """Measures getting a basic TFDS data source."""
   with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
-    ds = airio.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS)
+    ds = airio.pygrain.TfdsDataSource(
+        tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS
+    )
   while state:
     for split in _SOURCE_SPLITS:
       ds.get_data_source(split)
@@ -91,8 +109,11 @@ def tfds_data_source_get(state: google_benchmark.State) -> None:
 
 @google_benchmark.register
 def tfds_data_source_num_input_examples(state: google_benchmark.State) -> None:
+  """Measures getting number of input examples for a TFDS data source."""
   with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
-    ds = airio.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS)
+    ds = airio.pygrain.TfdsDataSource(
+        tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS
+    )
   while state:
     for split in _SOURCE_SPLITS:
       ds.num_input_examples(split)
@@ -100,8 +121,11 @@ def tfds_data_source_num_input_examples(state: google_benchmark.State) -> None:
 
 @google_benchmark.register
 def tfds_data_source_splits(state: google_benchmark.State) -> None:
+  """Measures getting splits for a TFDS data source."""
   with tfds.testing.mock_data(_SOURCE_NUM_EXAMPLES):
-    ds = airio.TfdsDataSource(tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS)
+    ds = airio.pygrain.TfdsDataSource(
+        tfds_name=_SOURCE_NAME, splits=_SOURCE_SPLITS
+    )
   while state:
     _ = ds.splits
 
