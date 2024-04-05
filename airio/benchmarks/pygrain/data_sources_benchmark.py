@@ -26,6 +26,19 @@ _SOURCE_NUM_EXAMPLES = 3
 _SOURCE_SPLITS = ("train", "test", "unsupervised")
 
 
+def _create_array_record_data_source() -> airio.pygrain.ArrayRecordDataSource:
+  """Creates a basic ArrayRecordDataSource."""
+  split_to_filepattern = {
+      split: os.path.join(_TEST_DATA_DIR, "classification.array_record@2")
+      for split in _SOURCE_SPLITS
+  }
+  return airio.pygrain.ArrayRecordDataSource(
+      split_to_filepattern=split_to_filepattern,
+  )
+
+
+
+
 def _generate_function_data_source(split: str):
   """Generates a simple dataset for testing.
 
@@ -38,6 +51,43 @@ def _generate_function_data_source(split: str):
   if split not in _SOURCE_SPLITS:
     raise ValueError(f"Split {split} not found in {_SOURCE_SPLITS}.")
   return np.array(range(_SOURCE_NUM_EXAMPLES))
+
+
+
+
+@google_benchmark.register
+def array_record_data_source_create(state: google_benchmark.State) -> None:
+  """Measures creating an array record data source."""
+  while state:
+    _create_array_record_data_source()
+
+
+@google_benchmark.register
+def array_record_data_source_get(state: google_benchmark.State) -> None:
+  """Measures getting an array record data source."""
+  ds = _create_array_record_data_source()
+  while state:
+    for split in _SOURCE_SPLITS:
+      ds.get_data_source(split)
+
+
+@google_benchmark.register
+def array_record_data_source_num_input_examples(
+    state: google_benchmark.State,
+) -> None:
+  """Measures getting number of input examples for an array record data source."""
+  ds = _create_array_record_data_source()
+  while state:
+    for split in _SOURCE_SPLITS:
+      ds.num_input_examples(split)
+
+
+@google_benchmark.register
+def array_record_data_source_splits(state: google_benchmark.State) -> None:
+  """Measures getting splits for an array record data source."""
+  ds = _create_array_record_data_source()
+  while state:
+    _ = ds.splits
 
 
 
@@ -85,6 +135,8 @@ def function_data_source_splits(state: google_benchmark.State) -> None:
     _ = ds.splits
 
 
+
+
 @google_benchmark.register
 def tfds_data_source_create(state: google_benchmark.State) -> None:
   """Measures creating a basic TFDS data source."""
@@ -128,8 +180,6 @@ def tfds_data_source_splits(state: google_benchmark.State) -> None:
     )
   while state:
     _ = ds.splits
-
-
 
 
 if __name__ == "__main__":
