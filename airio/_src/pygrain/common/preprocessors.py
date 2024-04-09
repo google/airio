@@ -168,3 +168,10 @@ def rekey(x, key_map=None):
         for new_key, old_key in key_map.items()
     }
   return x
+
+
+def remove_features_not_in_sequence_lengths(
+    ex, runtime_args: core_preprocessors.AirIOInjectedRuntimeArgs
+):
+  """Remove features from the example not in sequence lengths."""
+  return {k: v for k, v in ex.items() if k in runtime_args.sequence_lengths}

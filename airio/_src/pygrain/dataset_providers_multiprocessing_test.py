@@ -367,9 +367,15 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
                 "parent": {
                     "parent": {
                         "parent": {
-                            "parents": [{"next_index": 0}, {"next_index": 0}],
-                            "index": 0,
-                            "stop": False,
+                            "parent": {
+                                "parents": [
+                                    {"next_index": 0},
+                                    {"next_index": 0},
+                                ],
+                                "index": 0,
+                                "stop": False,
+                            },
+                            "index_for_rng": 0,
                         },
                         "index_for_rng": 0,
                     },
@@ -381,9 +387,15 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
                 "parent": {
                     "parent": {
                         "parent": {
-                            "parents": [{"next_index": 0}, {"next_index": 0}],
-                            "index": 0,
-                            "stop": False,
+                            "parent": {
+                                "parents": [
+                                    {"next_index": 0},
+                                    {"next_index": 0},
+                                ],
+                                "index": 0,
+                                "stop": False,
+                            },
+                            "index_for_rng": 0,
                         },
                         "index_for_rng": 0,
                     },
@@ -451,8 +463,11 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
                     "parent": {
                         "parent": {
                             "parent": {
-                                "parent": {"next_index": 0},
-                                "threshold": 4,
+                                "parent": {
+                                    "parent": {"next_index": 0},
+                                    "threshold": 4,
+                                },
+                                "index_for_rng": 0,
                             },
                             "index_for_rng": 0,
                         },
@@ -467,8 +482,11 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
                     "parent": {
                         "parent": {
                             "parent": {
-                                "parent": {"next_index": 0},
-                                "threshold": 4,
+                                "parent": {
+                                    "parent": {"next_index": 0},
+                                    "threshold": 4,
+                                },
+                                "index_for_rng": 0,
                             },
                             "index_for_rng": 0,
                         },

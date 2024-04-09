@@ -318,5 +318,40 @@ class PadPreprocessorsTest(absltest.TestCase):
       _ = list(ds)
 
 
+class RemoveFeaturesPreprocessorsTest(absltest.TestCase):
+
+  def test_remove_features_not_in_sequence_lengths(self):
+    input_examples = [
+        {"key1": b"some values", "key2": [1, 2, 3], "key3": [4, 5, 6]},
+        {"key1": b"for the test", "key2": [2, 3, 4], "key3": [6, 7, 8]},
+    ]
+    ds = lazy_dataset.SourceLazyMapDataset(input_examples)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"key1": 1, "key2": 2, "key4": 5}
+    )
+    ds = ds.map(
+        lambda x: preprocessors.remove_features_not_in_sequence_lengths(
+            x, runtime_args
+        )
+    )
+    # "key3" is removed because it is not in sequence_lengths. "key4" is in
+    # sequence_lengths but not in the input examples, hence abset from output.
+    expected = [
+        {
+            "key1": b"some values",
+            "key2": [1, 2, 3],
+        },
+        {
+            "key1": b"for the test",
+            "key2": [2, 3, 4],
+        },
+    ]
+    for act, exp in zip(list(ds), expected):
+      self.assertCountEqual(act.keys(), exp.keys())
+      for k in act.keys():
+        np.testing.assert_array_equal(act[k], exp[k])
+
+
 if __name__ == "__main__":
   absltest.main()

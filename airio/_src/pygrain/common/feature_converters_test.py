@@ -158,19 +158,6 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         "decoder_positions",
     ]
 
-  def _apply_preprocessors(
-      self,
-      ds: lazy_dataset.LazyMapDataset,
-      preprocessors: preprocessors_lib.PyGrainAirIOPreprocessor,
-      runtime_args: core_preprocessors_lib.AirIOInjectedRuntimeArgs,
-  ):
-    for preprocessor in preprocessors:
-      prep = preprocessors_lib.LazyDatasetTransform(preprocessor)
-      ds = prep(ds, runtime_args=runtime_args)
-      runtime_args = prep.get_updated_runtime_args(runtime_args)
-
-    return ds, runtime_args
-
   def test_encoder_decoder_unpacked(self):
     x = [{"inputs": [9, 4, 3, 8, 1], "targets": [3, 9, 4, 1]}]
     ds = lazy_dataset.SourceLazyMapDataset(x)
@@ -186,7 +173,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         pad_id=0,
         bos_id=0,
     )
-    ds, _ = self._apply_preprocessors(ds, preps, runtime_args)
+    ds, _ = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
     expected = {
@@ -224,7 +211,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         pad_id=0,
         bos_id=0,
     )
-    ds, runtime_args = self._apply_preprocessors(ds, preps, runtime_args)
+    ds, runtime_args = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
     expected_runtime_args = runtime_args.replace(
         sequence_lengths={
@@ -267,7 +254,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         pad_id=0,
         bos_id=0,
     )
-    ds, _ = self._apply_preprocessors(ds, preps, runtime_args)
+    ds, _ = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
     expected = {
@@ -302,7 +289,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         pad_id=0,
         bos_id=0,
     )
-    ds, _ = self._apply_preprocessors(ds, preps, runtime_args)
+    ds, _ = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
     expected = {
@@ -338,7 +325,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         pad_id=0,
         bos_id=0,
     )
-    ds, runtime_args = self._apply_preprocessors(ds, preps, runtime_args)
+    ds, runtime_args = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
     expected_runtime_args = runtime_args.replace(
         sequence_lengths={
@@ -390,7 +377,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         pad_id=0,
         bos_id=0,
     )
-    ds, _ = self._apply_preprocessors(ds, preps, runtime_args)
+    ds, _ = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
     # Corner case: packing is true but task_feature_lengths are too long for
@@ -432,11 +419,13 @@ class EncDecFeatureConverterTest(absltest.TestCase):
             "inputs": [7, 8, 5, 1],
             "targets": [3, 9, 1],
             "targets_pretokenized": "abc",
+            "inputs_pretokenized": "def ghi",
         },
         {
             "inputs": [8, 4, 9, 3, 1],
             "targets": [4, 1],
             "targets_pretokenized": "def",
+            "inputs_pretokenized": "ghi jkl",
         },
     ]
     ds = lazy_dataset.SourceLazyMapDataset(x)
@@ -453,7 +442,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         pad_id=0,
         bos_id=0,
     )
-    ds, _ = self._apply_preprocessors(ds, preps, runtime_args)
+    ds, _ = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
     expected = {
@@ -493,7 +482,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         pad_id=0,
         bos_id=10,
     )
-    ds, _ = self._apply_preprocessors(ds, preps, runtime_args)
+    ds, _ = _apply_preprocessors(ds, preps, runtime_args)
     ds = list(ds)
 
     expected = {
@@ -659,10 +648,10 @@ class LMFeatureConverter(absltest.TestCase):
       for k in self._expected_packed_keys:
         np.testing.assert_array_equal(actual[k], expected[k])
 
-  def test_lm_plaintext_field(self):
+  def test_lm_extra_field_removed(self):
     x = [
-        {"targets": [3, 9, 1], "targets_plaintext": "abc"},
-        {"targets": [4, 1], "targets_plaintext": "abc"},
+        {"targets": [3, 9, 1], "plaintext": "abc"},
+        {"targets": [4, 1], "plaintext": "abc"},
     ]
     ds = lazy_dataset.SourceLazyMapDataset(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})

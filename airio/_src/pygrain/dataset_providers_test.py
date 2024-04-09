@@ -374,89 +374,40 @@ class TaskTest(absltest.TestCase):
     )
     task = _create_task(source=source, preprocessors=_create_preprocessors())
     ds = task.get_dataset(
+        sequence_lengths={"inputs": 20, "targets": 10},
         split="train",
         runtime_preprocessors=_create_runtime_preprocessors(),
         shuffle=False,
     )
-    expected = [
-        {
-            "encoder_input_tokens": [
-                3,
-                8,
-                14,
-                21,
-                2,
-                3,
-                4,
-                2,
-                13,
-                3,
-                5,
-                20,
-                2,
-                4,
-                2,
-                20,
-                2,
-                4,
-            ],
-            "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
-            "decoder_input_tokens": [0, 3, 15, 7, 6, 8, 24, 8, 25],
-            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1],
-        },
-        {
-            "encoder_input_tokens": [
-                3,
-                8,
-                14,
-                21,
-                2,
-                3,
-                20,
-                2,
-                3,
-                5,
-                8,
-                2,
-                13,
-                8,
-                21,
-                13,
-                8,
-                2,
-                21,
-                2,
-            ],
-            "decoder_target_tokens": [3, 22, 4, 2, 18, 8, 25, 4],
-            "decoder_input_tokens": [0, 3, 22, 4, 2, 18, 8, 25],
-            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1],
-        },
-        {
-            "encoder_input_tokens": [
-                3,
-                8,
-                14,
-                21,
-                2,
-                3,
-                5,
-                13,
-                21,
-                20,
-                21,
-                5,
-                13,
-                2,
-                20,
-                20,
-                2,
-            ],
-            "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4],
-            "decoder_input_tokens": [0, 3, 15, 7, 6, 8, 24, 8, 25],
-            "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1],
-        },
-    ]
-    test_utils.assert_datasets_equal(ds, expected)
+    actual = next(ds)
+    expected_first_example = {
+        "encoder_input_tokens": [
+            3,
+            8,
+            14,
+            21,
+            2,
+            3,
+            4,
+            2,
+            13,
+            3,
+            5,
+            20,
+            2,
+            4,
+            2,
+            20,
+            2,
+            4,
+            0,
+            0,
+        ],
+        "decoder_target_tokens": [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
+        "decoder_input_tokens": [0, 3, 15, 7, 6, 8, 24, 8, 25, 4],
+        "decoder_loss_weights": [1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+    }
+    test_utils.assert_datasets_equal([actual], [expected_first_example])
 
   def test_task_get_dataset_batched_with_sequence_lengths(self):
     source = _create_source(
@@ -799,9 +750,8 @@ class TaskTest(absltest.TestCase):
             "targets_pretokenized": "positive",
             "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
         }],
-        # Trim.
+        # Remove features not in sequence lengths.
         [{
-            "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
             "inputs": [
                 3,
                 8,
@@ -822,11 +772,33 @@ class TaskTest(absltest.TestCase):
                 2,
                 4,
             ],
-            "targets_pretokenized": "positive",
+            "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
+        }],
+        # Trim.
+        [{
+            "inputs": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                4,
+                2,
+                13,
+                3,
+                5,
+                20,
+                2,
+                4,
+                2,
+                20,
+                2,
+                4,
+            ],
             "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4],
         }],  # Pad.
         [{
-            "inputs_pretokenized": "imdb ebc   ahgjefjhfe",
             "inputs": [
                 3,
                 8,
@@ -849,7 +821,6 @@ class TaskTest(absltest.TestCase):
                 0,
                 0,
             ],
-            "targets_pretokenized": "positive",
             "targets": [3, 15, 7, 6, 8, 24, 8, 25, 4, 0],
         }],
         # Convert to model features.

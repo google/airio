@@ -92,25 +92,34 @@ def get_t5x_enc_dec_feature_converter_preprocessors(
       bos_id=bos_id,
   )
   pad = functools.partial(common_preprocessors.pad, pad_id=pad_id)
-  preps = [
-      preprocessors.MapFnTransform(common_preprocessors.trim),
-      preprocessors.MapFnTransform(pad),
-      preprocessors.MapFnTransform(
-          convert_features,
-          update_runtime_args=update_runtime_args,
-      ),
-  ]
+  pack_prep = []
   if pack:
     packer = (
         packing.MultiBinTruePackIterPreprocessor
         if use_multi_bin_packing
         else packing.SingleBinTruePackIterPreprocessor
     )
-    packer_prep = preprocessors.LazyIterTransform(
-        packer, update_runtime_args=packer.update_runtime_args
+    pack_prep.append(
+        preprocessors.LazyIterTransform(
+            packer, update_runtime_args=packer.update_runtime_args
+        )
     )
-    preps = [packer_prep] + preps
-  return preps
+  return (
+      [
+          preprocessors.MapFnTransform(
+              common_preprocessors.remove_features_not_in_sequence_lengths
+          ),
+          preprocessors.MapFnTransform(common_preprocessors.trim),
+      ]
+      + pack_prep
+      + [
+          preprocessors.MapFnTransform(pad),
+          preprocessors.MapFnTransform(
+              convert_features,
+              update_runtime_args=update_runtime_args,
+          ),
+      ]
+  )
 
 
 # Equivalent to seqio.LMFeatureConverter
@@ -149,25 +158,34 @@ def get_t5x_lm_feature_converter_preprocessors(
       bos_id=bos_id,
   )
   pad = functools.partial(common_preprocessors.pad, pad_id=pad_id)
-  preps = [
-      preprocessors.MapFnTransform(common_preprocessors.trim),
-      preprocessors.MapFnTransform(pad),
-      preprocessors.MapFnTransform(
-          convert_features,
-          update_runtime_args=update_runtime_args,
-      ),
-  ]
+  packer_prep = []
   if pack:
     packer = (
         packing.MultiBinTruePackIterPreprocessor
         if use_multi_bin_packing
         else packing.SingleBinTruePackIterPreprocessor
     )
-    packer_prep = preprocessors.LazyIterTransform(
-        packer, update_runtime_args=packer.update_runtime_args
+    packer_prep.append(
+        preprocessors.LazyIterTransform(
+            packer, update_runtime_args=packer.update_runtime_args
+        )
     )
-    preps = [packer_prep] + preps
-  return preps
+  return (
+      [
+          preprocessors.MapFnTransform(
+              common_preprocessors.remove_features_not_in_sequence_lengths
+          ),
+          preprocessors.MapFnTransform(common_preprocessors.trim),
+      ]
+      + packer_prep
+      + [
+          preprocessors.MapFnTransform(pad),
+          preprocessors.MapFnTransform(
+              convert_features,
+              update_runtime_args=update_runtime_args,
+          ),
+      ]
+  )
 
 
 def get_t5x_prefix_lm_feature_converter_preprocessors(
