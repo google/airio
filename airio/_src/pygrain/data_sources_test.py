@@ -14,6 +14,7 @@
 
 """Tests for airio.pygrain.data_sources."""
 
+import json
 import os
 from typing import Sequence
 from unittest import mock
@@ -21,6 +22,9 @@ from unittest import mock
 from absl.testing import absltest
 from airio._src.core import data_sources as core_data_sources
 from airio._src.pygrain import data_sources
+from airio._src.pygrain import dataset_providers
+from airio._src.pygrain import preprocessors
+import jax
 import numpy as np
 import tensorflow_datasets as tfds
 
@@ -202,6 +206,31 @@ class JsonDataSourceTest(absltest.TestCase):
       self.assertLen(data_source, 5)
       data_source.close()
       data_source.unlink()
+
+  def test_get_dataset(self):
+    def _parse_json(ex):
+      ex = json.loads(ex)
+      ex = jax.tree.map(np.asarray, ex)
+      return ex
+
+    source = self._create_data_source(splits=_SOURCE_SPLITS)
+    task = dataset_providers.GrainTask(
+        "dummy_task",
+        source=source,
+        preprocessors=[preprocessors.MapFnTransform(_parse_json)],
+    )
+    ds = task.get_dataset(shuffle=False)
+    actual_ds = list(ds)
+    expected_ds = [
+        {"text": "abc", "label": 0},
+        {"text": "def", "label": 1},
+        {"text": "ghi", "label": 0},
+        {"text": "jkl", "label": 1},
+        {"text": "mno", "label": 0},
+    ]
+    for actual, expected in zip(actual_ds, expected_ds, strict=True):
+      for k in ["text", "label"]:
+        np.testing.assert_equal(actual[k], expected[k])
 
   def test_get_data_source_nonexistent_split(self):
     source = self._create_data_source(splits=_SOURCE_SPLITS)

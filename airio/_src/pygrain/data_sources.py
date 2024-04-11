@@ -18,10 +18,14 @@ import copy
 import json
 import typing
 from typing import Iterable, Mapping, Protocol
+
 from airio._src.core import data_sources
 import grain.python as grain
 import numpy as np
 import tensorflow_datasets as tfds
+
+
+Open = open
 
 
 class ArrayRecordDataSource(data_sources.DataSource):
@@ -89,7 +93,16 @@ class FunctionDataSource(data_sources.DataSource):
 
 
 class JsonDataSource(data_sources.DataSource):
-  """Wrapper for grain.InMemoryDataSource that uses json file(s) as input data."""
+  """Wrapper for grain.InMemoryDataSource that uses json file(s) as input data.
+
+  Assumes that the json file contains a list of elements.
+
+  Note: Each element is restricted to a primitve type of less than 10MB each. A
+  grain InMemoryDataSource is used under the hood, which stores elements
+  with multiprocessing.shared_memory.ShareableList. Hence, each
+  element in the list after loading the json file is encoded using json.dumps()
+  and must be parsed using json.loads() as a preprocessing step.
+  """
 
   def __init__(
       self,
@@ -104,12 +117,11 @@ class JsonDataSource(data_sources.DataSource):
     self._split_to_filepattern = copy.deepcopy(split_to_filepattern)
 
     self.splits = frozenset(self._split_to_filepattern.keys())
-    self._sources = {
-        split: grain.InMemoryDataSource(
-            elements=json.load(open(self._split_to_filepattern[split]))
-        )
-        for split in self.splits
-    }
+    self._sources = {}
+    for split in self.splits:
+      json_data = json.load(Open(self._split_to_filepattern[split]))
+      json_data = [json.dumps(d) for d in json_data]
+      self._sources[split] = grain.InMemoryDataSource(elements=json_data)
 
   def get_data_source(self, split: str) -> grain.InMemoryDataSource:
     if split not in self._sources:

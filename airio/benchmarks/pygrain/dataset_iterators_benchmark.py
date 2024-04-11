@@ -14,14 +14,13 @@
 
 """Microbenchmarks for AirIO dataset_iterators functions."""
 
-import ast
 import os
 import tempfile
 
 import airio.pygrain as airio
 import google_benchmark
 import grain.python as grain
-
+import tensorflow as tf
 
 _SOURCE_NUM_EXAMPLES = 6
 _TEST_DIR = os.path.join(
@@ -30,9 +29,19 @@ _TEST_DIR = os.path.join(
 
 
 def parse_and_preprocess(raw_example: bytes) -> dict[str, str]:
-  raw_example = ast.literal_eval(raw_example.decode("utf-8"))
+  """Parses and preprocesses raw example."""
 
-  final_example = {"inputs": raw_example["text"]}
+  def parse_fn(ex):
+    feature_description = {
+        "text": tf.io.FixedLenFeature([], tf.string),
+        "label": tf.io.FixedLenFeature([], tf.int64),
+    }
+    tensor = tf.io.parse_single_example(ex, feature_description)
+    return tf.nest.map_structure(lambda x: x.numpy(), tensor)
+
+  raw_example = parse_fn(raw_example)
+
+  final_example = {"inputs": raw_example["text"].decode()}
   raw_label = str(raw_example["label"])
   if raw_label == "0":
     final_example["targets"] = "negative"

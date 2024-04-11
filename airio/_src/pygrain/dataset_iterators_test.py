@@ -14,7 +14,6 @@
 
 """Tests for airio.dataset_iterators."""
 
-import ast
 import json
 import os
 from typing import Dict
@@ -29,15 +28,24 @@ from airio._src.pygrain import vocabularies
 from clu.data import dataset_iterator as clu_dataset_iterator
 import grain.python as grain
 import numpy as np
+import tensorflow as tf
 
 
 lazy_dataset = grain.experimental.lazy_dataset
 
 
 def _parse_and_preprocess(raw_example: bytes) -> Dict[str, str]:
-  raw_example = ast.literal_eval(raw_example.decode("utf-8"))
 
-  final_example = {"inputs": raw_example["text"]}
+  def parse_fn(ex):
+    feature_description = {
+        "text": tf.io.FixedLenFeature([], tf.string),
+        "label": tf.io.FixedLenFeature([], tf.int64),
+    }
+    tensor = tf.io.parse_single_example(ex, feature_description)
+    return tf.nest.map_structure(lambda x: x.numpy(), tensor)
+
+  raw_example = parse_fn(raw_example)
+  final_example = {"inputs": raw_example["text"].decode()}
   raw_label = str(raw_example["label"])
   if raw_label == "0":
     final_example["targets"] = "negative"
