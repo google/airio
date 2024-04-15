@@ -43,7 +43,6 @@ class Tokenizer(Generic[Inp, Out], Protocol):
 
   tokenizer_configs: Mapping[str, TokenizerConfig]
   copy_pretokenized: bool = True
-  with_eos: bool = False
 
   def __call__(self, orig_example: Inp) -> Out:
     ...

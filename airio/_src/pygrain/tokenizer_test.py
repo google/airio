@@ -49,7 +49,6 @@ class TokenizerTest(absltest.TestCase):
         tokenizer_obj.tokenizer_configs, self.tokenizer_configs
     )
     self.assertEqual(tokenizer_obj.copy_pretokenized, True)
-    self.assertEqual(tokenizer_obj.with_eos, False)
 
   def test_tokenize(self):
     orig_example = {
