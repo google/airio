@@ -20,6 +20,7 @@ import inspect
 import typing
 from typing import Any, Callable, Mapping, Protocol
 
+from absl import logging
 import jax
 import numpy as np
 
@@ -153,7 +154,14 @@ def inject_runtime_args_to_fn(
     ValueError: if there are multiple args annotated as
     `AirIOInjectedRuntimeArgs`.
   """
-  all_params = inspect.signature(fn).parameters
+  try:
+    # The following may fail, e.g. for C++ functions wrapped with pybind.
+    all_params = inspect.signature(fn).parameters
+  except ValueError as e:
+    logging.warning(
+        "Failed to inspect signature of %s to inject runtime args: %s", fn, e
+    )
+    return fn
   all_annotations = [
       (arg_name, param.annotation) for arg_name, param in all_params.items()
   ]

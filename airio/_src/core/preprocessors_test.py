@@ -152,6 +152,15 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     result_parameters = result.__code__.co_varnames
     self.assertEqual(result_parameters, expected_parameters)
 
+  def test_inject_runtime_args_to_fn_uninspectable_no_op(self):
+    fn = lambda x: x
+    runtime_args = test_utils.create_airio_injected_runtime_args()
+    with mock.patch.object(inspect, "signature", side_effect=ValueError()):
+      # inpsect throws error, original function is returned.
+      self.assertEqual(
+          preprocessors.inject_runtime_args_to_fn(fn, runtime_args), fn
+      )
+
 
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@
 
 import json
 import os
-from typing import Sequence
+from typing import Callable, Dict, Sequence
 from unittest import mock
 
 from absl.testing import absltest
@@ -24,8 +24,10 @@ from airio._src.core import data_sources as core_data_sources
 from airio._src.pygrain import data_sources
 from airio._src.pygrain import dataset_providers
 from airio._src.pygrain import preprocessors
+import grain.python as grain
 import jax
 import numpy as np
+import tensorflow as tf
 import tensorflow_datasets as tfds
 
 import multiprocessing
@@ -34,6 +36,18 @@ import multiprocessing
 _SOURCE_NAME = "imdb_reviews"
 _SOURCE_NUM_EXAMPLES = 3
 _SOURCE_SPLITS = frozenset(["train", "test", "unsupervised"])
+
+
+def _get_dataset(
+    src: core_data_sources.DataSource,
+    split: str,
+    parse_fn: Callable[bytes, Dict[str, np.ndarray]],
+):
+  return dataset_providers.GrainTask(
+      "dummy_task",
+      source=src,
+      preprocessors=[preprocessors.MapFnTransform(parse_fn)],
+  ).get_dataset(split=split, shuffle=False)
 
 
 class ArrayRecordDataSourceTest(absltest.TestCase):
@@ -75,6 +89,59 @@ class ArrayRecordDataSourceTest(absltest.TestCase):
     for split in _SOURCE_SPLITS:
       data_source = source.get_data_source(split)
       self.assertLen(data_source, 10)
+
+  def test_get_dataset_with_fast_proto_parser(self):
+    source = self._create_data_source(splits=_SOURCE_SPLITS)
+    ds = _get_dataset(
+        source,
+        "train",
+        grain.experimental.fast_proto_parser.parse_tf_example,
+    )
+    actual_ds = list(ds)
+    expected_ds = [
+        {"label": [0], "text": [b"abc"]},
+        {"label": [1], "text": [b"def"]},
+        {"label": [0], "text": [b"ghi"]},
+        {"label": [1], "text": [b"jkl"]},
+        {"label": [0], "text": [b"mno"]},
+        {"label": [0], "text": [b"pqr"]},
+        {"label": [1], "text": [b"stu"]},
+        {"label": [0], "text": [b"vwx"]},
+        {"label": [1], "text": [b"yza"]},
+        {"label": [0], "text": [b"bcd"]},
+    ]
+    for actual, expected in zip(actual_ds, expected_ds, strict=True):
+      for k in ["label", "text"]:
+        np.testing.assert_equal(actual[k], expected[k])
+
+  def test_get_dataset_with_tf_feature_description(self):
+    feature_description = {
+        "text": tf.io.FixedLenFeature([], tf.string),
+        "label": tf.io.FixedLenFeature([], tf.int64),
+    }
+    source = self._create_data_source(splits=_SOURCE_SPLITS)
+
+    def parse_fn(ex, feature_description):
+      tensor = tf.io.parse_single_example(ex, feature_description)
+      return tf.nest.map_structure(lambda x: x.numpy(), tensor)
+
+    ds = _get_dataset(
+        source, "train", lambda x: parse_fn(x, feature_description)
+    )
+    actual_ds = list(ds)
+    expected_examples = [
+        {"label": 0, "text": b"abc"},
+        {"label": 1, "text": b"def"},
+        {"label": 0, "text": b"ghi"},
+        {"label": 1, "text": b"jkl"},
+        {"label": 0, "text": b"mno"},
+        {"label": 0, "text": b"pqr"},
+        {"label": 1, "text": b"stu"},
+        {"label": 0, "text": b"vwx"},
+        {"label": 1, "text": b"yza"},
+        {"label": 0, "text": b"bcd"},
+    ]
+    self.assertListEqual(actual_ds, expected_examples)
 
   def test_get_data_source_nonexistent_split(self):
     source = self._create_data_source(splits=_SOURCE_SPLITS)
@@ -214,12 +281,7 @@ class JsonDataSourceTest(absltest.TestCase):
       return ex
 
     source = self._create_data_source(splits=_SOURCE_SPLITS)
-    task = dataset_providers.GrainTask(
-        "dummy_task",
-        source=source,
-        preprocessors=[preprocessors.MapFnTransform(_parse_json)],
-    )
-    ds = task.get_dataset(shuffle=False)
+    ds = _get_dataset(source, "train", _parse_json)
     actual_ds = list(ds)
     expected_ds = [
         {"text": "abc", "label": 0},
@@ -293,6 +355,23 @@ class TfdsDataSourceTest(absltest.TestCase):
     for split in _SOURCE_SPLITS:
       data_source = source.get_data_source(split)
       self.assertLen(data_source, _SOURCE_NUM_EXAMPLES)
+
+  def test_get_dataset(self):
+    source = self._create_data_source(
+        num_examples=_SOURCE_NUM_EXAMPLES,
+        splits=_SOURCE_SPLITS,
+    )
+    ds = _get_dataset(source, "train", lambda x: x)
+    actual_ds = list(ds)
+    print(actual_ds)
+    expected_ds = [
+        {"label": 1, "text": "ebc   ahgjefjhfe"},
+        {"label": 0, "text": "hj aijbcidcibdg"},
+        {"label": 1, "text": "acdhdacfhhjb"},
+    ]
+    for actual, expected in zip(actual_ds, expected_ds, strict=True):
+      for k in ["label", "text"]:
+        np.testing.assert_equal(actual[k], expected[k])
 
   def test_get_data_source_nonexistent_split(self):
     source = self._create_data_source(
