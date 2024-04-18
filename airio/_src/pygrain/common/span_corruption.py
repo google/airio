@@ -174,6 +174,8 @@ def span_corruption(
   ds = packing.PackLazyMapDataset(ds, pool_size=pack_pool_size, packer=packer)
   seed = update_seed(seed)
   ds = lazy_dataset_transforms.RandomMapFnLazyMapDataset(ds, denoise_fn, seed)
+  # Convert to numpy arrays.
+  ds = ds.map(lambda x: jax.tree.map(lambda k: k.numpy(), x))
   return ds
 
 
