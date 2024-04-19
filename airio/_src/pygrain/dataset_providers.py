@@ -69,43 +69,6 @@ class GrainTask(core_dataset_providers.Task):
         return True
     return False
 
-  def _apply_preprocessors_to_lazy_dataset(
-      self,
-      ds,
-      preps: Sequence[preprocessors_lib.PyGrainAirIOPreprocessor],
-      runtime_args: core_preprocessors_lib.AirIOInjectedRuntimeArgs,
-      base_rng: JaxRng,
-      has_none_elems: bool,
-      num_prefetch_threads: int | None,
-  ):
-    prep_rng = base_rng
-    for prep in preps:
-      transform = preprocessors_lib.LazyDatasetTransform(prep)
-      if transform.requires_iter_dataset and isinstance(
-          ds, lazy_dataset.LazyMapDataset
-      ):
-        ds = ds.to_iter_dataset(_get_read_options(num_prefetch_threads))
-      if (
-          has_none_elems
-          and transform.requires_non_none_elements
-          and isinstance(ds, lazy_dataset.LazyMapDataset)
-      ):
-        if not transform.can_process_iter_dataset:
-          raise ValueError(
-              "There are preprocessors in this Task that produce none elements"
-              " and a preprocessor which requires a non-none dataset. Consider"
-              " replacing this with a preprocessor that can either handle none"
-              " elements, or process a LazyIterDataset. Task name:"
-              f" {self.name}, preprocessor: {prep}"
-          )
-        ds = ds.to_iter_dataset(_get_read_options(num_prefetch_threads))
-      if transform.produces_none_elements:
-        has_none_elems = True
-      prep_rng, sub_rng = jax.random.split(prep_rng)
-      ds = transform(ds, sub_rng, runtime_args)
-      runtime_args = transform.get_updated_runtime_args(runtime_args)
-    return ds, runtime_args, has_none_elems
-
   def get_lazy_dataset(
       self,
       sequence_lengths: Mapping[str, int] | None,
@@ -159,13 +122,14 @@ class GrainTask(core_dataset_providers.Task):
       next_epoch_rng, prep_rng = jax.random.split(next_epoch_rng)
       prep_rng, shuffle_rng = jax.random.split(prep_rng)
       ds, updated_runtime_args, has_none_elems = (
-          self._apply_preprocessors_to_lazy_dataset(
+          _apply_preprocessors_to_lazy_dataset(
               ds,
               preps,
               ds_runtime_args,
               prep_rng,
               has_none_elems,
               num_prefetch_threads,
+              self.name,
           )
       )
       if shuffle:
@@ -190,13 +154,14 @@ class GrainTask(core_dataset_providers.Task):
           grain.Batch(batch_size=batch_size, drop_remainder=False)
       )
     unused_next_epoch_rng, prep_rng = jax.random.split(next_epoch_rng)
-    ds, _, _ = self._apply_preprocessors_to_lazy_dataset(
+    ds, _, _ = _apply_preprocessors_to_lazy_dataset(
         ds,
         runtime_preps,
         runtime_args,
         prep_rng,
         has_none_elems,
         num_prefetch_threads,
+        self.name,
     )
     return ds
 
@@ -535,13 +500,18 @@ class GrainMixture(core_dataset_providers.Mixture):
       runtime_args = self.leaf_tasks[0].get_updated_runtime_args(
           runtime_args, runtime_preprocessors=None
       )
-    if post_mix_preps:
-      post_mix_transforms = [
-          preprocessors_lib.LazyDatasetTransform(p) for p in post_mix_preps
-      ]
-      for t in post_mix_transforms:
-        ds = t(ds, runtime_args=runtime_args)
-        runtime_args = t.get_updated_runtime_args(runtime_args)
+    base_rng = jax.random.key(seed)
+    post_mix_rng, _ = jax.random.split(base_rng)
+    ds, _, _ = _apply_preprocessors_to_lazy_dataset(
+        ds,
+        post_mix_preps,
+        runtime_args,
+        post_mix_rng,
+        has_none_elems=False,  # already converted to LazyIterDataset for mixing
+        # if any Task dataset produces None elements.
+        num_prefetch_threads=num_prefetch_threads,
+        name=self.name,
+    )
     if num_epochs is None:
       ds = lazy_dataset.RepeatLazyMapDataset(ds, num_epochs=None)
     return ds
@@ -673,3 +643,42 @@ def _iter_and_prefetch(
   if num_workers and num_workers > 0:
     ds = ds.prefetch(grain.MultiprocessingOptions(num_workers=num_workers))
   return ds
+
+
+def _apply_preprocessors_to_lazy_dataset(
+    ds,
+    preps: Sequence[preprocessors_lib.PyGrainAirIOPreprocessor],
+    runtime_args: core_preprocessors_lib.AirIOInjectedRuntimeArgs,
+    base_rng: JaxRng,
+    has_none_elems: bool,
+    num_prefetch_threads: int | None,
+    name: str,
+):
+  """A helper function to apply preprocessors to a lazy dataset."""
+  prep_rng = base_rng
+  for prep in preps:
+    transform = preprocessors_lib.LazyDatasetTransform(prep)
+    if transform.requires_iter_dataset and isinstance(
+        ds, lazy_dataset.LazyMapDataset
+    ):
+      ds = ds.to_iter_dataset(_get_read_options(num_prefetch_threads))
+    if (
+        has_none_elems
+        and transform.requires_non_none_elements
+        and isinstance(ds, lazy_dataset.LazyMapDataset)
+    ):
+      if not transform.can_process_iter_dataset:
+        raise ValueError(
+            "There are preprocessors in this Task / Mixture that produce none"
+            " elements and a preprocessor which requires a non-none dataset."
+            " Consider replacing this with a preprocessor that can either"
+            " handle none elements, or process a LazyIterDataset. Task name:"
+            f" {name}, preprocessor: {prep}"
+        )
+      ds = ds.to_iter_dataset(_get_read_options(num_prefetch_threads))
+    if transform.produces_none_elements:
+      has_none_elems = True
+    prep_rng, sub_rng = jax.random.split(prep_rng)
+    ds = transform(ds, sub_rng, runtime_args)
+    runtime_args = transform.get_updated_runtime_args(runtime_args)
+  return ds, runtime_args, has_none_elems

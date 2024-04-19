@@ -90,11 +90,11 @@ def _create_preprocessors() -> (
   ]
 
 
-def _create_runtime_preprocessors() -> (
-    Sequence[preprocessors_lib.PyGrainAirIOPreprocessor]
-):
+def _create_runtime_preprocessors(
+    pack=False,
+) -> Sequence[preprocessors_lib.PyGrainAirIOPreprocessor]:
   return feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
-      pack=False,
+      pack=pack,
       use_multi_bin_packing=False,
       passthrough_feature_keys=[],
       pad_id=0,
@@ -1359,7 +1359,8 @@ class TaskTest(absltest.TestCase):
     test_task._switch_to_lazy_dataset = mock.Mock(return_value=True)
     with self.assertRaisesRegex(
         ValueError,
-        "There are preprocessors in this Task that produce none elements.*",
+        "There are preprocessors in this Task / Mixture that produce none"
+        " elements.",
     ):
       _ = test_task.get_dataset()
 
@@ -2316,6 +2317,33 @@ class MixtureTest(absltest.TestCase):
     for actual, expected in zip(ds, expected_dataset):
       for k in expected_keys:
         np.testing.assert_array_equal(actual[k], expected[k])
+
+  def test_simple_mixture_with_iter_post_mix_preprocessor(self):
+    mix = dataset_providers.GrainMixture(
+        name="test_mix",
+        tasks=[self._imdb_task, self._simple_to_imdb_task],
+        proportions=[1.0, 1.0],
+    )
+    ds = mix.get_dataset(
+        sequence_lengths={"inputs": 5, "targets": 4},
+        shuffle=False,
+        # LazyIter preprocessor used for pack = True.
+        runtime_preprocessors=_create_runtime_preprocessors(pack=True),
+    )
+    actual = next(ds)
+    expected = {
+        "encoder_input_tokens": [3, 8, 14, 21, 2],
+        "decoder_target_tokens": [3, 15, 7, 6],
+        "decoder_input_tokens": [0, 3, 15, 7],
+        "decoder_loss_weights": [1, 1, 1, 1],
+        "encoder_segment_ids": [1, 1, 1, 1, 1],
+        "decoder_segment_ids": [1, 1, 1, 1],
+        "encoder_positions": [0, 1, 2, 3, 4],
+        "decoder_positions": [0, 1, 2, 3],
+    }
+    self.assertCountEqual(actual.keys(), expected.keys())
+    for key in expected:
+      np.testing.assert_array_equal(actual[key], expected[key])
 
   def test_mixing_with_lazy_iter_preprocessor(self):
     # Mix tasks with LazyIter preprocessors and verify that mixture length and
