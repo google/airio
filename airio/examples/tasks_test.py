@@ -60,8 +60,12 @@ class TasksTest(absltest.TestCase):
         os.path.join(self.test_dir, "sentencepiece", "sentencepiece.model")
     )
     self.tokenizer_configs = {
-        "inputs": airio.TokenizerConfig(vocab=sentencepiece_vocab),
-        "targets": airio.TokenizerConfig(vocab=sentencepiece_vocab),
+        "inputs": airio.TokenizerConfig(
+            vocab=sentencepiece_vocab, add_eos=False
+        ),
+        "targets": airio.TokenizerConfig(
+            vocab=sentencepiece_vocab, add_eos=False
+        ),
     }
 
   def test_wmt_task_with_multiprocessing(self):
@@ -581,11 +585,11 @@ class TasksTest(absltest.TestCase):
     )
 
     expected_first_batch = {
-        "decoder_input_tokens": _pad([0, 25, 4, 2, 1], source_sequence_length),
+        "decoder_input_tokens": _pad([0, 25, 4, 2], source_sequence_length),
         "decoder_loss_weights": _pad(
-            [True, True, True, True], source_sequence_length, False
+            [True, True, True], source_sequence_length, False
         ),
-        "decoder_target_tokens": _pad([25, 4, 2, 1], source_sequence_length),
+        "decoder_target_tokens": _pad([25, 4, 2], source_sequence_length),
         "encoder_input_tokens": _pad(
             [
                 3,
@@ -599,7 +603,6 @@ class TasksTest(absltest.TestCase):
                 20,
                 21,
                 25,
-                1,
             ],
             source_sequence_length,
         ),

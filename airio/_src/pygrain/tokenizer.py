@@ -39,7 +39,17 @@ class Tokenizer(tokenizer.Tokenizer[Inp, Out]):
 
       tokenizer_config = self.tokenizer_configs[feature_name]
       encoded_val = tokenizer_config.vocab.encode(feature_value)
-      final_example[feature_name] = np.asarray(encoded_val)
+      encoded_val = np.asarray(encoded_val)
+      if tokenizer_config.add_eos:
+        pad_width = [(0, 1)]
+        # Tokenized rank is generally 1; adjust pad_width in case it's more
+        pad_width += [(0, 0)] * (len(encoded_val.shape) - 1)
+        encoded_val = np.pad(
+            encoded_val,
+            pad_width,
+            constant_values=tokenizer_config.vocab.eos_id,
+        )
+      final_example[feature_name] = encoded_val
     final_example = cast(Out, final_example)
 
     return final_example

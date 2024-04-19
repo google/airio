@@ -114,7 +114,9 @@ def _create_sentencepiece_vocab() -> vocabularies.SentencePieceVocabulary:
 
 
 def _create_tokenizer_config() -> core_tokenizer.TokenizerConfig:
-  return core_tokenizer.TokenizerConfig(vocab=_create_sentencepiece_vocab())
+  return core_tokenizer.TokenizerConfig(
+      vocab=_create_sentencepiece_vocab(), add_eos=False
+  )
 
 
 def _create_preprocessors() -> (

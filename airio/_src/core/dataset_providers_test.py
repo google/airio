@@ -66,7 +66,9 @@ def _create_sentencepiece_vocab() -> vocabularies.SentencePieceVocabulary:
 
 
 def _create_tokenizer_config() -> tokenizer.TokenizerConfig:
-  return tokenizer.TokenizerConfig(vocab=_create_sentencepiece_vocab())
+  return tokenizer.TokenizerConfig(
+      vocab=_create_sentencepiece_vocab(), add_eos=False
+  )
 
 
 def _create_preprocessors() -> Sequence[grain.Transformation]:

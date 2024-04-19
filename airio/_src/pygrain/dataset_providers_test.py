@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Tests for airio.pygrain.dataset_providers."""
+
 import functools
 import os
 from typing import Dict, Sequence
@@ -31,7 +32,6 @@ from airio._src.pygrain import dataset_providers
 from airio._src.pygrain import preprocessors as preprocessors_lib
 from airio._src.pygrain import tokenizer
 from airio._src.pygrain import vocabularies
-
 from airio._src.pygrain.common import feature_converters
 import grain.python as grain
 import jax
@@ -70,7 +70,9 @@ def _create_sentencepiece_vocab() -> vocabularies.SentencePieceVocabulary:
 
 
 def _create_tokenizer_config() -> core_tokenizer.TokenizerConfig:
-  return core_tokenizer.TokenizerConfig(vocab=_create_sentencepiece_vocab())
+  return core_tokenizer.TokenizerConfig(
+      vocab=_create_sentencepiece_vocab(), add_eos=False
+  )
 
 
 def _create_preprocessors() -> (
@@ -1265,6 +1267,120 @@ class TaskTest(absltest.TestCase):
     ]
     test_utils.assert_datasets_equal(ds, expected)
 
+  def test_task_switch_to_lazy_dataset_runtime_args_update(self):
+    # Add a preprocessor that has an update_runtime_args and a subsequent
+    # preprocessor that depends on the updated runtime_atand verify that
+    # Task.get_dataset() works correctly by running preprocessing using
+    # lazy_dataset instead of DataLoader operations.
+    def map1(ex):
+      return {"feature": ex["inputs"]}
+
+    def map2(ex, runtime_args: core_preprocessors_lib.AirIOInjectedRuntimeArgs):
+      ex.update({"feature_length": runtime_args.sequence_lengths["feature"]})
+      return ex
+
+    def update_runtime_args_fn(args):
+      return args.replace(
+          sequence_lengths={"feature": args.sequence_lengths["inputs"]}
+      )
+
+    source = _create_source(
+        source_name=_SOURCE_NAME,
+        splits=_SOURCE_SPLITS,
+        num_examples=_SOURCE_NUM_EXAMPLES,
+    )
+    preprocessors = _create_preprocessors() + [
+        preprocessors_lib.MapFnTransform(
+            map1, update_runtime_args=update_runtime_args_fn
+        ),
+        preprocessors_lib.MapFnTransform(map2),
+    ]
+
+    task = _create_task(source=source, preprocessors=preprocessors)
+    ds = task.get_dataset(
+        sequence_lengths={"inputs": 5, "targets": 5},
+        split="train",
+        shuffle=False,
+    )
+    expected_ds = [
+        {
+            "feature": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                4,
+                2,
+                13,
+                3,
+                5,
+                20,
+                2,
+                4,
+                2,
+                20,
+                2,
+                4,
+                1,
+            ],
+            "feature_length": 5,
+        },
+        {
+            "feature": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                20,
+                2,
+                3,
+                5,
+                8,
+                2,
+                13,
+                8,
+                21,
+                13,
+                8,
+                2,
+                21,
+                2,
+                1,
+            ],
+            "feature_length": 5,
+        },
+        {
+            "feature": [
+                3,
+                8,
+                14,
+                21,
+                2,
+                3,
+                5,
+                13,
+                21,
+                20,
+                21,
+                5,
+                13,
+                2,
+                20,
+                20,
+                2,
+                1,
+            ],
+            "feature_length": 5,
+        },
+    ]
+    for actual, expected in zip(ds, expected_ds, strict=True):
+      for key in ["feature", "feature_length"]:
+        np.testing.assert_array_equal(actual[key], expected[key])
+
   def test_task_lazy_dataset_batch_across_epochs(self):
     # Create a Task with 3 elements.
     test_task = _create_task(
@@ -1624,9 +1740,7 @@ class MixtureTest(absltest.TestCase):
 
   def test_mixture_runtime_args_updated_by_task(self):
     def update_runtime_args_fn(rargs):
-      return rargs.replace(
-          sequence_lengths={"inputs": 20, "targets": 10}
-      )
+      return rargs.replace(sequence_lengths={"inputs": 20, "targets": 10})
 
     task_with_runtime_args_update = (
         dataset_providers.GrainTaskBuilder.from_task(self._imdb_task)

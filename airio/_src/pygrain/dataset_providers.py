@@ -67,6 +67,11 @@ class GrainTask(core_dataset_providers.Task):
     for preprocessor in preps:
       if not isinstance(preprocessor, grain.Transformation):
         return True
+      if (
+          isinstance(preprocessor, preprocessors_lib.FnTransforms)
+          and preprocessor.update_runtime_args
+      ):
+        return True
     return False
 
   def get_lazy_dataset(
