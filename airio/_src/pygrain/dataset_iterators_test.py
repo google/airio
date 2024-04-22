@@ -102,7 +102,7 @@ class DatasetIteratorsWithDataLoaderTest(absltest.TestCase):
         os.path.join(self.test_dir, "sentencepiece", "sentencepiece.model")
     )
     self.tokenizer_config = core_tokenizer.TokenizerConfig(
-        vocab=sentencepiece_vocab
+        vocab=sentencepiece_vocab, add_eos=False
     )
     self.expected_data = _get_expected_data()
 
@@ -304,7 +304,7 @@ class DatasetIteratorsWithLazyMapDatasetTest(absltest.TestCase):
         os.path.join(self.test_dir, "sentencepiece", "sentencepiece.model")
     )
     self.tokenizer_config = core_tokenizer.TokenizerConfig(
-        vocab=sentencepiece_vocab
+        vocab=sentencepiece_vocab, add_eos=False
     )
     self.expected_data = _get_expected_data()
 
@@ -474,7 +474,7 @@ class DatasetIteratorsWithLazyIterDatasetTest(absltest.TestCase):
         os.path.join(self.test_dir, "sentencepiece", "sentencepiece.model")
     )
     self.tokenizer_config = core_tokenizer.TokenizerConfig(
-        vocab=sentencepiece_vocab
+        vocab=sentencepiece_vocab, add_eos=False
     )
     self.expected_data = _get_expected_data()
 

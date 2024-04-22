@@ -46,8 +46,12 @@ class MixturesTest(absltest.TestCase):
         os.path.join(self.test_dir, "sentencepiece", "sentencepiece.model")
     )
     self.tokenizer_configs = {
-        "inputs": airio.TokenizerConfig(vocab=sentencepiece_vocab),
-        "targets": airio.TokenizerConfig(vocab=sentencepiece_vocab),
+        "inputs": airio.TokenizerConfig(
+            vocab=sentencepiece_vocab, add_eos=False
+        ),
+        "targets": airio.TokenizerConfig(
+            vocab=sentencepiece_vocab, add_eos=False
+        ),
     }
 
   def test_mc4_mixture(self):

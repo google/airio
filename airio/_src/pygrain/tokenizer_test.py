@@ -33,12 +33,19 @@ class TokenizerTest(absltest.TestCase):
 
   def setUp(self):
     super().setUp()
+    self.tokenizer_configs = self._get_tokenizer_configs()
+
+  def _get_tokenizer_configs(self, add_eos=False):
     sentencepiece_vocab = vocabularies.SentencePieceVocabulary(
         os.path.join(_TEST_DATA_DIR, "sentencepiece", "sentencepiece.model")
     )
-    self.tokenizer_configs = {
-        "inputs": core_tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),
-        "targets": core_tokenizer.TokenizerConfig(vocab=sentencepiece_vocab),
+    return {
+        "inputs": core_tokenizer.TokenizerConfig(
+            vocab=sentencepiece_vocab, add_eos=add_eos
+        ),
+        "targets": core_tokenizer.TokenizerConfig(
+            vocab=sentencepiece_vocab, add_eos=add_eos
+        ),
     }
 
   def test_tokenizer_properties(self):
@@ -102,6 +109,28 @@ class TokenizerTest(absltest.TestCase):
             [3, 8, 14, 21, 2, 3, 4, 2, 13, 3, 5, 20, 2, 4, 2, 20, 2, 4]
         ),
         "targets": np.array([3, 15, 7, 6, 8, 24, 8, 25, 4]),
+    }
+    for feature, value in tokenized_example.items():
+      if isinstance(value, np.ndarray):
+        np.testing.assert_allclose(value, expected_example[feature])
+      else:
+        self.assertEqual(value, expected_example[feature])
+
+  def test_tokenize_add_eos(self):
+    orig_example = {
+        "inputs": "imdb ebc   ahgjefjhfe",
+        "targets": "positive",
+    }
+    tokenizer_obj = tokenizer.Tokenizer(
+        tokenizer_configs=self._get_tokenizer_configs(add_eos=True),
+        copy_pretokenized=False,
+    )
+    tokenized_example = tokenizer_obj(orig_example)
+    expected_example = {
+        "inputs": np.array(
+            [3, 8, 14, 21, 2, 3, 4, 2, 13, 3, 5, 20, 2, 4, 2, 20, 2, 4, 1]
+        ),
+        "targets": np.array([3, 15, 7, 6, 8, 24, 8, 25, 4, 1]),
     }
     for feature, value in tokenized_example.items():
       if isinstance(value, np.ndarray):
