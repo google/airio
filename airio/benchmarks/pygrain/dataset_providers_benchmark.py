@@ -242,6 +242,7 @@ def task_get_dataset_with_runtime_preps_without_batching(
   runtime_preprocessors = _create_runtime_preprocessors()
   while state:
     task.get_dataset(
+        sequence_lengths={"inputs": 20, "targets": 10},
         split="train",
         runtime_preprocessors=runtime_preprocessors,
         shuffle=False,

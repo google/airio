@@ -34,6 +34,7 @@ from airio._src.pygrain import preprocessors as preprocessors_lib
 from airio._src.pygrain import tokenizer
 from airio._src.pygrain import vocabularies
 from airio._src.pygrain.common import feature_converters
+from airio._src.pygrain.common import preprocessors as common_preprocessors
 import grain.python as grain
 import numpy as np
 import tensorflow_datasets as tfds
@@ -139,13 +140,20 @@ def _create_preprocessors() -> (
 def _create_runtime_preprocessors() -> (
     Sequence[preprocessors_lib.PyGrainAirIOPreprocessor]
 ):
-  return feature_converters.get_t5x_enc_dec_feature_converter_preprocessors(
-      pack=False,
-      use_multi_bin_packing=False,
-      passthrough_feature_keys=[],
-      pad_id=0,
-      bos_id=0,
+  trim_prep = preprocessors_lib.MapFnTransform(common_preprocessors.trim)
+  pad_prep = preprocessors_lib.MapFnTransform(
+      functools.partial(common_preprocessors.pad, pad_id=0)
   )
+  convert_prep = preprocessors_lib.MapFnTransform(
+      functools.partial(
+          feature_converters._convert_to_t5x_enc_dec_features,
+          pack=False,
+          passthrough_feature_keys=[],
+          pad_id=0,
+          bos_id=0,
+      )
+  )
+  return [trim_prep, pad_prep, convert_prep]
 
 
 def _create_source(
@@ -369,15 +377,9 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
                 "parent": {
                     "parent": {
                         "parent": {
-                            "parent": {
-                                "parents": [
-                                    {"next_index": 0},
-                                    {"next_index": 0},
-                                ],
-                                "index": 0,
-                                "stop": False,
-                            },
-                            "index_for_rng": 0,
+                            "parents": [{"next_index": 0}, {"next_index": 0}],
+                            "index": 0,
+                            "stop": False,
                         },
                         "index_for_rng": 0,
                     },
@@ -389,15 +391,9 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
                 "parent": {
                     "parent": {
                         "parent": {
-                            "parent": {
-                                "parents": [
-                                    {"next_index": 0},
-                                    {"next_index": 0},
-                                ],
-                                "index": 0,
-                                "stop": False,
-                            },
-                            "index_for_rng": 0,
+                            "parents": [{"next_index": 0}, {"next_index": 0}],
+                            "index": 0,
+                            "stop": False,
                         },
                         "index_for_rng": 0,
                     },
@@ -465,11 +461,8 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
                     "parent": {
                         "parent": {
                             "parent": {
-                                "parent": {
-                                    "parent": {"next_index": 0},
-                                    "threshold": 4,
-                                },
-                                "index_for_rng": 0,
+                                "parent": {"next_index": 0},
+                                "threshold": 4,
                             },
                             "index_for_rng": 0,
                         },
@@ -484,11 +477,8 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
                     "parent": {
                         "parent": {
                             "parent": {
-                                "parent": {
-                                    "parent": {"next_index": 0},
-                                    "threshold": 4,
-                                },
-                                "index_for_rng": 0,
+                                "parent": {"next_index": 0},
+                                "threshold": 4,
                             },
                             "index_for_rng": 0,
                         },
