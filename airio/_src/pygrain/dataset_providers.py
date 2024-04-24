@@ -202,6 +202,8 @@ class GrainTask(core_dataset_providers.Task):
           num_epochs=num_epochs,
           num_prefetch_threads=num_prefetch_threads,
       )
+      if num_epochs is None:
+        ds = lazy_dataset.RepeatLazyMapDataset(ds, num_epochs=None)
       ds = _iter_and_prefetch(
           ds, num_workers=num_workers, num_prefetch_threads=num_prefetch_threads
       )

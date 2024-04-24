@@ -368,6 +368,53 @@ class TaskTest(absltest.TestCase):
     ]
     test_utils.assert_datasets_equal(ds, expected)
 
+  def test_task_get_dataset_infinite_repeat_non_lazy(self):
+    source = _create_source(
+        source_name=_SOURCE_NAME,
+        splits=_SOURCE_SPLITS,
+        num_examples=_SOURCE_NUM_EXAMPLES,
+    )
+    task = _create_task(source=source, preprocessors=_create_preprocessors())
+    ds = task.get_dataset(split="train", shuffle=False, num_epochs=None)
+    actual = [
+        next(ds)["inputs_pretokenized"]
+        for _ in range(7)
+    ]
+    expected = [
+        "imdb ebc   ahgjefjhfe",
+        "imdb hj aijbcidcibdg",
+        "imdb acdhdacfhhjb",
+        "imdb ebc   ahgjefjhfe",  # first repeat
+        "imdb hj aijbcidcibdg",
+        "imdb acdhdacfhhjb",
+        "imdb ebc   ahgjefjhfe",  # second repeat
+    ]
+    self.assertListEqual(actual, expected)
+
+  def test_task_get_dataset_infinite_repeat_lazy(self):
+    source = _create_source(
+        source_name=_SOURCE_NAME,
+        splits=_SOURCE_SPLITS,
+        num_examples=_SOURCE_NUM_EXAMPLES,
+    )
+    task = _create_task(source=source, preprocessors=_create_preprocessors())
+    task._switch_to_lazy_dataset = mock.Mock(return_value=True)
+    ds = task.get_dataset(split="train", shuffle=False, num_epochs=None)
+    actual = [
+        next(ds)["inputs_pretokenized"]
+        for _ in range(7)
+    ]
+    expected = [
+        "imdb ebc   ahgjefjhfe",
+        "imdb hj aijbcidcibdg",
+        "imdb acdhdacfhhjb",
+        "imdb ebc   ahgjefjhfe",  # first repeat
+        "imdb hj aijbcidcibdg",
+        "imdb acdhdacfhhjb",
+        "imdb ebc   ahgjefjhfe",  # second repeat
+    ]
+    self.assertListEqual(actual, expected)
+
   def test_task_get_dataset_with_runtime_preps_without_batching(self):
     source = _create_source(
         source_name=_SOURCE_NAME,
