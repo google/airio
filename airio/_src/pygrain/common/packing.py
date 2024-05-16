@@ -902,16 +902,16 @@ def unflatten_packed_example(
 
 def save_np_tree(tree: PyTree[np.ndarray]):
   return {
-      "data": jax.tree_map(
+      "data": jax.tree.map(
           lambda x: base64.b64encode(x.tobytes()).decode(), tree
       ),
-      "dtypes": jax.tree_map(lambda x: x.dtype.descr[0][1], tree),
-      "shapes": jax.tree_map(lambda x: x.shape, tree),
+      "dtypes": jax.tree.map(lambda x: x.dtype.descr[0][1], tree),
+      "shapes": jax.tree.map(lambda x: x.shape, tree),
   }
 
 
 def load_np_tree(tree: dict[str, PyTree[Any]]):
-  return jax.tree_map(
+  return jax.tree.map(
       lambda x, y, z: np.frombuffer(
           base64.b64decode(x), dtype=np.dtype(y)
       ).reshape(z),
