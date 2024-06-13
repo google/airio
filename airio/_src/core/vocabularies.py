@@ -19,7 +19,7 @@ import functools
 import hashlib
 import threading
 import typing
-from typing import ClassVar, Generic, Protocol, TypeVar
+from typing import ClassVar, Generic, Protocol, Sequence, TypeVar
 
 from absl import logging
 
@@ -310,3 +310,63 @@ class SentencePieceVocabulary(Vocabulary[Encoded, Decoded], Protocol):
   def decode(self, ids: Encoded):
     """Detokenizes int32 iterable to a string, up through first EOS."""
     ...
+
+
+@typing.runtime_checkable
+class UnigramVocabulary(Vocabulary[Encoded, Decoded], Protocol):
+  """Vocabulary that does table-lookup of unigrams."""
+
+  def __init__(self, unigrams: Sequence[str]) -> None:
+    """UnigramVocabulary constructor.
+
+    Args:
+      unigrams: the collection of in-vocabulary tokens. This collection should
+        not include PAD or UNK, which are automatically assigned ids and managed
+        as possible decode tokens.
+    """
+    self._unigram_by_id = ["PAD"] + list(unigrams) + ["UNK"]
+    self._id_by_unigram = {u: i for i, u in enumerate(self._unigram_by_id)}
+
+  def encode(self, s: Decoded) -> Encoded:
+    """Tokenizes a string to a sequence of one int."""
+    ...
+
+  def decode(self, ids: Encoded) -> Decoded:
+    """Detokenizes int32 iterable to a space delimited string."""
+    ...
+
+  @property
+  def bos_id(self) -> int | None:
+    return None
+
+  @property
+  def eos_id(self) -> int | None:
+    return None
+
+  @property
+  def pad_id(self) -> int | None:
+    return PAD_ID
+
+  @property
+  def unk_id(self):
+    return self.base_vocab_size - 1
+
+  @property
+  def extra_ids(self) -> int:
+    return 0
+
+  @property
+  def base_vocab_size(self):
+    return len(self._id_by_unigram)
+
+  @property
+  def vocab_size(self):
+    return self.base_vocab_size
+
+  def __eq__(self, other):
+    if not isinstance(other, UnigramVocabulary):
+      return False
+    return self._id_by_unigram == other._id_by_unigram
+
+  def __str__(self) -> str:
+    return f"UnigramVocabulary(base_vocab_size={self.base_vocab_size})"

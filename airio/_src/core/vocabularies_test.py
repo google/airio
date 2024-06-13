@@ -309,5 +309,41 @@ class SentencepieceVocabularyTest(parameterized.TestCase):
         r"SentencePieceVocabulary\(file=[^,]*\, extra_ids=10\, spm_md5=[^)]*\)",
     )
 
+
+class UnigramVocabularyTest(parameterized.TestCase):
+
+  def test_equal(self):
+    vocab1 = vocabularies.UnigramVocabulary(["a", "test", "vocab"])
+    vocab2 = vocabularies.UnigramVocabulary(["a", "test", "vocab"])
+    self.assertEqual(vocab1, vocab2)
+
+  def test_not_equal(self):
+    vocab1 = vocabularies.UnigramVocabulary(["a", "test", "vocab"])
+    vocab2 = vocabularies.UnigramVocabulary(["another", "test", "vocab"])
+    self.assertNotEqual(vocab1, vocab2)
+
+  def test_properties(self):
+    test_vocab = vocabularies.UnigramVocabulary(["a", "test", "vocab"])
+    self.assertIsNone(test_vocab.bos_id)
+    self.assertIsNone(test_vocab.eos_id)
+    self.assertEqual(test_vocab.pad_id, 0)
+    self.assertEqual(test_vocab.unk_id, 4)
+    self.assertEqual(test_vocab.extra_ids, 0)
+    self.assertEqual(test_vocab.vocab_size, 5)
+
+  def test_pickling(self):
+    test_vocab = vocabularies.UnigramVocabulary(["a", "test", "vocab"])
+    dumped = pickle.dumps(test_vocab)
+    loaded_vocab = pickle.loads(dumped)
+    self.assertEqual(test_vocab, loaded_vocab)
+
+  def test_str(self):
+    test_vocab = vocabularies.UnigramVocabulary(["a", "test", "vocab"])
+    self.assertRegex(
+        str(test_vocab),
+        r"UnigramVocabulary\(base_vocab_size=5\)",
+    )
+
+
 if __name__ == "__main__":
   absltest.main()

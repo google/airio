@@ -58,3 +58,29 @@ class SentencePieceVocabulary(
     piece_size = self.tokenizer.GetPieceSize()
     clean_ids = [unk_id if i >= piece_size else int(i) for i in clean_ids]
     return self.tokenizer.DecodeIds(clean_ids)
+
+
+class UnigramVocabulary(vocabularies.UnigramVocabulary[Encoded, Decoded]):
+  """Unigram vocabulary for AirIO PyGrain."""
+
+  def encode(self, s: Decoded) -> Encoded:
+    """Encode a python string.
+
+    Args:
+      s: a string
+
+    Returns:
+      a list of a single integer
+    """
+    return [self._id_by_unigram.get(s, self.unk_id)]
+
+  def decode(self, ids: Encoded) -> str:
+    """Decode a list of integers.
+
+    Args:
+      ids: a list of integers
+
+    Returns:
+      a space delimited string decoded ids
+    """
+    return " ".join(self._unigram_by_id[id] for id in ids)

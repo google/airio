@@ -103,5 +103,25 @@ class SentencepieceVocabularyTest(absltest.TestCase):
     self.assertEqual(self.TEST_STRING, vocab.decode(tokens))
 
 
+class UnigramVocabularyTest(absltest.TestCase):
+
+  def test_encode_converts_unigrams_to_ints_correctly(self):
+    unigrams = ["this", "that", "is", "not", "a", "the", "test", "ball"]
+    vocabulary = vocabularies.UnigramVocabulary(unigrams)
+    self.assertEqual(vocabulary.unk_id, 9)
+    with self.subTest(name="pure_python"):
+      # Note that id 0 is reserved for padding.
+      self.assertEqual(vocabulary.encode("that"), [2])
+      self.assertEqual(vocabulary.encode("not"), [4])
+      self.assertEqual(vocabulary.encode("apple"), [vocabulary.unk_id])
+
+  def test_decode_converts_ints_to_unigrams_correctly(self):
+    unigrams = ["this", "that", "is", "not", "a", "the", "test", "ball"]
+    vocabulary = vocabularies.UnigramVocabulary(unigrams)
+    self.assertEqual(vocabulary.decode([1]), "this")
+    self.assertEqual(vocabulary.decode([3]), "is")
+    self.assertEqual(vocabulary.decode([vocabulary.unk_id]), "UNK")
+
+
 if __name__ == "__main__":
   absltest.main()
