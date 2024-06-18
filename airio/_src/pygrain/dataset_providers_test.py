@@ -2208,8 +2208,7 @@ class MixtureTest(absltest.TestCase):
     )
     with self.assertRaisesRegex(
         ValueError,
-        "(The two structures don't have the same nested structure|Dict key"
-        " mismatch;).*",
+        "All input elements have the same structure and shape but.*",
     ):
       _ = next(ds)
 
