@@ -2208,7 +2208,7 @@ class MixtureTest(absltest.TestCase):
     )
     with self.assertRaisesRegex(
         ValueError,
-        "All input elements have the same structure and shape but.*",
+        "Expected all input elements to have the same structure but.*",
     ):
       _ = next(ds)
 
