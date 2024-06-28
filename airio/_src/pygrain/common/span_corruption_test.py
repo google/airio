@@ -24,6 +24,7 @@ from airio._src.core import test_utils
 from airio._src.core import tokenizer
 from airio._src.pygrain import lazy_dataset_transforms
 from airio._src.pygrain.common import packing
+from airio._src.pygrain.common import preprocessors
 from airio._src.pygrain.common import span_corruption as asc
 import grain.python as grain
 import jax
@@ -359,6 +360,64 @@ class SpanCorruptionTest(absltest.TestCase):
     airio_ds_iter = iter(airio_ds)
     for seqio_ex, airio_ex in zip(seqio_ds_iter, airio_ds_iter, strict=True):
       np.testing.assert_array_equal(seqio_ex["targets"], airio_ex["targets"])
+
+
+class BatchedDenoiseTest(absltest.TestCase):
+
+  def test_denoise_batched(self):
+    # Step 1: Load tokenized test data.
+    test_data_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "../../../test_data/span_corruption",
+    )
+    src_filename = os.path.join(
+        test_data_dir, "c4_tokenized_t5_default_vocab_500_examples.tfrecord*"
+    )
+    src_feature_description = {
+        "targets": tf.io.FixedLenSequenceFeature(
+            [], dtype=tf.int64, allow_missing=True
+        )
+    }
+    test_src = seqio.TFExampleDataSource(
+        split_to_filepattern={"train": src_filename},
+        feature_description=src_feature_description,
+    )
+    src_ds = test_src.get_dataset("train")
+
+    # Step 2: Populate params.
+    seed = jax.random.key(123)
+    batch_size = 2
+    test_vocab = seqio.PassThroughVocabulary(size=32100)
+    tokenizer_configs = {
+        "inputs": tokenizer.TokenizerConfig(vocab=test_vocab, add_eos=True),
+        "targets": tokenizer.TokenizerConfig(vocab=test_vocab, add_eos=True),
+    }
+
+    # Step 3: Run trim/pad, batch and denoise.
+    examples = list(src_ds.as_numpy_iterator())
+    ds = lazy_dataset.SourceLazyMapDataset(examples)
+    runtime_args = test_utils.create_airio_injected_runtime_args(
+        sequence_lengths={"targets": 1024},
+    )
+    ds = ds.map(lambda x: preprocessors.trim(x, runtime_args))
+    ds = ds.map(lambda x: preprocessors.pad(x, runtime_args, pad_id=0))
+    ds = ds.batch(batch_size)
+    denoise_fn = functools.partial(
+        asc._t5_single_example_denoise,
+        tokenizer_configs=tokenizer_configs,
+        noise_density=0.15,
+        mean_noise_span_length=3.0,
+        input_feature_key="inputs",
+        passthrough_feature_keys=None,
+        batch_size=batch_size,
+    )
+    ds = lazy_dataset_transforms.RandomMapFnLazyMapDataset(ds, denoise_fn, seed)
+    # Convert to numpy arrays.
+    ds = ds.map(lambda x: jax.tree.map(lambda k: k.numpy(), x))
+    element = next(iter(ds))
+    expected_lengths = {"inputs": 921, "targets": 205}
+    for k in element:
+      self.assertTupleEqual(element[k].shape, (batch_size, expected_lengths[k]))
 
 
 if __name__ == "__main__":

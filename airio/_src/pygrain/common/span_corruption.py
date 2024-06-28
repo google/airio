@@ -66,6 +66,7 @@ def _t5_single_example_denoise(
     mean_noise_span_length: float,
     input_feature_key: str,
     passthrough_feature_keys: Sequence[str] | None = None,
+    batch_size: int | None = None,
 ):
   seed = jax.random.key_data(seed)
   return t5_preps.single_example_denoise(
@@ -81,6 +82,7 @@ def _t5_single_example_denoise(
       ),
       input_feature_key=input_feature_key,
       passthrough_feature_keys=passthrough_feature_keys,
+      batch_size=batch_size,
   )
 
 
