@@ -95,7 +95,7 @@ class ArrayRecordDataSourceTest(absltest.TestCase):
     ds = _get_dataset(
         source,
         "train",
-        grain.experimental.fast_proto_parser.parse_tf_example,
+        grain.fast_proto.parse_tf_example,
     )
     actual_ds = list(ds)
     expected_ds = [
