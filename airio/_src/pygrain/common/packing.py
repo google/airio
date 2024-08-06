@@ -30,7 +30,6 @@ import numpy as np
 import typing_extensions
 
 
-lazy_dataset = grain.experimental.lazy_dataset
 T = TypeVar("T")
 SKIP_FEATURE = constants.SKIP_FEATURE
 
@@ -122,10 +121,10 @@ class AirIOPackDatasetMapPreprocessor:
 
   def __call__(
       self,
-      ds: lazy_dataset.LazyMapDataset,
+      ds: grain.MapDataset,
       runtime_args: core_preprocessors.AirIOInjectedRuntimeArgs,
       unused_rng: jax.Array,
-  ) -> lazy_dataset.LazyMapDataset:
+  ) -> grain.MapDataset:
     self.packer.feature_lengths = runtime_args.sequence_lengths
     if not isinstance(self.pool_size, int):
       self.pool_size = self.pool_size(runtime_args.sequence_lengths)
@@ -162,10 +161,10 @@ class AirIOPackDatasetIterPreprocessor:
 
   def __call__(
       self,
-      ds: lazy_dataset.LazyIterDataset,
+      ds: grain.IterDataset,
       runtime_args: core_preprocessors.AirIOInjectedRuntimeArgs,
       unused_rng: jax.Array,
-  ) -> lazy_dataset.LazyIterDataset:
+  ) -> grain.IterDataset:
     self.packer.feature_lengths = runtime_args.sequence_lengths
     return PackLazyIterDataset(ds, packer=self.packer)
 
@@ -181,7 +180,7 @@ class AirIOPackDatasetIterPreprocessor:
 
 
 @dataclasses.dataclass(frozen=False)
-class PackLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
+class PackLazyMapDataset(grain.MapDataset[T]):
   """Packs a dataset. Produces a sparse dataset.
 
   Replicates algorithms traditionally used in SeqIO / Tensor2Tensor. Summary:
@@ -206,15 +205,12 @@ class PackLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
   """
 
   def __init__(
-      self,
-      parent: lazy_dataset.LazyMapDataset,
-      pool_size: int,
-      packer: PackerProtocol
+      self, parent: grain.MapDataset, pool_size: int, packer: PackerProtocol
   ):
     super().__init__([parent])
     self._packed_ds = PoolLazyMapDataset(parent, pool_size)
     pack_flatmap = PackPoolFlatMap(pool_size, packer)
-    self._packed_ds = lazy_dataset.FlatMapLazyMapDataset(
+    self._packed_ds = grain.experimental.FlatMapMapDataset(
         self._packed_ds, pack_flatmap
     )
 
@@ -231,12 +227,12 @@ class PackLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
     return self._packed_ds[index]
 
 
-class PoolLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
+class PoolLazyMapDataset(grain.MapDataset[T]):
   """Pools consecutive examples from a LazyMapDataset.
 
   Example:
     ```
-    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = grain.MapDataset.source(range(10))
     ds = PoolLazyMapDataset(ds, 3)
     list(ds)
     > [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]]
@@ -245,7 +241,7 @@ class PoolLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
 
   def __init__(
       self,
-      parent: lazy_dataset.LazyMapDataset,
+      parent: grain.MapDataset,
       pool_size: int,
   ):
     super().__init__(parent)
@@ -310,7 +306,7 @@ class PackPoolFlatMap(grain.experimental.FlatMapTransform):
       yield packer.get_packed_example()
 
 
-class _PackLazyDatasetIterator(lazy_dataset.LazyDatasetIterator):
+class _PackLazyDatasetIterator(grain.DatasetIterator):
   """See PackLazyIterDataset for details.
 
   Warning: This object is not threadsafe!
@@ -318,7 +314,7 @@ class _PackLazyDatasetIterator(lazy_dataset.LazyDatasetIterator):
 
   def __init__(
       self,
-      parent: lazy_dataset.LazyDatasetIterator,
+      parent: grain.DatasetIterator,
       packer: PackerProtocol,
   ):
     super().__init__()
@@ -361,7 +357,7 @@ class _PackLazyDatasetIterator(lazy_dataset.LazyDatasetIterator):
 
 
 @dataclasses.dataclass(frozen=False)
-class PackLazyIterDataset(lazy_dataset.LazyIterDataset[T]):
+class PackLazyIterDataset(grain.IterDataset[T]):
   """Packs a `LazyIterDataset`.
 
   Iterates through parent dataset and applies the packer to examples. Yields
@@ -377,15 +373,11 @@ class PackLazyIterDataset(lazy_dataset.LazyIterDataset[T]):
     packer: A `PackerProtocol` impl to pack examples.
   """
 
-  def __init__(
-      self,
-      parent: lazy_dataset.LazyIterDataset,
-      packer: PackerProtocol
-  ):
+  def __init__(self, parent: grain.IterDataset, packer: PackerProtocol):
     super().__init__([parent])
     self._packer = packer
 
-  def __iter__(self) -> lazy_dataset.LazyDatasetIterator:
+  def __iter__(self) -> grain.DatasetIterator:
     return _PackLazyDatasetIterator(
         iter(self._parent), self._packer
     )  # pytype: disable=wrong-arg-types

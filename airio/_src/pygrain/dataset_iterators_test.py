@@ -31,8 +31,6 @@ import numpy as np
 import tensorflow as tf
 
 
-lazy_dataset = grain.experimental.lazy_dataset
-
 
 def _parse_and_preprocess(raw_example: bytes) -> Dict[str, str]:
 
@@ -308,9 +306,9 @@ class DatasetIteratorsWithLazyMapDatasetTest(absltest.TestCase):
     )
     self.expected_data = _get_expected_data()
 
-  def _get_dummy_lazy_map_dataset(self) -> lazy_dataset.LazyMapDataset:
+  def _get_dummy_lazy_map_dataset(self) -> grain.MapDataset:
     test_data_path = os.path.join(self.test_dir, "classification")
-    ds = lazy_dataset.SourceLazyMapDataset(
+    ds = grain.MapDataset.source(
         grain.ArrayRecordDataSource(
             os.path.join(test_data_path, "classification.array_record@2")
         )
@@ -478,9 +476,9 @@ class DatasetIteratorsWithLazyIterDatasetTest(absltest.TestCase):
     )
     self.expected_data = _get_expected_data()
 
-  def _get_dummy_lazy_iter_dataset(self) -> lazy_dataset.LazyMapDataset:
+  def _get_dummy_lazy_iter_dataset(self) -> grain.MapDataset:
     test_data_path = os.path.join(self.test_dir, "classification")
-    ds = lazy_dataset.SourceLazyMapDataset(
+    ds = grain.MapDataset.source(
         grain.ArrayRecordDataSource(
             os.path.join(test_data_path, "classification.array_record@2")
         )

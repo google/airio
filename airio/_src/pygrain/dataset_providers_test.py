@@ -40,7 +40,6 @@ import tensorflow_datasets as tfds
 
 
 
-lazy_dataset = grain.experimental.lazy_dataset
 _SOURCE_NAME = "imdb_reviews"
 _SOURCE_NUM_EXAMPLES = 3
 _SOURCE_SPLITS = frozenset(["train", "test", "unsupervised"])
@@ -155,12 +154,12 @@ def _create_task_builder(
   )
 
 
-class _TestFilterLazyDatasetIterator(lazy_dataset.LazyDatasetIterator):
+class _TestFilterLazyDatasetIterator(grain.DatasetIterator):
   """Iterator that filters elements based on an int threshold."""
 
   def __init__(
       self,
-      parent: lazy_dataset.LazyDatasetIterator,
+      parent: grain.DatasetIterator,
       threshold: int,
   ):
     super().__init__()
@@ -182,12 +181,12 @@ class _TestFilterLazyDatasetIterator(lazy_dataset.LazyDatasetIterator):
     self._threshold = state["threshold"]
 
 
-class TestFilterLazyIterDataset(lazy_dataset.LazyIterDataset):
+class TestFilterLazyIterDataset(grain.IterDataset):
   """LazyIterDataset thatfilters elements based on an int threshold."""
 
   def __init__(
       self,
-      parent: lazy_dataset.LazyIterDataset,
+      parent: grain.IterDataset,
       threshold: int,
   ):
     super().__init__(parent)
@@ -1098,7 +1097,7 @@ class TaskTest(absltest.TestCase):
     # Task.get_dataset() works correctly by running preprocessing using
     # lazy_dataset instead of DataLoader operations.
     def lazy_id_fn(
-        ds: lazy_dataset.LazyMapDataset,
+        ds: grain.MapDataset,
         rargs: core_preprocessors_lib.AirIOInjectedRuntimeArgs,
         rng: jax.Array,
     ):
@@ -1206,7 +1205,7 @@ class TaskTest(absltest.TestCase):
     # Task.get_dataset() works correctly by running preprocessing using
     # lazy_dataset instead of DataLoader operations.
     def lazy_id_fn(
-        ds: lazy_dataset.LazyMapDataset,
+        ds: grain.MapDataset,
         rargs: core_preprocessors_lib.AirIOInjectedRuntimeArgs,
         rng: jax.Array,
     ):
@@ -1454,7 +1453,8 @@ class TaskTest(absltest.TestCase):
       np.testing.assert_array_equal(actual, expected)
 
   def test_task_lazy_dataset_runtime_preprocessors_after_shuffle(self):
-    class ElemAndIdMapDataset(lazy_dataset.LazyMapDataset):
+
+    class ElemAndIdMapDataset(grain.MapDataset):
       """Returns a pair of the element and its index."""
 
       def __len__(self):
@@ -1525,7 +1525,8 @@ class TaskTest(absltest.TestCase):
       _ = test_task.get_dataset()
 
   def test_task_requires_non_none_prep_converts_ds_to_iter(self):
-    class FilterMapDataset(lazy_dataset.LazyMapDataset):
+
+    class FilterMapDataset(grain.MapDataset):
       """Filters out the 3rd element."""
 
       def __len__(self):

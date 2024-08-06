@@ -26,8 +26,7 @@ import grain.python as grain
 import numpy as np
 
 
-lazy_dataset = grain.experimental.lazy_dataset
-LazyDataset = lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset
+LazyDataset = grain.MapDataset | grain.IterDataset
 
 
 class PyGrainDatasetIteratorWrapper(dataset_iterators.AirIODatasetIterator):

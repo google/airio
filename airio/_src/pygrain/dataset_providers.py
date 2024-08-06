@@ -35,7 +35,7 @@ SHUFFLE_BUFFER_SIZE = 1000
 DEFAULT_NUM_RECORDS_TO_INSPECT = 2
 MAX_NUM_RECORDS_TO_INSPECT = 1000
 
-lazy_dataset = grain.experimental.lazy_dataset
+
 # TODO(sahildua): Expose these data sources as AirIO data sources?
 GrainDataSource = grain.RandomAccessDataSource
 JaxRng = jax.Array
@@ -87,12 +87,10 @@ class GrainTask(core_dataset_providers.Task):
       shard_info: core_dataset_providers.ShardInfo | None,
       num_epochs: int | None,
       num_prefetch_threads: int | None,
-  ) -> lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset:
+  ) -> grain.MapDataset | grain.IterDataset:
     """Returns a lazy dataset for Task source and preprocessors."""
     # Step 1: Get Source.
-    ds = lazy_dataset.SourceLazyMapDataset(
-        self._get_data_source_for_split(split=split)
-    )
+    ds = grain.MapDataset.source(self._get_data_source_for_split(split=split))
     if shard_info:
       start, end = _even_split(
           len(ds),
@@ -139,7 +137,7 @@ class GrainTask(core_dataset_providers.Task):
       )
       if shuffle:
         shuffle_seed = int(jax.random.randint(shuffle_rng, [], 0, 2**16 - 1))
-        ds = lazy_dataset.ShuffleLazyMapDataset(ds, seed=shuffle_seed)
+        ds = ds.shuffle(seed=shuffle_seed)
       preprocessed_dss.append(ds)
     runtime_args = updated_runtime_args
     # pylint:enable=protected-access
@@ -203,7 +201,7 @@ class GrainTask(core_dataset_providers.Task):
           num_prefetch_threads=num_prefetch_threads,
       )
       if num_epochs is None:
-        ds = lazy_dataset.RepeatLazyMapDataset(ds, num_epochs=None)
+        ds = ds.repeat(num_epochs=None)  # pytype: disable=attribute-error
       ds = _iter_and_prefetch(
           ds, num_workers=num_workers, num_prefetch_threads=num_prefetch_threads
       )
@@ -432,7 +430,7 @@ class GrainMixture(core_dataset_providers.Mixture):
       shard_info: core_dataset_providers.ShardInfo | None = None,
       num_epochs: int | None = 1,
       num_prefetch_threads: int | None = None,
-  ) -> lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset:
+  ) -> grain.MapDataset | grain.IterDataset:
     """Returns a lazy dataset for the Mixture."""
     if num_epochs is None and shuffle:
       raise ValueError(
@@ -465,9 +463,7 @@ class GrainMixture(core_dataset_providers.Mixture):
       # the exact number of epochs required.
     # If any Task dataset produces a LazyIterDataset, then use a LazyIter impl
     # for mixing.
-    use_mix_iter = any(
-        [isinstance(ds, lazy_dataset.LazyIterDataset) for ds in datasets]
-    )
+    use_mix_iter = any([isinstance(ds, grain.IterDataset) for ds in datasets])
     # If any Task dataset produces None elements, mixing it with a LazyMap impl
     # will deviate from desired proportions because None elements will be
     # sampled. A LazyIter impl for mixing must be used for correct behavior.
@@ -480,13 +476,13 @@ class GrainMixture(core_dataset_providers.Mixture):
       read_options = _get_read_options(num_prefetch_threads)
       datasets = [
           ds.to_iter_dataset(read_options)
-          if isinstance(ds, lazy_dataset.LazyMapDataset)
+          if isinstance(ds, grain.MapDataset)
           else ds
           for ds in datasets
       ]
-      ds = lazy_dataset.MixedLazyIterDataset(datasets, proportions)
+      ds = grain.IterDataset.mix(datasets, proportions)
     else:
-      ds = lazy_dataset.MixedLazyMapDataset(datasets, proportions)
+      ds = grain.MapDataset.mix(datasets, proportions)
 
     post_mix_preps = []
     if runtime_preprocessors:
@@ -520,7 +516,7 @@ class GrainMixture(core_dataset_providers.Mixture):
         name=self.name,
     )
     if num_epochs is None:
-      ds = lazy_dataset.RepeatLazyMapDataset(ds, num_epochs=None)
+      ds = ds.repeat(num_epochs=None)  # pytype: disable=attribute-error
     return ds
 
   def get_dataset(
@@ -641,14 +637,16 @@ def _get_read_options(num_prefetch_threads: int | None) -> grain.ReadOptions:
 
 
 def _iter_and_prefetch(
-    ds: lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset,
+    ds: grain.MapDataset | grain.IterDataset,
     num_workers: int | None,
     num_prefetch_threads: int | None,
-) -> lazy_dataset.LazyIterDataset:
-  if not isinstance(ds, lazy_dataset.LazyIterDataset):
+) -> grain.IterDataset:
+  if not isinstance(ds, grain.IterDataset):
     ds = ds.to_iter_dataset(_get_read_options(num_prefetch_threads))
   if num_workers and num_workers > 0:
-    ds = ds.prefetch(grain.MultiprocessingOptions(num_workers=num_workers))
+    ds = grain.experimental.MultiprocessPrefetchIterDataset(
+        ds, grain.MultiprocessingOptions(num_workers=num_workers)
+    )
   return ds
 
 
@@ -665,14 +663,12 @@ def _apply_preprocessors_to_lazy_dataset(
   prep_rng = base_rng
   for prep in preps:
     transform = preprocessors_lib.LazyDatasetTransform(prep)
-    if transform.requires_iter_dataset and isinstance(
-        ds, lazy_dataset.LazyMapDataset
-    ):
+    if transform.requires_iter_dataset and isinstance(ds, grain.MapDataset):
       ds = ds.to_iter_dataset(_get_read_options(num_prefetch_threads))
     if (
         has_none_elems
         and transform.requires_non_none_elements
-        and isinstance(ds, lazy_dataset.LazyMapDataset)
+        and isinstance(ds, grain.MapDataset)
     ):
       if not transform.can_process_iter_dataset:
         raise ValueError(

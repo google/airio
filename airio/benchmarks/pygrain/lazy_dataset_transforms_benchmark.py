@@ -19,15 +19,13 @@ import google_benchmark
 import grain.python as grain
 import jax.random
 
-lazy_dataset = grain.experimental.lazy_dataset
-
 
 @google_benchmark.register
 def length(state: google_benchmark.State) -> None:
   parent_lens = [4, 5, 4, 1]
   datasets = []
   for data_len in parent_lens:
-    datasets.append(lazy_dataset.RangeLazyMapDataset(data_len))
+    datasets.append(grain.MapDataset.range(data_len))
   ds = airio.lazy_dataset_transforms.ConcatLazyMapDataset(datasets)
   while state:
     len(ds)
@@ -36,11 +34,11 @@ def length(state: google_benchmark.State) -> None:
 @google_benchmark.register
 def get_item(state: google_benchmark.State) -> None:
   parents = [
-      lazy_dataset.RangeLazyMapDataset(5),
-      lazy_dataset.RangeLazyMapDataset(5, 9),
-      lazy_dataset.RangeLazyMapDataset(9, 18),
-      lazy_dataset.RangeLazyMapDataset(18, 19),
-      lazy_dataset.RangeLazyMapDataset(19, 22),
+      grain.MapDataset.range(5),
+      grain.MapDataset.range(5, 9),
+      grain.MapDataset.range(9, 18),
+      grain.MapDataset.range(18, 19),
+      grain.MapDataset.range(19, 22),
   ]
   ds = airio.lazy_dataset_transforms.ConcatLazyMapDataset(parents)
   while state:
@@ -51,11 +49,11 @@ def get_item(state: google_benchmark.State) -> None:
 def iter_items(state: google_benchmark.State) -> None:
   """Analogous to the ConcatLazyMapDatasetTest with the same name."""
   parents = [
-      lazy_dataset.RangeLazyMapDataset(5),
-      lazy_dataset.RangeLazyMapDataset(5, 9),
-      lazy_dataset.RangeLazyMapDataset(9, 18),
-      lazy_dataset.RangeLazyMapDataset(18, 19),
-      lazy_dataset.RangeLazyMapDataset(19, 22),
+      grain.MapDataset.range(5),
+      grain.MapDataset.range(5, 9),
+      grain.MapDataset.range(9, 18),
+      grain.MapDataset.range(18, 19),
+      grain.MapDataset.range(19, 22),
   ]
   ds = airio.lazy_dataset_transforms.ConcatLazyMapDataset(parents)
   ds_iter = iter(ds)
@@ -70,7 +68,7 @@ def length_reproducible(state: google_benchmark.State) -> None:
   def random_map_fn(ex, rng):
     return ex + int(jax.random.randint(rng, [], 0, 10))
 
-  ds = lazy_dataset.RangeLazyMapDataset(5)
+  ds = grain.MapDataset.range(5)
   ds = airio.lazy_dataset_transforms.RandomMapFnLazyMapDataset(
       ds, random_map_fn, jax.random.PRNGKey(42)
   )
@@ -85,7 +83,7 @@ def get_item_reproducible(state: google_benchmark.State) -> None:
   def random_map_fn(ex, rng):
     return ex + int(jax.random.randint(rng, [], 0, 10))
 
-  ds = lazy_dataset.RangeLazyMapDataset(5)
+  ds = grain.MapDataset.range(5)
   while state:
     for _ in range(5):
       ds1 = airio.lazy_dataset_transforms.RandomMapFnLazyMapDataset(
@@ -101,7 +99,7 @@ def iter_items_reproducible(state: google_benchmark.State) -> None:
   def random_map_fn(ex, rng):
     return ex + int(jax.random.randint(rng, [], 0, 10))
 
-  ds = lazy_dataset.RangeLazyMapDataset(5)
+  ds = grain.MapDataset.range(5)
   while state:
     for _ in range(5):
       ds1 = airio.lazy_dataset_transforms.RandomMapFnLazyMapDataset(

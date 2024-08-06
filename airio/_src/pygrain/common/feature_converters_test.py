@@ -23,9 +23,6 @@ import grain.python as grain
 import numpy as np
 
 
-lazy_dataset = grain.experimental.lazy_dataset
-
-
 class AutoregressiveInputsTest(absltest.TestCase):
 
   def test_autoregressive_inputs_unpacked(self):
@@ -125,7 +122,7 @@ class AutoregressiveInputsTest(absltest.TestCase):
 
 
 def _apply_preprocessors(
-    ds: lazy_dataset.LazyMapDataset,
+    ds: grain.MapDataset,
     preprocessors: preprocessors_lib.PyGrainAirIOPreprocessor,
     runtime_args: core_preprocessors_lib.AirIOInjectedRuntimeArgs,
 ):
@@ -160,7 +157,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
 
   def test_encoder_decoder_unpacked(self):
     x = [{"inputs": [9, 4, 3, 8, 1], "targets": [3, 9, 4, 1]}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 7, "targets": 5},
@@ -198,7 +195,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         "targets": [3, 9, 4, 1],
         "passthrough": [4, 2, 3],
     }]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 7, "targets": 5, "passthrough": 3},
@@ -241,7 +238,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
 
   def test_encoder_decoder_targets_max_length(self):
     x = [{"inputs": [9, 4, 3, 8, 1], "targets": [3, 9, 4, 5, 1]}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 5, "targets": 5},
@@ -277,7 +274,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
     # explicitly part of the feature converter, it's ok to expect untrimmed
     # sequences. This behavior can be modified if needed.
     x = [{"inputs": [9, 4, 3, 8, 4, 5, 1], "targets": [3, 9, 4, 7, 8, 1]}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 5, "targets": 8},
@@ -311,7 +308,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         {"inputs": [7, 8, 5, 1], "targets": [3, 9, 1]},
         {"inputs": [8, 4, 9, 3, 1], "targets": [4, 1]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -363,7 +360,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         {"inputs": [7, 8, 5, 6, 9, 4, 1], "targets": [3, 9, 1]},
         {"inputs": [8, 4, 9, 3, 5, 1], "targets": [4, 1]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -428,7 +425,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
             "inputs_pretokenized": "ghi jkl",
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -468,7 +465,7 @@ class EncDecFeatureConverterTest(absltest.TestCase):
         {"inputs": [7, 8, 5, 1], "targets": [3, 9, 1]},
         {"inputs": [8, 4, 9, 3, 1], "targets": [4, 1]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -523,7 +520,7 @@ class LMFeatureConverter(absltest.TestCase):
 
   def test_lm_unpacked(self):
     x = [{"targets": [3, 9, 1]}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"targets": 5}
@@ -559,7 +556,7 @@ class LMFeatureConverter(absltest.TestCase):
 
   def test_lm_only_packed(self):
     x = [{"targets": [3, 9, 1]}, {"targets": [4, 1]}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -600,7 +597,7 @@ class LMFeatureConverter(absltest.TestCase):
 
   def test_lm_pack_long_sequences(self):
     x = [{"targets": [3, 9, 4, 5, 1]}, {"targets": [4, 3, 2, 1]}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -653,7 +650,7 @@ class LMFeatureConverter(absltest.TestCase):
         {"targets": [3, 9, 1], "plaintext": "abc"},
         {"targets": [4, 1], "plaintext": "abc"},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -694,7 +691,7 @@ class LMFeatureConverter(absltest.TestCase):
 
   def test_lm_only_packed_without_default_bos(self):
     x = [{"targets": [3, 9, 1]}, {"targets": [4, 1]}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -755,7 +752,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
 
   def test_prefix_lm_unpacked(self):
     x = [{"inputs": [9, 4, 6, 1], "targets": [3, 9, 1]}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
 
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -804,7 +801,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
         "targets": [3, 9, 1],
         "passthrough": [6, 5, 4, 3, 2, 1, 0],
     }]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
 
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -850,7 +847,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
 
   def test_prefix_lm_unpacked_trivial_targets(self):
     x = [{"inputs": [9, 4, 6, 1], "targets": []}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
 
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -895,7 +892,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
 
   def test_prefix_lm_long_inputs_feature_length(self):
     x = [{"inputs": [9, 4, 6, 1], "targets": [3, 9, 1]}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
 
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -943,7 +940,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
         {"inputs": [7, 8, 5, 1], "targets": [3, 9, 1]},
         {"inputs": [8, 4, 9, 3, 1], "targets": [4, 1]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
 
@@ -1009,7 +1006,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
 
   def test_prefix_lm_unpacked_loss_on_inputs_and_targets(self):
     x = [{"inputs": [9, 4, 6, 1], "targets": [3, 9, 1]}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
 
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -1057,7 +1054,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
         {"inputs": [7, 8, 5, 1], "targets": [3, 9, 1]},
         {"inputs": [8, 4, 9, 3, 1], "targets": [4, 1]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
 
@@ -1128,7 +1125,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
         {"inputs": [7, 8, 5, 6, 1], "targets": [3, 9, 7, 1]},
         {"inputs": [8, 4, 9, 3, 8, 1], "targets": [4, 1]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
 
@@ -1190,7 +1187,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
         {"inputs": [7, 8, 5, 1], "targets": [3, 9, 1]},
         {"inputs": [8, 4, 1], "targets": [5, 1]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
 
@@ -1275,7 +1272,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
         {"inputs": [7, 8, 5, 1], "targets": [3, 9, 1]},
         {"inputs": [8, 4, 9, 3, 1], "targets": [4, 1]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
 
@@ -1370,7 +1367,7 @@ class PrefixLMFeatureConverter(absltest.TestCase):
             "targets": [5, 6],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
 
@@ -1436,7 +1433,7 @@ class CmsLMFeatureConverter(absltest.TestCase):
 
   def test_lm_unpacked(self):
     x = [{"targets": [3, 9, 1]}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"targets": 5}
@@ -1478,7 +1475,7 @@ class CmsLMFeatureConverter(absltest.TestCase):
 
   def test_lm_only_packed(self):
     x = [{"targets": [3, 9, 1]}, {"targets": [4, 1]}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -1521,7 +1518,7 @@ class CmsLMFeatureConverter(absltest.TestCase):
 
   def test_lm_pack_long_sequences(self):
     x = [{"targets": [3, 9, 4, 5, 1]}, {"targets": [4, 3, 2, 1]}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -1578,7 +1575,7 @@ class CmsLMFeatureConverter(absltest.TestCase):
         {"targets": [3, 9, 1], "plaintext": "abc"},
         {"targets": [4, 1], "plaintext": "abc"},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -1621,7 +1618,7 @@ class CmsLMFeatureConverter(absltest.TestCase):
 
   def test_lm_only_packed_without_default_bos(self):
     x = [{"targets": [3, 9, 1]}, {"targets": [4, 1]}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -1677,7 +1674,7 @@ class CmsPrefixLMFeatureConverter(absltest.TestCase):
 
   def test_prefix_lm_unpacked(self):
     x = [{"inputs": [9, 4, 6, 1], "targets": [3, 9, 1]}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
 
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -1727,7 +1724,7 @@ class CmsPrefixLMFeatureConverter(absltest.TestCase):
         "targets": [3, 9, 1],
         "passthrough": [6, 5, 4, 3, 2, 1, 0],
     }]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
 
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -1776,7 +1773,7 @@ class CmsPrefixLMFeatureConverter(absltest.TestCase):
 
   def test_prefix_lm_unpacked_trivial_targets(self):
     x = [{"inputs": [9, 4, 6, 1], "targets": []}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
 
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -1822,7 +1819,7 @@ class CmsPrefixLMFeatureConverter(absltest.TestCase):
 
   def test_prefix_lm_long_inputs_feature_length(self):
     x = [{"inputs": [9, 4, 6, 1], "targets": [3, 9, 1]}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
 
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -1871,7 +1868,7 @@ class CmsPrefixLMFeatureConverter(absltest.TestCase):
         {"inputs": [7, 8, 5, 1], "targets": [3, 9, 1]},
         {"inputs": [8, 4, 9, 3, 1], "targets": [4, 1]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
 
@@ -1918,7 +1915,7 @@ class CmsPrefixLMFeatureConverter(absltest.TestCase):
 
   def test_prefix_lm_unpacked_loss_on_inputs_and_targets(self):
     x = [{"inputs": [9, 4, 6, 1], "targets": [3, 9, 1]}]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
 
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -1967,7 +1964,7 @@ class CmsPrefixLMFeatureConverter(absltest.TestCase):
         {"inputs": [7, 8, 5, 1], "targets": [3, 9, 1]},
         {"inputs": [8, 4, 9, 3, 1], "targets": [4, 1]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
 
@@ -2019,7 +2016,7 @@ class CmsPrefixLMFeatureConverter(absltest.TestCase):
         {"inputs": [7, 8, 5, 6, 1], "targets": [3, 9, 7, 1]},
         {"inputs": [8, 4, 9, 3, 8, 1], "targets": [4, 1]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
 
@@ -2079,7 +2076,7 @@ class CmsPrefixLMFeatureConverter(absltest.TestCase):
         {"inputs": [7, 8, 5, 1], "targets": [3, 9, 1]},
         {"inputs": [8, 4, 1], "targets": [5, 1]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
 
@@ -2139,7 +2136,7 @@ class CmsPrefixLMFeatureConverter(absltest.TestCase):
         {"inputs": [7, 8, 5, 1], "targets": [3, 9, 1]},
         {"inputs": [8, 4, 9, 3, 1], "targets": [4, 1]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
 
@@ -2199,7 +2196,7 @@ class CmsPrefixLMFeatureConverter(absltest.TestCase):
             "targets": [5, 6],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(x)
+    ds = grain.MapDataset.source(x)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
 

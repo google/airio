@@ -24,8 +24,6 @@ import grain.python as grain
 import jax.random
 
 
-lazy_dataset = grain.experimental.lazy_dataset
-
 
 class ConcatLazyMapDatasetTest(parameterized.TestCase):
 
@@ -37,18 +35,18 @@ class ConcatLazyMapDatasetTest(parameterized.TestCase):
   def test_len(self, parent_lens: Sequence[int]):
     datasets = []
     for data_len in parent_lens:
-      datasets.append(lazy_dataset.RangeLazyMapDataset(data_len))
+      datasets.append(grain.MapDataset.range(data_len))
 
     ds = lazy_dataset_transforms.ConcatLazyMapDataset(datasets)
     self.assertLen(ds, sum(parent_lens))
 
   def test_getitem(self):
     parents = [
-        lazy_dataset.RangeLazyMapDataset(5),
-        lazy_dataset.RangeLazyMapDataset(5, 9),
-        lazy_dataset.RangeLazyMapDataset(9, 18),
-        lazy_dataset.RangeLazyMapDataset(18, 19),
-        lazy_dataset.RangeLazyMapDataset(19, 22),
+        grain.MapDataset.range(5),
+        grain.MapDataset.range(5, 9),
+        grain.MapDataset.range(9, 18),
+        grain.MapDataset.range(18, 19),
+        grain.MapDataset.range(19, 22),
     ]
     ds = lazy_dataset_transforms.ConcatLazyMapDataset(parents)
     actual = [ds[i] for i in range(len(ds))]
@@ -56,11 +54,11 @@ class ConcatLazyMapDatasetTest(parameterized.TestCase):
 
   def test_iter(self):
     parents = [
-        lazy_dataset.RangeLazyMapDataset(5),
-        lazy_dataset.RangeLazyMapDataset(5, 9),
-        lazy_dataset.RangeLazyMapDataset(9, 18),
-        lazy_dataset.RangeLazyMapDataset(18, 19),
-        lazy_dataset.RangeLazyMapDataset(19, 22),
+        grain.MapDataset.range(5),
+        grain.MapDataset.range(5, 9),
+        grain.MapDataset.range(9, 18),
+        grain.MapDataset.range(18, 19),
+        grain.MapDataset.range(19, 22),
     ]
     ds = lazy_dataset_transforms.ConcatLazyMapDataset(parents)
     ds_iter = iter(ds)
@@ -75,7 +73,7 @@ class RandomMapFnLazyMapDatasetTest(absltest.TestCase):
     def random_map_fn(ex, rng):
       return ex + int(jax.random.randint(rng, [], 0, 10))
 
-    ds = lazy_dataset.RangeLazyMapDataset(5)
+    ds = grain.MapDataset.range(5)
 
     for _ in range(5):
       ds1 = lazy_dataset_transforms.RandomMapFnLazyMapDataset(
@@ -87,7 +85,7 @@ class RandomMapFnLazyMapDatasetTest(absltest.TestCase):
     def random_map_fn(ex, rng):
       return ex + int(jax.random.randint(rng, [], 0, 10))
 
-    ds = lazy_dataset.RangeLazyMapDataset(5)
+    ds = grain.MapDataset.range(5)
 
     for _ in range(5):
       ds1 = lazy_dataset_transforms.RandomMapFnLazyMapDataset(
@@ -99,7 +97,7 @@ class RandomMapFnLazyMapDatasetTest(absltest.TestCase):
     def random_map_fn(ex, rng):
       return ex + int(jax.random.randint(rng, [], 0, 10))
 
-    ds = lazy_dataset.RangeLazyMapDataset(5)
+    ds = grain.MapDataset.range(5)
     ds = lazy_dataset_transforms.RandomMapFnLazyMapDataset(
         ds, random_map_fn, jax.random.key(42)
     )
@@ -109,7 +107,7 @@ class RandomMapFnLazyMapDatasetTest(absltest.TestCase):
     def random_map_fn(ex, rng):
       return ex + int(jax.random.randint(rng, [], 0, 10))
 
-    parent_ds = lazy_dataset.RangeLazyMapDataset(5)
+    parent_ds = grain.MapDataset.range(5)
     ds = lazy_dataset_transforms.RandomMapFnLazyMapDataset(
         parent_ds, random_map_fn, jax.random.key(42)
     )

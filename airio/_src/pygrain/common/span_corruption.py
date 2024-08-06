@@ -27,9 +27,6 @@ import jax
 from t5.data import preprocessors as t5_preps
 
 
-lazy_dataset = grain.experimental.lazy_dataset
-
-
 def filter_empty(ex, feature_key):
   return ex[feature_key].any()
 
@@ -87,7 +84,7 @@ def _t5_single_example_denoise(
 
 
 def span_corruption(
-    dataset: lazy_dataset.LazyMapDataset,
+    dataset: grain.MapDataset,
     runtime_args: core_preprocessors.AirIOInjectedRuntimeArgs,
     seed: jax.Array,
     tokenizer_configs: Mapping[str, tokenizer.TokenizerConfig],

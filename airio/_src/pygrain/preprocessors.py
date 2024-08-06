@@ -27,8 +27,8 @@ import numpy as np
 
 # TODO(b/294122943): Implement flat_map.
 
-lazy_dataset = grain.experimental.lazy_dataset
-LazyDataset = lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset
+
+LazyDataset = grain.MapDataset | grain.IterDataset
 JaxRng = jax.Array
 
 
@@ -84,9 +84,9 @@ class LazyMapTransform:
   because it is not possible to verify correctness at runtime.
 
   Attributes:
-    transform: A `Callable` that preprocesses `lazy_dataset.LazyMapDataset`
-      based on runtime args like sequence lengths provided via
-      `AirIOInjectedRuntimeArgs`, and returns a `lazy_dataset.LazyMapDataset`.
+    transform: A `Callable` that preprocesses `grain.MapDataset` based on
+      runtime args like sequence lengths provided via
+      `AirIOInjectedRuntimeArgs`, and returns a `grain.MapDataset`.
     update_runtime_args: A `Callable` that updates the
       `AirIOInjectedRuntimeArgs` for use by subsequent transforms if this
       transform modifies or adds new features (e.g. segment ids after packing).
@@ -100,11 +100,11 @@ class LazyMapTransform:
 
   transform: Callable[
       [
-          lazy_dataset.LazyMapDataset,
+          grain.MapDataset,
           core_preprocessors.AirIOInjectedRuntimeArgs,
           JaxRng | None,
       ],
-      lazy_dataset.LazyMapDataset,
+      grain.MapDataset,
   ]
   update_runtime_args: core_preprocessors.UpdateRuntimeArgsCallable
   produces_none_elements: bool
@@ -112,11 +112,11 @@ class LazyMapTransform:
 
   def __call__(
       self,
-      ds: lazy_dataset.LazyMapDataset,
+      ds: grain.MapDataset,
       runtime_args: core_preprocessors.AirIOInjectedRuntimeArgs,
       rng: JaxRng | None,
-  ) -> lazy_dataset.LazyMapDataset:
-    if not isinstance(ds, lazy_dataset.LazyMapDataset):
+  ) -> grain.MapDataset:
+    if not isinstance(ds, grain.MapDataset):
       raise ValueError(
           f"Cannot apply LazyMapDataset transform: {str(self.transform)} to"
           f" non-LazyMapDataset dataset: {str(ds)}"
@@ -133,9 +133,9 @@ class LazyIterTransform:
   verify correctness at runtime.
 
   Attributes:
-    transform: A `Callable` that preprocesses `lazy_dataset.LazyIterDataset`
-      based on runtime args like sequence lengths provided via
-      `AirIOInjectedRuntimeArgs`, and returns a `lazy_dataset.LazyIterDataset`.
+    transform: A `Callable` that preprocesses `grain.IterDataset` based on
+      runtime args like sequence lengths provided via
+      `AirIOInjectedRuntimeArgs`, and returns a `grain.IterDataset`.
     update_runtime_args: A `Callable` that updates the
       `AirIOInjectedRuntimeArgs` for use by subsequent transforms if this
       transform modifies or adds new features (e.g. segment ids after packing).
@@ -144,21 +144,21 @@ class LazyIterTransform:
 
   transform: Callable[
       [
-          lazy_dataset.LazyIterDataset,
+          grain.IterDataset,
           core_preprocessors.AirIOInjectedRuntimeArgs,
           JaxRng | None,
       ],
-      lazy_dataset.LazyIterDataset,
+      grain.IterDataset,
   ]
   update_runtime_args: core_preprocessors.UpdateRuntimeArgsCallable
 
   def __call__(
       self,
-      ds: lazy_dataset.LazyMapDataset | lazy_dataset.LazyIterDataset,
+      ds: grain.MapDataset | grain.IterDataset,
       runtime_args: core_preprocessors.AirIOInjectedRuntimeArgs,
       rng: JaxRng | None,
-  ) -> lazy_dataset.LazyIterDataset:
-    if not isinstance(ds, lazy_dataset.LazyIterDataset):
+  ) -> grain.IterDataset:
+    if not isinstance(ds, grain.IterDataset):
       raise ValueError(
           f"Cannot apply LazyIterDataset transform: {str(self.transform)} to"
           f" non-LazyIterDataset dataset: {str(ds)}"
@@ -251,7 +251,7 @@ class LazyDatasetTransform:
         # Special case to support reproducible stochastic transformations with
         # jax rng keys.
         # Note: LazyIterDatasets are not yet supported, but can be if needed.
-        if not isinstance(ds, lazy_dataset.LazyMapDataset):
+        if not isinstance(ds, grain.MapDataset):
           raise ValueError(
               "RandomMapFnTransform is not yet supported for"
               " non-LazyMapDatasets. Please file a bug with the AirIO team."

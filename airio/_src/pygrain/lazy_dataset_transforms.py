@@ -26,19 +26,18 @@ import grain.python as grain
 import jax
 
 
-lazy_dataset = grain.experimental.lazy_dataset
 JaxRng = jax.Array
 T = TypeVar("T")
 
 
 # TODO(b/300282178): These may be upstreamed to the grain codebase.
 @dataclasses.dataclass(frozen=False)
-class ConcatLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
+class ConcatLazyMapDataset(grain.MapDataset[T]):
   """Concats LazyMapDatasets."""
 
   def __init__(
       self,
-      parents: Sequence[lazy_dataset.LazyMapDataset[T]],
+      parents: Sequence[grain.MapDataset[T]],
   ):
     super().__init__(parents)
     self._accumulated_lens = [0] + list(
@@ -57,16 +56,16 @@ class ConcatLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
 
 
 @dataclasses.dataclass(frozen=False)
-class RandomMapFnLazyMapDataset(lazy_dataset.LazyMapDataset[T]):
+class RandomMapFnLazyMapDataset(grain.MapDataset[T]):
   """LazyMapDataset for random map fns with jax rng key support."""
 
-  parent: lazy_dataset.LazyMapDataset
+  parent: grain.MapDataset
   map_fn: Callable[[Any, JaxRng], Any]
   base_rng: JaxRng
 
   def __init__(
       self,
-      parent: lazy_dataset.LazyMapDataset,
+      parent: grain.MapDataset,
       map_fn: Callable[[Any, JaxRng], Any],
       base_rng: JaxRng,
   ):

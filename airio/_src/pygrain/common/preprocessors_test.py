@@ -23,15 +23,12 @@ import grain.python as grain
 import numpy as np
 
 
-lazy_dataset = grain.experimental.lazy_dataset
-
-
 class TrimPreprocessorsTest(parameterized.TestCase):
 
   @parameterized.parameters(1, 4, 7, 9)
   def test_trim_1d(self, length: int):
     input_examples = [{"inputs": list(range(i))} for i in range(10)]
-    ds = lazy_dataset.SourceLazyMapDataset(input_examples)
+    ds = grain.MapDataset.source(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": length}
@@ -44,7 +41,7 @@ class TrimPreprocessorsTest(parameterized.TestCase):
   def test_trim_2d(self, length: int):
     # [[1, 1]], [[2, 2], [2, 2]], [[3, 3], [3, 3], [3, 3]] ...
     input_examples = [{"inputs": [[i, i]] * i} for i in range(10)]
-    ds = lazy_dataset.SourceLazyMapDataset(input_examples)
+    ds = grain.MapDataset.source(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": length}
@@ -60,7 +57,7 @@ class TrimPreprocessorsTest(parameterized.TestCase):
         {"inputs": list(range(i)), "targets": list(range(2 * i))}
         for i in range(10)
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_examples)
+    ds = grain.MapDataset.source(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": length, "targets": 2 * length},
@@ -77,7 +74,7 @@ class TrimPreprocessorsTest(parameterized.TestCase):
         {"to_trim": list(range(i)), "not_to_trim": list(range(i))}
         for i in range(10)
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_examples)
+    ds = grain.MapDataset.source(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"to_trim": 5, "not_to_trim": constants.SKIP_FEATURE},
@@ -92,7 +89,7 @@ class TrimPreprocessorsTest(parameterized.TestCase):
         {"to_trim": list(range(i)), "not_to_trim": list(range(i))}
         for i in range(10)
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_examples)
+    ds = grain.MapDataset.source(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"to_trim": 5}
@@ -113,7 +110,7 @@ class TrimPreprocessorsTest(parameterized.TestCase):
             "targets": [[4, 1.2], [1, 1]],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_examples)
+    ds = grain.MapDataset.source(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": [1, 1, 4], "targets": [2, 1]},
@@ -144,7 +141,7 @@ class TrimPreprocessorsTest(parameterized.TestCase):
             "targets": [[4, 1.2], [1, 1]],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_examples)
+    ds = grain.MapDataset.source(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": [1, 1, 4, 5], "targets": [2, 1]},
@@ -158,7 +155,7 @@ class PadPreprocessorsTest(absltest.TestCase):
 
   def test_pad_1d(self):
     input_examples = [{"inputs": list(range(i))} for i in range(10)]
-    ds = lazy_dataset.SourceLazyMapDataset(input_examples)
+    ds = grain.MapDataset.source(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 10}
@@ -172,7 +169,7 @@ class PadPreprocessorsTest(absltest.TestCase):
   def test_pad_2d(self):
     # [[1, 1]], [[2, 2], [2, 2]], [[3, 3], [3, 3], [3, 3]] ...
     input_examples = [{"inputs": [[i, i]] * i} for i in range(1, 10)]
-    ds = lazy_dataset.SourceLazyMapDataset(input_examples)
+    ds = grain.MapDataset.source(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 10}
@@ -187,7 +184,7 @@ class PadPreprocessorsTest(absltest.TestCase):
         {"inputs": list(range(i)), "targets": list(range(2 * i))}
         for i in range(10)
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_examples)
+    ds = grain.MapDataset.source(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 10, "targets": 20},
@@ -203,7 +200,7 @@ class PadPreprocessorsTest(absltest.TestCase):
 
   def test_feature_too_long(self):
     input_examples = [{"inputs": list(range(i))} for i in range(10)]
-    ds = lazy_dataset.SourceLazyMapDataset(input_examples)
+    ds = grain.MapDataset.source(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 5}
@@ -217,7 +214,7 @@ class PadPreprocessorsTest(absltest.TestCase):
         {"to_pad": list(range(i)), "not_to_pad": list(range(i))}
         for i in range(10)
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_examples)
+    ds = grain.MapDataset.source(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"to_pad": 10, "not_to_pad": constants.SKIP_FEATURE},
@@ -234,7 +231,7 @@ class PadPreprocessorsTest(absltest.TestCase):
         {"to_pad": list(range(i)), "not_to_pad": list(range(i))}
         for i in range(10)
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_examples)
+    ds = grain.MapDataset.source(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"to_pad": 10}
@@ -257,7 +254,7 @@ class PadPreprocessorsTest(absltest.TestCase):
             "targets": [[4, 1.2], [1, 1]],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_examples)
+    ds = grain.MapDataset.source(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": [2, 1, 5], "targets": [3, 3]},
@@ -288,7 +285,7 @@ class PadPreprocessorsTest(absltest.TestCase):
             "targets": [[4, 1.2], [1, 1]],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_examples)
+    ds = grain.MapDataset.source(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": [2, 1, 5], "targets": [3, 3]},
@@ -308,7 +305,7 @@ class PadPreprocessorsTest(absltest.TestCase):
             "targets": [[4, 1.2], [1, 1]],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_examples)
+    ds = grain.MapDataset.source(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": [1, 1, 4, 5], "targets": [2, 1]},
@@ -325,7 +322,7 @@ class RemoveFeaturesPreprocessorsTest(absltest.TestCase):
         {"key1": b"some values", "key2": [1, 2, 3], "key3": [4, 5, 6]},
         {"key1": b"for the test", "key2": [2, 3, 4], "key3": [6, 7, 8]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_examples)
+    ds = grain.MapDataset.source(input_examples)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"key1": 1, "key2": 2, "key4": 5}

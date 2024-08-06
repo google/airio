@@ -26,9 +26,6 @@ import seqio
 import t5.data
 
 
-lazy_dataset = grain.experimental.lazy_dataset
-
-
 class PackingEquivalenceTest(absltest.TestCase):
 
   def test_noam_packing_equivalence_on_c4(self):
@@ -87,7 +84,7 @@ class PackingEquivalenceTest(absltest.TestCase):
     # Populate the tokenized dataset in-memory to create a LazyMapDataset; this
     # is slow and expensive.
     examples = list(ds.as_numpy_iterator())
-    packed_airio_ds = lazy_dataset.SourceLazyMapDataset(examples)
+    packed_airio_ds = grain.MapDataset.source(examples)
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"targets": 1024}
     )
@@ -163,7 +160,7 @@ class PackingEquivalenceTest(absltest.TestCase):
     # Populate the tokenized dataset in-memory to create a LazyMapDataset; this
     # is slow and expensive.
     examples = list(ds.as_numpy_iterator())
-    packed_airio_ds = lazy_dataset.SourceLazyMapDataset(examples)
+    packed_airio_ds = grain.MapDataset.source(examples)
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths=feature_lengths
     )
@@ -258,7 +255,7 @@ class PackingEquivalenceTest(absltest.TestCase):
     # Populate the tokenized dataset in-memory to create a LazyMapDataset; this
     # is slow and expensive.
     examples = list(ds.as_numpy_iterator())
-    packed_airio_ds = lazy_dataset.SourceLazyMapDataset(examples)
+    packed_airio_ds = grain.MapDataset.source(examples)
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths=feature_lengths
     )

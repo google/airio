@@ -142,14 +142,12 @@ def _create_mixture(
   )
 
 
-class _TestFilterLazyDatasetIterator(
-    airio.preprocessors.lazy_dataset.LazyDatasetIterator
-):
+class _TestFilterLazyDatasetIterator(grain.DatasetIterator):
   """Iterator that filters elements based on an int threshold."""
 
   def __init__(
       self,
-      parent: airio.preprocessors.lazy_dataset.LazyDatasetIterator,
+      parent: grain.DatasetIterator,
       threshold: int,
   ):
     super().__init__()
@@ -171,14 +169,12 @@ class _TestFilterLazyDatasetIterator(
     self._threshold = state["threshold"]
 
 
-class TestFilterLazyIterDataset(
-    airio.preprocessors.lazy_dataset.LazyIterDataset
-):
+class TestFilterLazyIterDataset(grain.IterDataset):
   """LazyIterDataset thatfilters elements based on an int threshold."""
 
   def __init__(
       self,
-      parent: airio.preprocessors.lazy_dataset.LazyIterDataset,
+      parent: grain.IterDataset,
       threshold: int,
   ):
     super().__init__(parent)
@@ -549,7 +545,7 @@ def task_get_dataset_by_step_with_runtime_args(
 # def task_switch_to_lazy_dataset(state):
 #   """Analogous to the DatasetProvidersTest with the same name."""
 #   def lazy_id_fn(
-#       ds: lazy_dataset.LazyMapDataset,
+#       ds: grain.MapDataset,
 #       rargs: preprocessors_lib.AirIOInjectedRuntimeArgs,
 #   ):
 #     del rargs

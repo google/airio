@@ -22,24 +22,22 @@ import jax
 import numpy as np
 
 
-lazy_dataset = grain.experimental.lazy_dataset
-
 _SOURCE_NUM_EXAMPLES = 5
 
 
 def _lazy_map_fn(
-    ds: lazy_dataset.LazyMapDataset,
+    ds: grain.MapDataset,
     run_args: airio.AirIOInjectedRuntimeArgs,
     unused_rng: jax.Array,
-) -> lazy_dataset.LazyMapDataset:
+) -> grain.MapDataset:
   return ds.map(lambda x: x + run_args.sequence_lengths["val"])
 
 
 def _lazy_iter_fn(
-    ds: lazy_dataset.LazyIterDataset,
+    ds: grain.IterDataset,
     run_args: airio.AirIOInjectedRuntimeArgs,
     unused_rng: jax.Array,
-) -> lazy_dataset.LazyIterDataset:
+) -> grain.IterDataset:
   return ds.map(lambda x: x + run_args.sequence_lengths["val"])
 
 
@@ -140,7 +138,7 @@ def map_lazydataset_transform(state: google_benchmark.State) -> None:
   """Analogous to the PreprocessorsTest with the same name."""
   transform = airio.MapFnTransform(lambda x: x + 1)
   lazy_dataset_transform = airio.preprocessors.LazyDatasetTransform(transform)
-  ds = lazy_dataset.SourceLazyMapDataset(list(range(_SOURCE_NUM_EXAMPLES)))
+  ds = grain.MapDataset.source(list(range(_SOURCE_NUM_EXAMPLES)))
   while state:
     lazy_dataset_transform(ds)
 
@@ -152,7 +150,7 @@ def random_map_fn_lazydataset_transform(state: google_benchmark.State) -> None:
       lambda x, rng: x + int(jax.random.randint(rng, [], 0, 10))
   )
   lazy_dataset_transform = airio.preprocessors.LazyDatasetTransform(transform)
-  ds = lazy_dataset.SourceLazyMapDataset(list(range(_SOURCE_NUM_EXAMPLES)))
+  ds = grain.MapDataset.source(list(range(_SOURCE_NUM_EXAMPLES)))
   while state:
     lazy_dataset_transform(ds, rng=jax.random.key(42))
 
@@ -162,7 +160,7 @@ def filter_lazydataset_transform(state: google_benchmark.State) -> None:
   """Analogous to the PreprocessorsTest with the same name."""
   transform = airio.FilterFnTransform(lambda x: x > 2)
   lazy_dataset_transform = airio.preprocessors.LazyDatasetTransform(transform)
-  ds = lazy_dataset.SourceLazyMapDataset(list(range(_SOURCE_NUM_EXAMPLES)))
+  ds = grain.MapDataset.source(list(range(_SOURCE_NUM_EXAMPLES)))
   while state:
     lazy_dataset_transform(ds)
 
@@ -174,7 +172,7 @@ def batch_lazydataset_transform_with_drop_remainder(
   """Analogous to the PreprocessorsTest with the same name."""
   transform = grain.Batch(batch_size=2, drop_remainder=True)
   lazy_dataset_transform = airio.preprocessors.LazyDatasetTransform(transform)
-  ds = lazy_dataset.SourceLazyMapDataset(list(range(_SOURCE_NUM_EXAMPLES)))
+  ds = grain.MapDataset.source(list(range(_SOURCE_NUM_EXAMPLES)))
   while state:
     lazy_dataset_transform(ds)
 
@@ -186,7 +184,7 @@ def batch_lazydataset_transform_without_drop_remainder(
   """Analogous to the PreprocessorsTest with the same name."""
   transform = grain.Batch(batch_size=2)
   lazy_dataset_transform = airio.preprocessors.LazyDatasetTransform(transform)
-  ds = lazy_dataset.SourceLazyMapDataset(list(range(_SOURCE_NUM_EXAMPLES)))
+  ds = grain.MapDataset.source(list(range(_SOURCE_NUM_EXAMPLES)))
   while state:
     lazy_dataset_transform(ds)
 
@@ -264,7 +262,7 @@ def map_lazydataset_transform_with_runtime_args(
       lambda x, rargs: x > rargs.sequence_lengths["val"],
   )
   lazy_dataset_transform = airio.preprocessors.LazyDatasetTransform(transform)
-  ds = lazy_dataset.SourceLazyMapDataset(list(range(_SOURCE_NUM_EXAMPLES)))
+  ds = grain.MapDataset.source(list(range(_SOURCE_NUM_EXAMPLES)))
   while state:
     lazy_dataset_transform(ds, runtime_args=runtime_args)
 
@@ -280,7 +278,7 @@ def map_lazydataset_transform_updated_runtime_args(
       update_runtime_args=_update_runtime_args,
   )
   lazy_dataset_transform = airio.preprocessors.LazyDatasetTransform(transform)
-  ds = lazy_dataset.SourceLazyMapDataset(list(range(_SOURCE_NUM_EXAMPLES)))
+  ds = grain.MapDataset.source(list(range(_SOURCE_NUM_EXAMPLES)))
   while state:
     lazy_dataset_transform(ds, runtime_args=runtime_args)
 
@@ -301,7 +299,7 @@ def random_map_fn_lazydataset_transform_with_runtime_args(
   runtime_args = _get_runtime_args()
   transform = airio.RandomMapFnTransform(test_random_map_fn)
   lazy_dataset_transform = airio.preprocessors.LazyDatasetTransform(transform)
-  ds = lazy_dataset.SourceLazyMapDataset(list(range(_SOURCE_NUM_EXAMPLES)))
+  ds = grain.MapDataset.source(list(range(_SOURCE_NUM_EXAMPLES)))
   while state:
     lazy_dataset_transform(
         ds, rng=jax.random.key(42), runtime_args=runtime_args
@@ -326,7 +324,7 @@ def random_map_fn_lazydataset_transform_updated_runtime_args(
       test_random_map_fn, update_runtime_args=_update_runtime_args
   )
   lazy_dataset_transform = airio.preprocessors.LazyDatasetTransform(transform)
-  ds = lazy_dataset.SourceLazyMapDataset(list(range(_SOURCE_NUM_EXAMPLES)))
+  ds = grain.MapDataset.source(list(range(_SOURCE_NUM_EXAMPLES)))
   while state:
     lazy_dataset_transform(
         ds, rng=jax.random.key(42), runtime_args=runtime_args
@@ -343,7 +341,7 @@ def filter_lazydataset_transform_with_runtime_args(
       lambda x, rargs: x > rargs.sequence_lengths["val"]
   )
   lazy_dataset_transform = airio.preprocessors.LazyDatasetTransform(transform)
-  ds = lazy_dataset.SourceLazyMapDataset(list(range(_SOURCE_NUM_EXAMPLES)))
+  ds = grain.MapDataset.source(list(range(_SOURCE_NUM_EXAMPLES)))
   while state:
     lazy_dataset_transform(ds, runtime_args=runtime_args)
 
@@ -359,7 +357,7 @@ def filter_lazydataset_transform_updated_runtime_args(
       update_runtime_args=_update_runtime_args,
   )
   lazy_dataset_transform = airio.preprocessors.LazyDatasetTransform(transform)
-  ds = lazy_dataset.SourceLazyMapDataset(list(range(_SOURCE_NUM_EXAMPLES)))
+  ds = grain.MapDataset.source(list(range(_SOURCE_NUM_EXAMPLES)))
   while state:
     lazy_dataset_transform(ds, runtime_args=runtime_args)
 
@@ -374,7 +372,7 @@ def lazy_map_transform_with_runtime_args(state: google_benchmark.State) -> None:
       produces_none_elements=False,
       requires_non_none_elements=False,
   )
-  ds = lazy_dataset.SourceLazyMapDataset(range(10))
+  ds = grain.MapDataset.source(range(10))
   while state:
     unused_rng = None
     transform(ds, runtime_args, unused_rng)
@@ -386,7 +384,7 @@ def lazy_map_transform_with_none_elements_and_runtime_args(
 ) -> None:
   """Analogous to the PreprocessorsWithInjectedArgsTest with the same name."""
 
-  class MyLazyMapDataset(lazy_dataset.LazyMapDataset):
+  class MyLazyMapDataset(grain.MapDataset):
     """Test class."""
 
     def __init__(self, parent, threshold):
@@ -412,7 +410,7 @@ def lazy_map_transform_with_none_elements_and_runtime_args(
       produces_none_elements=True,
       requires_non_none_elements=False,
   )
-  ds = lazy_dataset.SourceLazyMapDataset(range(10))
+  ds = grain.MapDataset.source(range(10))
   while state:
     unused_rng = None
     transform(ds, runtime_args, unused_rng)
@@ -428,7 +426,7 @@ def lazy_iter_transform_with_runtime_args(
       _lazy_iter_fn,
       update_runtime_args=_update_runtime_args,
   )
-  ds = lazy_dataset.SourceLazyMapDataset(range(10))
+  ds = grain.MapDataset.source(range(10))
   ds = ds.to_iter_dataset()
   while state:
     unused_rng = None
@@ -445,7 +443,7 @@ def lazy_iter_transform_on_map_dataset_with_runtime_args(
       _lazy_iter_fn,
       update_runtime_args=_update_runtime_args,
   )
-  ds = lazy_dataset.SourceLazyMapDataset(range(10))
+  ds = grain.MapDataset.source(range(10))
   ds = ds.to_iter_dataset()
   while state:
     unused_rng = None
@@ -456,7 +454,7 @@ def lazy_iter_transform_on_map_dataset_with_runtime_args(
 def map_transform_on_iter_dataset(state: google_benchmark.State) -> None:
   """Analogous to the PreprocessorsWithInjectedArgsTest with the same name."""
   transform = airio.MapFnTransform(lambda x: x + 1)
-  ds = lazy_dataset.SourceLazyMapDataset(range(10))
+  ds = grain.MapDataset.source(range(10))
   ds = ds.to_iter_dataset()
   while state:
     airio.preprocessors.LazyDatasetTransform(transform)(ds)
@@ -466,7 +464,7 @@ def map_transform_on_iter_dataset(state: google_benchmark.State) -> None:
 def filter_transform_on_iter_dataset(state: google_benchmark.State) -> None:
   """Analogous to the PreprocessorsWithInjectedArgsTest with the same name."""
   transform = airio.FilterFnTransform(lambda x: x > 5)
-  ds = lazy_dataset.SourceLazyMapDataset(range(10))
+  ds = grain.MapDataset.source(range(10))
   ds = ds.to_iter_dataset()
   while state:
     airio.preprocessors.LazyDatasetTransform(transform)(ds)
@@ -478,7 +476,7 @@ def batch_transform_on_iter_dataset_with_drop(
 ) -> None:
   """Analogous to the PreprocessorsWithInjectedArgsTest with the same name."""
   batch_with_drop = grain.Batch(batch_size=3, drop_remainder=True)
-  ds = lazy_dataset.SourceLazyMapDataset(range(10))
+  ds = grain.MapDataset.source(range(10))
   ds = ds.to_iter_dataset()
   while state:
     airio.preprocessors.LazyDatasetTransform(batch_with_drop)(ds)
@@ -490,7 +488,7 @@ def batch_transform_on_iter_dataset_without_drop(
 ) -> None:
   """Analogous to the PreprocessorsWithInjectedArgsTest with the same name."""
   batch_without_drop = grain.Batch(batch_size=3, drop_remainder=False)
-  ds = lazy_dataset.SourceLazyMapDataset(range(10))
+  ds = grain.MapDataset.source(range(10))
   ds = ds.to_iter_dataset()
   while state:
     airio.preprocessors.LazyDatasetTransform(batch_without_drop)(ds)
@@ -506,7 +504,7 @@ def lazy_iter_transform_on_iter_dataset_with_runtime_args(
       _lazy_iter_fn,
       update_runtime_args=_update_runtime_args,
   )
-  ds = lazy_dataset.SourceLazyMapDataset(range(10))
+  ds = grain.MapDataset.source(range(10))
   ds = ds.to_iter_dataset()
   while state:
     unused_rng = None

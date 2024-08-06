@@ -37,7 +37,6 @@ import tensorflow_datasets as tfds
 
 
 
-lazy_dataset = grain.experimental.lazy_dataset
 _SOURCE_NAME = "imdb_reviews"
 _SOURCE_NUM_EXAMPLES = 3
 _SOURCE_SPLITS = frozenset(["train", "test", "unsupervised"])
@@ -135,12 +134,12 @@ def _create_task_builder(
   )
 
 
-class _TestFilterLazyDatasetIterator(lazy_dataset.LazyDatasetIterator):
+class _TestFilterLazyDatasetIterator(grain.DatasetIterator):
   """Iterator that filters elements based on an int threshold."""
 
   def __init__(
       self,
-      parent: lazy_dataset.LazyDatasetIterator,
+      parent: grain.DatasetIterator,
       threshold: int,
   ):
     super().__init__()
@@ -162,12 +161,12 @@ class _TestFilterLazyDatasetIterator(lazy_dataset.LazyDatasetIterator):
     self._threshold = state["threshold"]
 
 
-class TestFilterLazyIterDataset(lazy_dataset.LazyIterDataset):
+class TestFilterLazyIterDataset(grain.IterDataset):
   """LazyIterDataset thatfilters elements based on an int threshold."""
 
   def __init__(
       self,
-      parent: lazy_dataset.LazyIterDataset,
+      parent: grain.IterDataset,
       threshold: int,
   ):
     super().__init__(parent)

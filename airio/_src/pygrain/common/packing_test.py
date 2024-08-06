@@ -26,15 +26,12 @@ import grain.python as grain
 import numpy as np
 
 
-lazy_dataset = grain.experimental.lazy_dataset
-
-
 class MultiBinPackingMapTest(parameterized.TestCase):
 
   def test_pack_single_feature(self):
     # 5 elements of variable sequence length.
     input_elements = [[1, 2, 3, 4], [5, 6], [11, 12, 13, 14], [7], [8]]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(np.asarray)
     packer = packing.MultiBinPacker(feature_lengths=4, num_partial_examples=10)
     ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
@@ -77,7 +74,7 @@ class MultiBinPackingMapTest(parameterized.TestCase):
             "inputs": [8],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     packer = packing.MultiBinPacker(
         feature_lengths={"inputs": 4}, num_partial_examples=10
@@ -138,7 +135,7 @@ class MultiBinPackingMapTest(parameterized.TestCase):
             "targets": [60],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     packer = packing.MultiBinPacker(
         feature_lengths={"inputs": 4, "targets": 4}, num_partial_examples=10
@@ -210,7 +207,7 @@ class MultiBinPackingMapTest(parameterized.TestCase):
             "targets": [60],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     packer = packing.MultiBinPacker(
         feature_lengths={"inputs": 6, "targets": 4}, num_partial_examples=10
@@ -262,7 +259,7 @@ class MultiBinPackingMapTest(parameterized.TestCase):
             "id": [2, 2],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     packer = packing.MultiBinPacker(
         feature_lengths={"inputs": 6, "targets": 4, "id": -1},
@@ -297,7 +294,7 @@ class MultiBinPackingMapTest(parameterized.TestCase):
             "input_vectors": [[5, 6, 7]],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     packer = packing.MultiBinPacker(
         feature_lengths={"input_tokens": 3, "input_vectors": 3},
@@ -350,7 +347,7 @@ class MultiBinPackingMapTest(parameterized.TestCase):
             "inputs": [8],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 4}
@@ -427,7 +424,7 @@ class MultiBinPackingMapTest(parameterized.TestCase):
             "inputs": [8],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     packer = packing.MultiBinPacker(
         feature_lengths={"inputs": 4}, num_partial_examples=10
@@ -479,7 +476,7 @@ class MultiBinPackingMapTest(parameterized.TestCase):
         {"inputs": [11, 12, 13, 14]},
         {"inputs": [7]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 4}
@@ -548,7 +545,7 @@ class NoamPackingMapTest(parameterized.TestCase):
   def test_pack_single_feature(self):
     # 5 elements of variable sequence length.
     input_elements = [[1, 2, 3, 4], [5, 6], [11, 12, 13, 14], [7]]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(np.asarray)
     packer = packing.NoamPacker(feature_lengths=4)
     ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
@@ -573,7 +570,7 @@ class NoamPackingMapTest(parameterized.TestCase):
         {"inputs": [11, 12, 13, 14]},
         {"inputs": [7]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     packer = packing.NoamPacker(feature_lengths={"inputs": 4})
     ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
@@ -607,7 +604,7 @@ class NoamPackingMapTest(parameterized.TestCase):
         {"inputs": [7]},
         {"inputs": [8]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     packer = packing.NoamPacker(feature_lengths={"inputs": 2})
     ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
@@ -649,7 +646,7 @@ class NoamPackingMapTest(parameterized.TestCase):
             "targets": [60],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     packer = packing.NoamPacker(feature_lengths={"inputs": 4, "targets": 4})
     ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
@@ -702,7 +699,7 @@ class NoamPackingMapTest(parameterized.TestCase):
             "targets": [60],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     packer = packing.NoamPacker(feature_lengths={"inputs": 6, "targets": 3})
     ds = packing.PackLazyMapDataset(ds, pool_size=10, packer=packer)
@@ -744,7 +741,7 @@ class NoamPackingMapTest(parameterized.TestCase):
             "targets": [60],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     packer = packing.NoamPacker(
         feature_lengths={"inputs": 6, "targets": -1},
@@ -774,7 +771,7 @@ class NoamPackingMapTest(parameterized.TestCase):
             "input_vectors": [[5, 6, 7]],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     packer = packing.NoamPacker(
         feature_lengths={"input_tokens": 2, "input_vectors": 2}
@@ -807,7 +804,7 @@ class NoamPackingMapTest(parameterized.TestCase):
         {"inputs": [7]},
         {"inputs": [8]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 4}
@@ -856,7 +853,7 @@ class NoamPackingMapTest(parameterized.TestCase):
         {"inputs": [7]},
         {"inputs": [8]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 2}
@@ -894,7 +891,7 @@ class NoamPackingMapTest(parameterized.TestCase):
         {"inputs": [5, 6]},
         {"inputs": [11, 12, 13, 14]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 4}
@@ -941,7 +938,7 @@ class NoamPackingMapTest(parameterized.TestCase):
         {"inputs": [11, 12, 13, 14]},
         {"inputs": [7]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     packer = packing.NoamPacker(feature_lengths={"inputs": 4})
     ds = packing.PackLazyMapDataset(ds, pool_size=3, packer=packer)
@@ -990,7 +987,7 @@ class MultiBinPackingIterTest(parameterized.TestCase):
   def test_pack_single_feature(self):
     # 5 elements of variable sequence length.
     input_elements = [[1, 2, 3, 4], [5, 6], [11, 12, 13, 14], [7], [8]]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(np.asarray)
     ds = ds.to_iter_dataset()
     packer = packing.MultiBinPacker(feature_lengths=4, num_partial_examples=10)
@@ -1022,7 +1019,7 @@ class MultiBinPackingIterTest(parameterized.TestCase):
         {"inputs": [7]},
         {"inputs": [8]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     packer = packing.MultiBinPacker(
@@ -1083,7 +1080,7 @@ class MultiBinPackingIterTest(parameterized.TestCase):
             "targets": [60],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     packer = packing.MultiBinPacker(
@@ -1155,7 +1152,7 @@ class MultiBinPackingIterTest(parameterized.TestCase):
             "targets": [60],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     packer = packing.MultiBinPacker(
@@ -1207,7 +1204,7 @@ class MultiBinPackingIterTest(parameterized.TestCase):
             "id": [2, 2],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     packer = packing.MultiBinPacker(
@@ -1243,7 +1240,7 @@ class MultiBinPackingIterTest(parameterized.TestCase):
             "input_vectors": [[5, 6, 7]],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     packer = packing.MultiBinPacker(
@@ -1296,7 +1293,7 @@ class MultiBinPackingIterTest(parameterized.TestCase):
             "inputs": [8],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -1360,7 +1357,7 @@ class MultiBinPackingIterTest(parameterized.TestCase):
         {"inputs": [11, 12, 13, 14]},
         {"inputs": [7]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -1410,7 +1407,7 @@ class MultiBinPackingIterTest(parameterized.TestCase):
 
   def test_checkpointing_with_json_serialization(self):
     input_elements = [[1, 2], [3], [4], [5, 6], [11], [12], [13], [14, 7, 8]]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(np.asarray)
     ds = ds.to_iter_dataset()
     packer = packing.MultiBinPacker(feature_lengths=2, num_partial_examples=10)
@@ -1438,7 +1435,7 @@ class NoamPackingIterTest(parameterized.TestCase):
   def test_pack_single_feature(self):
     # 5 elements of variable sequence length.
     input_elements = [[1, 2, 3, 4], [5, 6], [11, 12, 13, 14], [7]]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(np.asarray)
     ds = ds.to_iter_dataset()
     packer = packing.NoamPacker(feature_lengths=4)
@@ -1463,7 +1460,7 @@ class NoamPackingIterTest(parameterized.TestCase):
         {"inputs": [11, 12, 13, 14]},
         {"inputs": [7]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     packer = packing.NoamPacker(feature_lengths={"inputs": 4})
@@ -1497,7 +1494,7 @@ class NoamPackingIterTest(parameterized.TestCase):
         {"inputs": [7]},
         {"inputs": [8]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     packer = packing.NoamPacker(feature_lengths={"inputs": 2})
@@ -1540,7 +1537,7 @@ class NoamPackingIterTest(parameterized.TestCase):
             "targets": [60],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     packer = packing.NoamPacker(feature_lengths={"inputs": 4, "targets": 4})
@@ -1593,7 +1590,7 @@ class NoamPackingIterTest(parameterized.TestCase):
             "targets": [60],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     packer = packing.NoamPacker(feature_lengths={"inputs": 6, "targets": 3})
@@ -1635,7 +1632,7 @@ class NoamPackingIterTest(parameterized.TestCase):
             "targets": [60],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     packer = packing.NoamPacker(
@@ -1654,7 +1651,7 @@ class NoamPackingIterTest(parameterized.TestCase):
         {"id": 2, "inputs": [5, 6, 7, 8, 9]},
         {"id": 3, "inputs": [10]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     packer = packing.NoamPacker(
@@ -1684,7 +1681,7 @@ class NoamPackingIterTest(parameterized.TestCase):
             "input_vectors": [[5, 6, 7]],
         },
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     packer = packing.NoamPacker(
@@ -1717,7 +1714,7 @@ class NoamPackingIterTest(parameterized.TestCase):
         {"inputs": [7]},
         {"inputs": [8]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -1762,7 +1759,7 @@ class NoamPackingIterTest(parameterized.TestCase):
         {"inputs": [5, 6]},
         {"inputs": [11, 12, 13, 14]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     ds = ds.to_iter_dataset()
     runtime_args = test_utils.create_airio_injected_runtime_args(
@@ -1803,7 +1800,7 @@ class NoamPackingIterTest(parameterized.TestCase):
 
   def test_yield_packed_examples_at_the_end(self):
     input_elements = [[1, 2, 3, 4, 5, 6]]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(np.asarray)
     ds = ds.to_iter_dataset()
     packer = packing.NoamPacker(feature_lengths=2)
@@ -1815,7 +1812,7 @@ class NoamPackingIterTest(parameterized.TestCase):
 
   def test_yield_partially_packed_examples_at_the_end(self):
     input_elements = [[1, 2, 3]]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(np.asarray)
     ds = ds.to_iter_dataset()
     packer = packing.NoamPacker(feature_lengths=2)
@@ -1828,7 +1825,7 @@ class NoamPackingIterTest(parameterized.TestCase):
   def test_checkpointing_with_json_serialization(self):
     # 5 elements of variable sequence length.
     input_elements = [[1, 2, 3, 4], [5, 6], [11, 12, 13, 14], [7]]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(np.asarray)
     ds = ds.to_iter_dataset()
     packer = packing.NoamPacker(feature_lengths=2)
@@ -1860,7 +1857,7 @@ class CommonPackersTest(absltest.TestCase):
         {"inputs": [11, 12, 13, 14]},
         {"inputs": [7]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 4}
@@ -1891,7 +1888,7 @@ class CommonPackersTest(absltest.TestCase):
         {"inputs": [8, 9]},
         {"inputs": [10]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 4}
@@ -1949,7 +1946,7 @@ class CommonPackersTest(absltest.TestCase):
         {"inputs": [8, 9]},
         {"inputs": [10]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 4}
@@ -2006,7 +2003,7 @@ class CommonPackersTest(absltest.TestCase):
         {"inputs": [11, 12, 13, 14]},
         {"inputs": [7]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 4}
@@ -2036,7 +2033,7 @@ class CommonPackersTest(absltest.TestCase):
         {"inputs": [8, 9]},
         {"inputs": [10]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 4}
@@ -2093,7 +2090,7 @@ class CommonPackersTest(absltest.TestCase):
         {"inputs": [8, 9]},
         {"inputs": [10]},
     ]
-    ds = lazy_dataset.SourceLazyMapDataset(input_elements)
+    ds = grain.MapDataset.source(input_elements)
     ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
     runtime_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"inputs": 4}

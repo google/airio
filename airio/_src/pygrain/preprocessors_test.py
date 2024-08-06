@@ -26,11 +26,9 @@ import jax.random
 import numpy as np
 
 
-lazy_dataset = grain.experimental.lazy_dataset
-
 
 def _lazy_map_fn(
-    ds: lazy_dataset.LazyMapDataset,
+    ds: grain.MapDataset,
     run_args: core_preprocessors_lib.AirIOInjectedRuntimeArgs,
     rng: jax.Array,
 ):
@@ -39,7 +37,7 @@ def _lazy_map_fn(
 
 
 def _lazy_iter_fn(
-    ds: lazy_dataset.LazyIterDataset,
+    ds: grain.IterDataset,
     run_args: core_preprocessors_lib.AirIOInjectedRuntimeArgs,
     rng: jax.Array,
 ):
@@ -155,7 +153,7 @@ class PreprocessorsTest(absltest.TestCase):
 
     transform = preprocessors.MapFnTransform(test_map_fn)
     lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
-    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    ds = grain.MapDataset.source(list(range(5)))
     ds = lazy_dataset_transform(ds)
     self.assertListEqual(list(ds), list(range(1, 6)))
 
@@ -165,7 +163,7 @@ class PreprocessorsTest(absltest.TestCase):
 
     transform = preprocessors.RandomMapFnTransform(test_random_map_fn)
     lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
-    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    ds = grain.MapDataset.source(list(range(5)))
     ds = lazy_dataset_transform(ds, rng=jax.random.key(42))
     self.assertListEqual(list(ds), [5, 4, 5, 12, 13])
 
@@ -185,21 +183,21 @@ class PreprocessorsTest(absltest.TestCase):
 
     transform = preprocessors.FilterFnTransform(test_filter_fn)
     lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
-    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    ds = grain.MapDataset.source(list(range(5)))
     ds = lazy_dataset_transform(ds)
     self.assertListEqual(list(ds), [3, 4])
 
   def test_batch_lazydataset_transform_with_drop_remainder(self):
     transform = grain.Batch(batch_size=2, drop_remainder=True)
     lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
-    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    ds = grain.MapDataset.source(list(range(5)))
     ds = lazy_dataset_transform(ds)
     self.assertListEqual([t.tolist() for t in list(ds)], [[0, 1], [2, 3]])
 
   def test_batch_lazydataset_transform_without_drop_remainder(self):
     transform = grain.Batch(batch_size=2)
     lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
-    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    ds = grain.MapDataset.source(list(range(5)))
     ds = lazy_dataset_transform(ds)
     self.assertListEqual([t.tolist() for t in list(ds)], [[0, 1], [2, 3], [4]])
 
@@ -299,7 +297,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
 
     transform = preprocessors.MapFnTransform(test_map_fn)
     lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
-    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    ds = grain.MapDataset.source(list(range(5)))
     ds = lazy_dataset_transform(ds, runtime_args=self._runtime_args)
     self.assertListEqual(list(ds), list(range(3, 8)))
 
@@ -314,7 +312,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         test_map_fn, update_runtime_args=self._update_runtime_args
     )
     lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
-    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    ds = grain.MapDataset.source(list(range(5)))
     ds = lazy_dataset_transform(ds, runtime_args=self._runtime_args)
     updated_runtime_args = lazy_dataset_transform.get_updated_runtime_args(
         self._runtime_args
@@ -338,7 +336,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
 
     transform = preprocessors.RandomMapFnTransform(test_random_map_fn)
     lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
-    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    ds = grain.MapDataset.source(list(range(5)))
     ds = lazy_dataset_transform(
         ds, rng=jax.random.key(42), runtime_args=self._runtime_args
     )
@@ -359,7 +357,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         test_random_map_fn, update_runtime_args=self._update_runtime_args
     )
     lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
-    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    ds = grain.MapDataset.source(list(range(5)))
     ds = lazy_dataset_transform(
         ds, rng=jax.random.key(42), runtime_args=self._runtime_args
     )
@@ -381,7 +379,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
 
     transform = preprocessors.FilterFnTransform(test_filter_fn)
     lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
-    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    ds = grain.MapDataset.source(list(range(5)))
     ds = lazy_dataset_transform(ds, runtime_args=self._runtime_args)
     self.assertListEqual(list(ds), [4])
 
@@ -396,7 +394,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         test_filter_fn, update_runtime_args=self._update_runtime_args
     )
     lazy_dataset_transform = preprocessors.LazyDatasetTransform(transform)
-    ds = lazy_dataset.SourceLazyMapDataset(list(range(5)))
+    ds = grain.MapDataset.source(list(range(5)))
     ds = lazy_dataset_transform(ds, runtime_args=self._runtime_args)
     updated_runtime_args = lazy_dataset_transform.get_updated_runtime_args(
         self._runtime_args
@@ -417,7 +415,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         produces_none_elements=False,
         requires_non_none_elements=False,
     )
-    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = grain.MapDataset.source(range(10))
     ds = transform(ds, run_args, rng=None)
     updated_runtime_args = transform.update_runtime_args(run_args)
     expected_runtime_args = run_args.replace(
@@ -436,7 +434,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         produces_none_elements=False,
         requires_non_none_elements=False,
     )
-    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = grain.MapDataset.source(range(10))
     ds = transform(ds, run_args, rng=jax.random.key(42))
     updated_runtime_args = transform.update_runtime_args(run_args)
     expected_runtime_args = run_args.replace(
@@ -446,7 +444,8 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     self.assertEqual(updated_runtime_args, expected_runtime_args)
 
   def test_lazy_map_transform_with_none_elements(self):
-    class MyLazyMapDataset(lazy_dataset.LazyMapDataset):
+
+    class MyLazyMapDataset(grain.MapDataset):
 
       def __init__(self, parent, threshold):
         super().__init__(parent)
@@ -475,7 +474,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         produces_none_elements=True,
         requires_non_none_elements=False,
     )
-    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = grain.MapDataset.source(range(10))
     ds = transform(ds, run_args, rng=None)
     updated_runtime_args = transform.update_runtime_args(run_args)
     expected_runtime_args = run_args.replace(
@@ -492,7 +491,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         _lazy_map_fn,
         update_runtime_args=self._update_runtime_args,
     )
-    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = grain.MapDataset.source(range(10))
     ds = ds.to_iter_dataset()
     ds = transform(ds, run_args, rng=None)
     updated_runtime_args = transform.update_runtime_args(run_args)
@@ -510,7 +509,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         _lazy_map_fn,
         update_runtime_args=self._update_runtime_args,
     )
-    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = grain.MapDataset.source(range(10))
     ds = ds.to_iter_dataset()
     ds = transform(ds, run_args, rng=jax.random.key(42))
     updated_runtime_args = transform.update_runtime_args(run_args)
@@ -531,7 +530,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
     self.assertTrue(
         preprocessors.LazyDatasetTransform(transform).requires_iter_dataset
     )
-    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = grain.MapDataset.source(range(10))
     with self.assertRaisesRegex(
         ValueError, "Cannot apply LazyIterDataset transform.*"
     ):
@@ -539,14 +538,14 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
 
   def test_map_transform_on_iter_dataset(self):
     transform = preprocessors.MapFnTransform(lambda x: x + 1)
-    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = grain.MapDataset.source(range(10))
     ds = ds.to_iter_dataset()
     ds = preprocessors.LazyDatasetTransform(transform)(ds)
     self.assertListEqual(list(ds), list(range(1, 11)))
 
   def test_filter_transform_on_iter_dataset(self):
     transform = preprocessors.FilterFnTransform(lambda x: x > 5)
-    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = grain.MapDataset.source(range(10))
     ds = ds.to_iter_dataset()
     ds = preprocessors.LazyDatasetTransform(transform)(ds)
     self.assertListEqual(list(ds), list(range(6, 10)))
@@ -554,7 +553,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
   def test_batch_transform_on_iter_dataset(self):
     batch_with_drop = grain.Batch(batch_size=3, drop_remainder=True)
     batch_without_drop = grain.Batch(batch_size=3, drop_remainder=False)
-    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = grain.MapDataset.source(range(10))
     ds = ds.to_iter_dataset()
     ds_with_drop = preprocessors.LazyDatasetTransform(batch_with_drop)(ds)
     ds_without_drop = preprocessors.LazyDatasetTransform(batch_without_drop)(ds)
@@ -574,7 +573,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         _lazy_map_fn,
         update_runtime_args=self._update_runtime_args,
     )
-    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = grain.MapDataset.source(range(10))
     ds = ds.to_iter_dataset()
     ds = transform(ds, run_args, rng=None)
     self.assertListEqual(list(ds), list(range(3, 13)))
@@ -584,7 +583,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
       return ex + int(jax.random.randint(rng, [], 0, 10))
 
     transform = preprocessors.RandomMapFnTransform(test_random_map_fn)
-    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = grain.MapDataset.source(range(10))
     ds = ds.to_iter_dataset()
     run_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"val": 3}
@@ -601,7 +600,7 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         produces_none_elements=False,
         requires_non_none_elements=False,
     )
-    ds = lazy_dataset.SourceLazyMapDataset(range(10))
+    ds = grain.MapDataset.source(range(10))
     ds = ds.to_iter_dataset()
     run_args = test_utils.create_airio_injected_runtime_args(
         sequence_lengths={"val": 3}
