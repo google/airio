@@ -284,7 +284,9 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
             preprocessors.MapFnTransform(test_map_fn, self._runtime_args)
         ],
     )
-    with self.assertRaisesRegex(ValueError, "PyGrain encountered an error.*"):
+    with self.assertRaisesRegex(
+        TypeError, "missing 1 required positional argument: 'run_args'"
+    ):
       ds = task.get_dataset(None, "train", shuffle=False)
       _ = list(ds)
 
