@@ -318,7 +318,7 @@ class _PackLazyDatasetIterator(grain.DatasetIterator):
       packer: PackerProtocol,
   ):
     super().__init__()
-    self._parent = parent
+    self._parent_iter = parent
     self._packer = packer
     self._packer_type = type(packer)
     self._packed_examples = collections.deque[PyTree[np.ndarray]]()
@@ -329,7 +329,7 @@ class _PackLazyDatasetIterator(grain.DatasetIterator):
       return self._packed_examples.popleft()
     try:
       while not self._packed_examples:
-        ex = next(self._parent)
+        ex = next(self._parent_iter)
         for ex in self._packer.fit_example(ex):
           self._packed_examples.append(ex)
       return self._packed_examples.popleft()
@@ -343,13 +343,13 @@ class _PackLazyDatasetIterator(grain.DatasetIterator):
 
   def get_state(self):
     return {
-        "parent": self._parent.get_state(),
+        "parent": self._parent_iter.get_state(),
         "packer": self._packer.as_dict(),
         "packed_examples": [save_np_tree(ex) for ex in self._packed_examples],
     }
 
   def set_state(self, state):
-    self._parent.set_state(state["parent"])
+    self._parent_iter.set_state(state["parent"])
     self._packer = self._packer_type.from_dict(state["packer"])
     self._packed_examples = collections.deque[PyTree[np.ndarray]](
         [load_np_tree(t) for t in state["packed_examples"]]

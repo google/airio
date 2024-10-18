@@ -163,21 +163,24 @@ class _TestFilterLazyDatasetIterator(grain.DatasetIterator):
       threshold: int,
   ):
     super().__init__()
-    self._parent = parent
+    self._parent_iter = parent
     self._threshold = threshold
     self._index = 0
 
   def __next__(self):
     while True:
-      elem = next(self._parent)
+      elem = next(self._parent_iter)
       if elem > self._threshold:
         return elem
 
   def get_state(self):
-    return {"parent": self._parent.get_state(), "threshold": self._threshold}
+    return {
+        "parent": self._parent_iter.get_state(),
+        "threshold": self._threshold,
+    }
 
   def set_state(self, state):
-    self._parent.set_state(state["parent"])
+    self._parent_iter.set_state(state["parent"])
     self._threshold = state["threshold"]
 
 
