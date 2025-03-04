@@ -42,9 +42,7 @@ def _get_seeds(seed: int, num_seeds: int, ds_size: int):
   # Replicates seed distribution logic in seqio map_over_dataset
   random_ds_seeds = np.arange(seed, seed + 2 * num_seeds).reshape(-1, 2)
   random_ds_seeds = tuple(tuple(s) for s in random_ds_seeds)
-  seed_ds = tf.nest.map_structure(
-      tf.data.experimental.RandomDataset, random_ds_seeds
-  )
+  seed_ds = tf.nest.map_structure(tf.data.Dataset.random, random_ds_seeds)
   range_ds = tf.data.Dataset.from_tensor_slices(range(ds_size))
   zip_ds = tf.data.Dataset.zip(range_ds, seed_ds)
   return [d[1][0] for d in zip_ds.as_numpy_iterator()]
@@ -196,9 +194,7 @@ class SpanCorruptionTest(absltest.TestCase):
     # Replicates seed distribution logic in seqio map_over_dataset
     random_ds_seeds = np.arange(seed, seed + 2 * num_seeds).reshape(-1, 2)
     random_ds_seeds = tuple(tuple(s) for s in random_ds_seeds)
-    seed_ds = tf.nest.map_structure(
-        tf.data.experimental.RandomDataset, random_ds_seeds
-    )
+    seed_ds = tf.nest.map_structure(tf.data.Dataset.random, random_ds_seeds)
     range_ds = tf.data.Dataset.from_tensor_slices(range(ds_size))
     zip_ds = tf.data.Dataset.zip(range_ds, seed_ds)
     return [d[1][0] for d in zip_ds.as_numpy_iterator()]
