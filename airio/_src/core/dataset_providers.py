@@ -14,6 +14,7 @@
 
 """Classes for AirIO data loading."""
 
+import collections
 import dataclasses
 import functools
 import typing
@@ -110,9 +111,19 @@ class Mixture(DatasetProviderBase, Protocol):
           f"Mixture {name} must have same number of tasks and proportions."
           f"tasks: {tasks}, proportions: {proportions}."
       )
+    all_tasks = [t for t in tasks if isinstance(t, Task)]
+    all_mixtures = [m for m in tasks if isinstance(m, Mixture)]
+    sub_tasks = [mix.leaf_tasks for mix in all_mixtures]
+    leaf_tasks = sum(sub_tasks, all_tasks)
+    duplicate_tasks = [
+        t for t, c in collections.Counter(leaf_tasks).items() if c > 1
+    ]
+    if duplicate_tasks:
+      raise ValueError(
+          f"Mixture {name} has duplicate tasks: {duplicate_tasks}."
+      )
+
     hashes = [hash(task) for task in tasks]
-    if len(set(hashes)) != len(tasks):
-      raise ValueError(f"Mixture {name} has duplicate tasks. tasks: {tasks}.")
 
     self.name = name
     self._tasks_or_mixtures = dict(zip(hashes, tasks))
@@ -155,8 +166,8 @@ class Mixture(DatasetProviderBase, Protocol):
     all_ = self.tasks_or_mixtures
     tasks = [t for t in all_ if isinstance(t, Task)]
     mixtures = [m for m in all_ if isinstance(m, Mixture)]
-    sub_tasks = [mix.leaf_tasks for mix in mixtures]  # pytype: disable=attribute-error
-    return list(sorted(set(sum(sub_tasks, tasks)), key=lambda t: t.name))
+    sub_tasks = [mix.leaf_tasks for mix in mixtures]
+    return sum(sub_tasks, tasks)
 
   @property
   def total_proportion(self) -> float:
