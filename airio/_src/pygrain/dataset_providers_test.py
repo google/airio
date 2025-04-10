@@ -39,6 +39,8 @@ import numpy as np
 import tensorflow_datasets as tfds
 
 
+jax.config.update("jax_threefry_partitionable", False)
+
 
 _SOURCE_NAME = "imdb_reviews"
 _SOURCE_NUM_EXAMPLES = 3

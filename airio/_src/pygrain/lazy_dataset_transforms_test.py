@@ -24,6 +24,8 @@ import grain.python as grain
 import jax.random
 
 
+jax.config.update("jax_threefry_partitionable", False)
+
 
 class ConcatLazyMapDatasetTest(parameterized.TestCase):
 

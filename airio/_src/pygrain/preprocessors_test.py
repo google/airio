@@ -22,9 +22,12 @@ from airio._src.pygrain import data_sources
 from airio._src.pygrain import dataset_providers
 from airio._src.pygrain import preprocessors
 import grain.python as grain
+import jax
 import jax.random
 import numpy as np
 
+
+jax.config.update("jax_threefry_partitionable", False)
 
 
 def _lazy_map_fn(
