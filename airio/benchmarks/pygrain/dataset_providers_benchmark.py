@@ -150,8 +150,7 @@ class _TestFilterLazyDatasetIterator(grain.DatasetIterator):
       parent: grain.DatasetIterator,
       threshold: int,
   ):
-    super().__init__()
-    self._parent = parent
+    super().__init__(parent)
     self._threshold = threshold
     self._index = 0
 
