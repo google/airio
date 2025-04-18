@@ -380,10 +380,7 @@ class TaskTest(absltest.TestCase):
     )
     task = _create_task(source=source, preprocessors=_create_preprocessors())
     ds = task.get_dataset(split="train", shuffle=False, num_epochs=None)
-    actual = [
-        next(ds)["inputs_pretokenized"]
-        for _ in range(7)
-    ]
+    actual = [next(ds)["inputs_pretokenized"] for _ in range(7)]
     expected = [
         "imdb ebc   ahgjefjhfe",
         "imdb hj aijbcidcibdg",
@@ -404,10 +401,7 @@ class TaskTest(absltest.TestCase):
     task = _create_task(source=source, preprocessors=_create_preprocessors())
     task._switch_to_lazy_dataset = mock.Mock(return_value=True)
     ds = task.get_dataset(split="train", shuffle=False, num_epochs=None)
-    actual = [
-        next(ds)["inputs_pretokenized"]
-        for _ in range(7)
-    ]
+    actual = [next(ds)["inputs_pretokenized"] for _ in range(7)]
     expected = [
         "imdb ebc   ahgjefjhfe",
         "imdb hj aijbcidcibdg",
@@ -2399,7 +2393,7 @@ class MixtureTest(absltest.TestCase):
     )
     mix = dataset_providers.GrainMixture(
         name="test_mix",
-        tasks=[task_with_none, ordinary_task],
+        tasks=[ordinary_task, task_with_none],
         proportions=[1.0, 1.0],
     )
     ds = mix.get_dataset(shuffle=False)
@@ -2441,7 +2435,7 @@ class MixtureTest(absltest.TestCase):
     )
     mix = dataset_providers.GrainMixture(
         name="test_mix",
-        tasks=[task_with_none, ordinary_task],
+        tasks=[ordinary_task, task_with_none],
         proportions=[1.0, 1.0],
     )
     sequence_lengths = {"inputs": 2, "targets": 1}
@@ -2531,7 +2525,7 @@ class MixtureTest(absltest.TestCase):
     )
     mix = dataset_providers.GrainMixture(
         name="test_mix",
-        tasks=[task_with_iter, ordinary_task],
+        tasks=[ordinary_task, task_with_iter],
         proportions=[1.0, 1.0],
     )
     ds = mix.get_dataset(shuffle=False)
@@ -2580,7 +2574,7 @@ class MixtureTest(absltest.TestCase):
     )
     mix = dataset_providers.GrainMixture(
         name="test_mix",
-        tasks=[task_with_none, ordinary_task],
+        tasks=[ordinary_task, task_with_none],
         proportions=[1.0, 1.0],
     )
     sequence_lengths = {"inputs": 2, "targets": 1}
@@ -2647,8 +2641,8 @@ class MixturePropertiesTest(absltest.TestCase):
     )
     self.mix_of_mix_of_mix = dataset_providers.GrainMixture(
         name="test_mix_3",
-        tasks=[self.simple_mix, self.mix_of_mix, self.tasks[4]],
-        proportions=[0.5, 0.7, 0.8],
+        tasks=[self.mix_of_mix, self.tasks[4]],
+        proportions=[0.5, 0.8],
     )
 
   def test_tasks_or_mixtures(self):
@@ -2658,13 +2652,13 @@ class MixturePropertiesTest(absltest.TestCase):
     )
     self.assertListEqual(
         self.mix_of_mix_of_mix.tasks_or_mixtures,
-        [self.simple_mix, self.mix_of_mix, self.tasks[4]],
+        [self.mix_of_mix, self.tasks[4]],
     )
 
   def test_total_proportions(self):
     self.assertAlmostEqual(self.simple_mix.total_proportion, 3.5)
     self.assertAlmostEqual(self.mix_of_mix.total_proportion, 1.2)
-    self.assertAlmostEqual(self.mix_of_mix_of_mix.total_proportion, 2.0)
+    self.assertAlmostEqual(self.mix_of_mix_of_mix.total_proportion, 1.3)
 
   def test_get_proportion(self):
     self.assertAlmostEqual(self.simple_mix.get_proportion(self.tasks[0]), 1.0)
@@ -2687,18 +2681,18 @@ class MixturePropertiesTest(absltest.TestCase):
 
     self.assertAlmostEqual(
         self.mix_of_mix_of_mix.get_proportion(self.tasks[0]),
-        0.5 * (1.0 / 3.5) + 0.7 * (0.5 / 1.2) * (1.0 / 3.5),
+        0.5 * (0.5 / 1.2) * (1.0 / 3.5),
     )
     self.assertAlmostEqual(
         self.mix_of_mix_of_mix.get_proportion(self.tasks[1]),
-        0.5 * (0.5 / 3.5) + 0.7 * (0.5 / 1.2) * (0.5 / 3.5),
+        0.5 * (0.5 / 1.2) * (0.5 / 3.5),
     )
     self.assertAlmostEqual(
         self.mix_of_mix_of_mix.get_proportion(self.tasks[2]),
-        0.5 * (2.0 / 3.5) + 0.7 * (0.5 / 1.2) * (2.0 / 3.5),
+        0.5 * (0.5 / 1.2) * (2.0 / 3.5),
     )
     self.assertAlmostEqual(
-        self.mix_of_mix_of_mix.get_proportion(self.tasks[3]), 0.7 * (0.7 / 1.2)
+        self.mix_of_mix_of_mix.get_proportion(self.tasks[3]), 0.5 * (0.7 / 1.2)
     )
     self.assertAlmostEqual(
         self.mix_of_mix_of_mix.get_proportion(self.tasks[4]), 0.8
@@ -2706,8 +2700,13 @@ class MixturePropertiesTest(absltest.TestCase):
 
   def test_leaf_tasks(self):
     self.assertListEqual(self.simple_mix.leaf_tasks, self.tasks[:3])
-    self.assertListEqual(self.mix_of_mix.leaf_tasks, self.tasks[:4])
-    self.assertListEqual(self.mix_of_mix_of_mix.leaf_tasks, self.tasks)
+    self.assertListEqual(
+        self.mix_of_mix.leaf_tasks, [self.tasks[3], *self.simple_mix.leaf_tasks]
+    )
+    self.assertListEqual(
+        self.mix_of_mix_of_mix.leaf_tasks,
+        [self.tasks[4], *self.mix_of_mix.leaf_tasks],
+    )
 
   def test_splits(self):
     self.assertSequenceEqual(self.simple_mix.splits, ["train"])
@@ -2718,8 +2717,7 @@ class MixturePropertiesTest(absltest.TestCase):
     self.assertEqual(self.simple_mix.num_input_examples("train"), 3 * 5)
     self.assertEqual(self.mix_of_mix.num_input_examples("train"), 3 * 5 + 5)
     self.assertEqual(
-        self.mix_of_mix_of_mix.num_input_examples("train"),
-        3 * 5 + (3 * 5 + 5) + 5,
+        self.mix_of_mix_of_mix.num_input_examples("train"), (3 * 5 + 5) + 5
     )
 
   def test_tasks_and_proportions_mismatch(self):
@@ -2733,11 +2731,10 @@ class MixturePropertiesTest(absltest.TestCase):
 
   def test_duplicate_tasks(self):
     with self.assertRaisesRegex(
-        ValueError,
-        "Mixture invalid_mix has duplicate tasks.*",
+        ValueError, "Mixture invalid_mix has duplicate tasks.*"
     ):
       _ = dataset_providers.GrainMixture(
-          "invalid_mix", [self.tasks[0], self.tasks[0]], [1.0, 1.0]
+          "invalid_mix", [self.mix_of_mix, self.tasks[0]], [1.0, 1.0]
       )
 
 

@@ -326,7 +326,7 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
     )
     mix = dataset_providers.GrainMixture(
         name="test_mix",
-        tasks=[task_with_none, ordinary_task],
+        tasks=[ordinary_task, task_with_none],
         proportions=[1.0, 1.0],
     )
     sequence_lengths = {"inputs": 2, "targets": 1}
