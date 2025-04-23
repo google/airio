@@ -123,11 +123,9 @@ class Mixture(DatasetProviderBase, Protocol):
           f"Mixture {name} has duplicate tasks: {duplicate_tasks}."
       )
 
-    hashes = [hash(task) for task in tasks]
-
     self.name = name
-    self._tasks_or_mixtures = dict(zip(hashes, tasks))
-    self._proportions = dict(zip(hashes, proportions))
+    self._tasks_or_mixtures = tasks
+    self._proportions = dict(zip(tasks, proportions))
 
   def num_input_examples(self, split: str) -> int | None:
     return sum(
@@ -139,9 +137,8 @@ class Mixture(DatasetProviderBase, Protocol):
   def get_proportion(self, task: Task) -> float:
     """Computes the mixing proportion for the given task."""
     prop = 0.0
-    task_hash = hash(task)
-    if task_hash in self._proportions:
-      prop += self._proportions[task_hash]
+    if task in self._proportions:
+      prop += self._proportions[task]
 
     if task not in self.leaf_tasks:
       return prop
@@ -149,7 +146,7 @@ class Mixture(DatasetProviderBase, Protocol):
     for sub_task in self.tasks_or_mixtures:
       if isinstance(sub_task, Mixture) and task in sub_task.leaf_tasks:
         prop += (
-            self._proportions[hash(sub_task)]
+            self._proportions[sub_task]
             * sub_task.get_proportion(task)
             / sub_task.total_proportion
         )
@@ -158,7 +155,7 @@ class Mixture(DatasetProviderBase, Protocol):
   @property
   def tasks_or_mixtures(self) -> Sequence[Union[Task, "Mixture"]]:
     """Tasks or Mixtures confiugured during Mixture init."""
-    return list(self._tasks_or_mixtures.values())
+    return list(self._tasks_or_mixtures)
 
   @functools.cached_property
   def leaf_tasks(self) -> Sequence[Task]:
