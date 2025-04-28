@@ -472,7 +472,7 @@ class MultiBinPacker:
   def get_packed_example(self):
     if not self._partially_packed_examples:
       raise ValueError("No packed examples available.")
-    return unflatten_packed_example(
+    return unflatten_packed_example(  # pytype: disable=wrong-arg-types
         self._partially_packed_examples.popleft().pack(),
         length_struct=self.feature_lengths,
     )
@@ -528,7 +528,7 @@ class MultiBinPacker:
     # Add to result if example fit and became fully packed
     if fully_packed:
       assert fits
-      packed = unflatten_packed_example(
+      packed = unflatten_packed_example(  # pytype: disable=wrong-arg-types
           fully_packed.pack(),
           length_struct=self.feature_lengths,
       )
