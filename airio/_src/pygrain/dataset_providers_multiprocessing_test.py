@@ -377,32 +377,14 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
         ds.get_state()["workers_state"],
         {
             "0": {
-                "parent": {
-                    "parent": {
-                        "parent": {
-                            "parents": [{"next_index": 0}, {"next_index": 0}],
-                            "index": 0,
-                            "stop": False,
-                        },
-                        "index_for_rng": 0,
-                    },
-                    "index_for_rng": 0,
-                },
-                "index_for_rng": 0,
+                "parents": [{"next_index": 0}, {"next_index": 0}],
+                "index": 0,
+                "stop": False,
             },
             "1": {
-                "parent": {
-                    "parent": {
-                        "parent": {
-                            "parents": [{"next_index": 0}, {"next_index": 0}],
-                            "index": 0,
-                            "stop": False,
-                        },
-                        "index_for_rng": 0,
-                    },
-                    "index_for_rng": 0,
-                },
-                "index_for_rng": 0,
+                "parents": [{"next_index": 0}, {"next_index": 0}],
+                "index": 0,
+                "stop": False,
             },
         },
     )
@@ -459,38 +441,8 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
     self.assertDictEqual(
         ds.get_state()["workers_state"],
         {
-            "0": {
-                "parent": {
-                    "parent": {
-                        "parent": {
-                            "parent": {
-                                "parent": {"next_index": 0},
-                                "threshold": 4,
-                            },
-                            "index_for_rng": 0,
-                        },
-                        "index_for_rng": 0,
-                    },
-                    "index_for_rng": 0,
-                },
-                "index_for_rng": 0,
-            },
-            "1": {
-                "parent": {
-                    "parent": {
-                        "parent": {
-                            "parent": {
-                                "parent": {"next_index": 0},
-                                "threshold": 4,
-                            },
-                            "index_for_rng": 0,
-                        },
-                        "index_for_rng": 0,
-                    },
-                    "index_for_rng": 0,
-                },
-                "index_for_rng": 0,
-            },
+            "0": {"parent": {"next_index": 0}, "threshold": 4},
+            "1": {"parent": {"next_index": 0}, "threshold": 4},
         },
     )
 
