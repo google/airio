@@ -24,7 +24,7 @@ sys.path.append(version_path)
 from version import __version__  # pylint: disable=g-import-not-at-top
 
 # Get the long description from the README file.
-with open('README.md') as fp:
+with open('README.md', encoding='utf-8') as fp:
   _LONG_DESCRIPTION = fp.read()
 
 _jax_version = '0.4.16'
@@ -56,7 +56,7 @@ setuptools.setup(
     install_requires=[
         'absl-py',
         'clu @ git+https://github.com/google/CommonLoopUtils#egg=clu',
-        'grain==0.2.0',
+        'grain @ git+https://github.com/google/grain/#egg-grain',
         f'jax >= {_jax_version}',
         f'jaxlib >= {_jaxlib_version}',
         (
