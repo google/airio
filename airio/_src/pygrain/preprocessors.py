@@ -1,4 +1,4 @@
-# Copyright 2024 The AirIO Authors.
+# Copyright 2025 The AirIO Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 import dataclasses
 import time
-from typing import Callable
+from typing import Any, Callable, Mapping, Sequence
 
 from airio._src.core import preprocessors as core_preprocessors
 from airio._src.pygrain import lazy_dataset_transforms
@@ -33,9 +33,7 @@ JaxRng = jax.Array
 
 
 @dataclasses.dataclass
-class MapFnTransform(
-    core_preprocessors.MapFnTransform, grain.MapTransform
-):
+class MapFnTransform(core_preprocessors.MapFnTransform, grain.MapTransform):
   """Grain Transform to represent AirIO map preprocessors."""
 
 
@@ -73,6 +71,20 @@ class FilterFnTransform(
     return core_preprocessors.inject_runtime_args_to_fn(
         self.filter_fn, self.runtime_args
     )(element)
+
+
+@dataclasses.dataclass
+class SelectFields(grain.MapTransform):
+  """Selects fields from a dictionary."""
+
+  field_names: Sequence[str]
+
+  def __post_init__(self):
+    usage_logging.log_class_init(self)
+
+  def map(self, element: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Selects fields from `element`."""
+    return {f: element[f] for f in self.field_names}
 
 
 @dataclasses.dataclass

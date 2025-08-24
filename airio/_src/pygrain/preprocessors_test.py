@@ -1,4 +1,4 @@
-# Copyright 2024 The AirIO Authors.
+# Copyright 2025 The AirIO Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Preprocessors tests."""
+
 from unittest import mock
 
 from absl.testing import absltest
@@ -60,6 +61,22 @@ def _get_test_src(num_elements=5):
 
 
 class PreprocessorsTest(absltest.TestCase):
+
+  def test_select_fields_preprocessor(self):
+    source = data_sources.FunctionDataSource(
+        dataset_fn=lambda split: np.array([
+            {"a": 1, "b": 2, "c": 3},
+            {"a": 4, "b": 5, "c": 6},
+        ]),
+        splits=["train"],
+    )
+    task = dataset_providers.GrainTask(
+        name="test_task",
+        source=source,
+        preprocessors=[preprocessors.SelectFields(field_names=["a", "c"])],
+    )
+    ds = task.get_dataset(None, "train", shuffle=False)
+    self.assertListEqual(list(ds), [{"a": 1, "c": 3}, {"a": 4, "c": 6}])
 
   def test_map_fn_preprocessor(self):
     def test_map_fn(ex):
