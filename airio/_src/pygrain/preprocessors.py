@@ -1,4 +1,4 @@
-# Copyright 2024 The AirIO Authors.
+# Copyright 2025 The AirIO Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,10 @@
 
 import dataclasses
 import time
+from typing import Any
 from typing import Callable
+from typing import final
+from typing import MutableMapping
 
 from airio._src.core import preprocessors as core_preprocessors
 from airio._src.pygrain import lazy_dataset_transforms
@@ -44,6 +47,57 @@ class MapFnTransform(
     return core_preprocessors.inject_runtime_args_to_fn(
         self.map_fn, self.runtime_args
     )(element)
+
+
+@final
+class ConvertBoxesYXYXToCXCYHW(MapFnTransform):
+  """Converts bounding boxes from [ymin, xmin, ymax, xmax] to [cx, cy, h, w]."""
+
+  def __init__(self, box_field_name: str):
+    """Initializes the transform.
+
+    Args:
+      box_field_name: The name of the field containing the bounding box tensor.
+        The tensor is expected to have shape [..., 4].
+    """
+    self._box_field_name = box_field_name
+
+  def map(self, element: MutableMapping[str, Any]) -> MutableMapping[str, Any]:
+    """Applies the bounding box conversion to the data record.
+
+    Args:
+      element: A dict-like data record containing the data.
+
+    Returns:
+      The modified data record with the bounding box field updated in-place.
+
+    Raises:
+      ValueError: If the bounding box tensor does not have shape [..., 4].
+    """
+    boxes_yx_yx = element[self._box_field_name]
+    if boxes_yx_yx.shape[-1] != 4:
+      raise ValueError(
+          f"Input tensor for field '{self._box_field_name}' must have shape "
+          f"[..., 4], but got shape {boxes_yx_yx.shape}."
+      )
+
+    # Split into coordinates (numpy as np is imported at top of file)
+    ymin, xmin, ymax, xmax = np.split(boxes_yx_yx, 4, axis=-1)
+
+    # Calculate height, width, and center coordinates
+    height = ymax - ymin
+    width = xmax - xmin
+    center_y = ymin + height / 2.0
+    center_x = xmin + width / 2.0
+
+    # Concatenate into new format [center_x, center_y, height, width]
+    boxes_cx_cy_hw = np.concatenate(
+        [center_x, center_y, height, width], axis=-1
+    )
+
+    # Update the field in-place
+    element[self._box_field_name] = boxes_cx_cy_hw
+    return element
 
 
 @dataclasses.dataclass

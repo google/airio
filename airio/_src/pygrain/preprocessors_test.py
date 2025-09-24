@@ -1,4 +1,4 @@
-# Copyright 2024 The AirIO Authors.
+# Copyright 2025 The AirIO Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -667,6 +667,113 @@ class PreprocessorsWithInjectedArgsTest(absltest.TestCase):
         preprocessors.LazyDatasetTransform(prep).produces_none_elements
     )
 
+
+
+class ConvertBoxesYXYXToCXCYHWTest(absltest.TestCase):
+
+  def test_conversion_single_box(self):
+    transform = preprocessors.ConvertBoxesYXYXToCXCYHW(box_field_name="boxes")
+    data = {"boxes": np.array([0.1, 0.2, 0.5, 0.6], dtype=np.float32)}
+    # Use 'element' to match the updated signature, although the test interacts
+    # with the dict directly, not the map method parameter name.
+    # We pass 'data' dict.
+    result = transform.map(data)
+
+    # ymin=0.1, xmin=0.2, ymax=0.5, xmax=0.6
+    # height = 0.5 - 0.1 = 0.4
+    # width = 0.6 - 0.2 = 0.4
+    # center_y = 0.1 + (0.4 / 2) = 0.3
+    # center_x = 0.2 + (0.4 / 2) = 0.4
+    # Expected: [cx, cy, h, w]
+    expected = np.array([0.4, 0.3, 0.4, 0.4], dtype=np.float32)
+
+    self.assertIn("boxes", result)
+    np.testing.assert_allclose(result["boxes"], expected)
+
+  def test_conversion_multiple_boxes(self):
+    transform = preprocessors.ConvertBoxesYXYXToCXCYHW(box_field_name="boxes")
+    boxes_data = np.array(
+        [
+            [0.1, 0.2, 0.5, 0.6],  # Box 1
+            [0.0, 0.0, 1.0, 1.0],  # Box 2
+        ],
+        dtype=np.float32,
+    )
+    data = {"boxes": boxes_data}
+    result = transform.map(data)
+
+    # Box 1 expected: [0.4, 0.3, 0.4, 0.4]
+    # Box 2 expected: [0.5, 0.5, 1.0, 1.0]
+    expected = np.array(
+        [
+            [0.4, 0.3, 0.4, 0.4],
+            [0.5, 0.5, 1.0, 1.0],
+        ],
+        dtype=np.float32,
+    )
+
+    self.assertIn("boxes", result)
+    np.testing.assert_allclose(result["boxes"], expected)
+    self.assertEqual(result["boxes"].shape, (2, 4))
+
+  def test_conversion_batched_shape(self):
+    # Test tensor with shape [Batch, NumBoxes, 4]
+    transform = preprocessors.ConvertBoxesYXYXToCXCYHW(box_field_name="boxes")
+    boxes_data = np.array(
+        [
+            [  # Batch 1
+                [0.1, 0.2, 0.5, 0.6],
+                [0.0, 0.0, 1.0, 1.0],
+            ],
+            [  # Batch 2
+                [0.2, 0.2, 0.4, 0.4],
+                [0.5, 0.5, 0.6, 0.7],
+            ],
+        ],
+        dtype=np.float32,
+    )
+    data = {"boxes": boxes_data}
+    result = transform.map(data)
+
+    # Batch 1 expected:
+    #   [0.4, 0.3, 0.4, 0.4]
+    #   [0.5, 0.5, 1.0, 1.0]
+    # Batch 2 expected:
+    #   [0.3, 0.3, 0.2, 0.2]
+    #   [0.6, 0.55, 0.1, 0.2]
+    expected = np.array(
+        [
+            [
+                [0.4, 0.3, 0.4, 0.4],
+                [0.5, 0.5, 1.0, 1.0],
+            ],
+            [
+                [0.3, 0.3, 0.2, 0.2],
+                [0.6, 0.55, 0.1, 0.2],
+            ],
+        ],
+        dtype=np.float32,
+    )
+    self.assertEqual(result["boxes"].shape, (2, 2, 4))
+    np.testing.assert_allclose(result["boxes"], expected)
+
+  def test_shape_value_error(self):
+    transform = preprocessors.ConvertBoxesYXYXToCXCYHW(box_field_name="boxes")
+    # Wrong shape: [..., 3] instead of [..., 4]
+    data = {"boxes": np.array([0.1, 0.2, 0.5], dtype=np.float32)}
+    with self.assertRaisesRegex(
+        ValueError, "must have shape .*4.*, but got shape .*3"
+    ):
+      transform.map(data)
+
+    # Also test batched wrong shape
+    data_batch = {
+        "boxes": np.array([[[0.1, 0.2, 0.5]]], dtype=np.float32)
+    }
+    with self.assertRaisesRegex(
+        ValueError, "must have shape .*4.*, but got shape .*1, 1, 3"
+    ):
+      transform.map(data_batch)
 
 
 if __name__ == "__main__":
