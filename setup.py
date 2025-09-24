@@ -1,4 +1,4 @@
-# Copyright 2024 The AirIO Authors.
+# Copyright 2025 The AirIO Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ setuptools.setup(
     install_requires=[
         'absl-py',
         'clu @ git+https://github.com/google/CommonLoopUtils#egg=clu',
-        'grain==0.2.0',
+        'grain==0.2.12',
         f'jax >= {_jax_version}',
         f'jaxlib >= {_jaxlib_version}',
         (
