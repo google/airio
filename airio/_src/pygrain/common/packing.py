@@ -712,6 +712,165 @@ class NoamPacker:
   # pytype:enable=attribute-error
 
 
+class SliceAndQueuePacker:
+  """An implementation of the Slice and Queue Packing algorithm.
+
+  This can be used to pack a fixed pool of examples (LazyMapDataset impl) or an
+  iterative stream of examples (LazyIterDataset impl). A typical workflow would
+  be:
+    ```
+    packer = SliceAndQueuePacker(feature_lengths)
+    for example in dataset:
+      packed_examples = packer.fit_example(example)
+      if packed_examples:
+        for packed in packed_examples:
+          yield packed
+    while packer.has_partially_packed_examples():
+      yield packer.get_packed_example()
+    ```
+
+  Slice and queue packing appends sequences from consecutive examples until they
+  exceed desired packing lengths, then slices them, producing packed examples
+  with zero padding.  The remainder of a packed example is added to a queue.
+  Once the size of the queue exceeds a set limit (`max_sliced_examples`),
+  slices are popped from the queue (FIFO order) and placed in the current
+  partially packed example. Slices could be sliced again to fit the partially
+  packed example; these slices are added to the queue as usual. There may not be
+  enough examples to fill the desired packed length at the end of a pool /
+  stream of examples, so there may be occasional examples with padding.
+
+  This is a variant of concat-then-split packing (aka Noam-packing) with the key
+  difference that slices are queued and appended to future packed examples
+  instead of the immediate next packed example. This distributes segments of
+  examples farther apart in the packed dataset, improving any susequent
+  shuffling that is applied. The distance between slices of an example is
+  limited by `max_sliced_examples`. Increasing `max_sliced_examples` improves
+  shuffling out of the box, but requires checkpointing a larger queue of slices.
+
+  A few things to keep in mind:
+    + Slice and queue packing should be used when examples have a single feature
+    or multiple correlated features (e.g. token ids, token weights). Otherwise,
+    sequences may get sliced to different lengths, causing misalignment.
+    + Slice and queue packing does not produce segment_ids and positions
+    features, thus treating the packed example as a single example without
+    boundaries. Support for marker features can be added.
+    + The append and slice approach leads to examples being possibly sliced and
+    distributed over multiple packed examples. Hence, shuffling the packed
+    dataset is highly recommended. However, the distribution of examples is
+    better shuffled out of the box compared to Noam-packing.
+    + When using this packer on a pool of examples (LazyMapDataset), it is
+    possible (although rare) that the packed dataset has more examples than the
+    unpacked dataset. In this case, packed examples may be capped because the
+    maximum possible size of a LazyMapDataset must be statically known.
+  """
+
+  def __init__(
+      self,
+      max_sliced_examples: int,
+      feature_lengths: PyTree[int],
+  ):
+    self._max_sliced_examples = max_sliced_examples
+    self._sliced_examples = collections.deque[PyTree[np.ndarray]]()
+    self._feature_lengths = feature_lengths
+    self._flat_feature_lengths = flatten(feature_lengths)
+    self._partially_packed_example = PartiallyPackedExample(
+        copy.copy(self._flat_feature_lengths)
+    )
+
+  def __repr__(self):
+    return (
+        f"SliceAndQueuePacker(max_sliced_examples={self._max_sliced_examples})"
+    )
+
+  @property
+  def feature_lengths(self) -> PyTree[int]:
+    """The maximum feature lengths to pack to."""
+    return self._feature_lengths
+
+  @property
+  def flat_feature_lengths(self):
+    return self._flat_feature_lengths
+
+  def fit_example(self, ex: PyTree[np.ndarray]) -> Sequence[PyTree[np.ndarray]]:
+    """Fit an example, return fully packed examples if any."""
+    if not self.feature_lengths:
+      raise ValueError("feature_lengths must be set before packing.")
+    assert not self._partially_packed_example.is_fully_packed()
+
+    packed_examples = []
+
+    flat_ex = flatten(ex)
+    self._partially_packed_example.add_example(flat_ex)
+    if self._partially_packed_example.is_fully_packed():
+      packed_examples.append(self._slice_and_queue_remainder())
+
+    # If size of queue exceeds set limit, then pop from queue and add to
+    # partially packed example. The sliced example could be so long that it
+    # fills the partially packed example and has a remainder, which is added to
+    # the end of the sliced queue. If so, the queue size remains unchanged,
+    # hence keep popping from the queue until its size is under the limit.
+    while len(self._sliced_examples) > self._max_sliced_examples:
+      sliced_ex = self._sliced_examples.popleft()
+      self._partially_packed_example.add_example(sliced_ex)
+      if self._partially_packed_example.is_fully_packed():
+        packed_examples.append(self._slice_and_queue_remainder())
+
+    return packed_examples
+
+  def has_partially_packed_examples(self) -> bool:
+    """Returns True if there are partially packed examples."""
+    return bool(
+        not self._partially_packed_example.is_empty() or self._sliced_examples
+    )
+
+  def get_packed_example(self) -> PyTree[np.ndarray]:
+    """Gets a packed example from the partially packed buffer, if present."""
+    if self._partially_packed_example.is_empty() and not self._sliced_examples:
+      raise ValueError("No packed examples available.")
+    while not self._partially_packed_example.is_fully_packed():
+      if not self._sliced_examples:
+        break
+      sliced_ex = self._sliced_examples.popleft()
+      self._partially_packed_example.add_example(sliced_ex)
+    return self._slice_and_queue_remainder()
+
+  def get_packed_feature_lengths(self) -> PyTree[int]:
+    if not self.feature_lengths:
+      raise ValueError("feature_lengths must be set before packing.")
+    return self.feature_lengths
+
+  # pytype:disable=attribute-error
+  def _slice_and_queue_remainder(self):
+    """Packs and slices at required lengths; adds remaining to sliced example queue; resets the partially packed example."""
+    # Pack.
+    packed = self._partially_packed_example.pack()
+    # Remove marker features.
+    packed = remove_packed_marker_features_flattened(
+        packed, self.flat_feature_lengths
+    )
+    # Trim to required lengths.
+    trimmed = trim_flattened(
+        copy.copy(packed), self.flat_feature_lengths
+    )
+    # Get remainder after slicing.
+    remainder = remainder_after_trim_flattened(
+        copy.copy(packed), self.flat_feature_lengths
+    )
+    # Enqueue remainder if non-empty.
+    if not is_empty_flattened(remainder, self.flat_feature_lengths):
+      self._sliced_examples.append(remainder)
+    # Reset partially packed example.
+    self._partially_packed_example = PartiallyPackedExample(
+        copy.copy(self.flat_feature_lengths)
+    )
+    # Return packed example.
+    return unflatten_packed_example(
+        trimmed, length_struct=self.feature_lengths
+    )
+
+  # pytype:enable=attribute-error
+
+
 @dataclasses.dataclass
 class PartiallyPackedExample:
   """Container and utils for partially packed examples.

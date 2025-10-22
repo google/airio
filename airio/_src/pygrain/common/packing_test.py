@@ -20,6 +20,7 @@ import json
 from absl.testing import absltest
 from absl.testing import parameterized
 from airio._src.core import test_utils
+from airio._src.pygrain.common import constants
 from airio._src.pygrain.common import packing
 from airio._src.pygrain.common import preprocessors
 import grain.python as grain
@@ -2137,6 +2138,73 @@ class CommonPackersTest(absltest.TestCase):
       # Compare keys.
       self.assertSequenceEqual(sorted(actual), sorted(expected))
       for feature in ["inputs", "inputs_segment_ids", "inputs_positions"]:
+        np.testing.assert_array_equal(actual[feature], expected[feature])
+
+  def test_slice_and_queue_packer_compared_to_noam_packer(self):
+    input_elements = [
+        {"id": 0, "inputs": [0]},
+        {"id": 1, "inputs": [1, 2, 3, 4, 5]},
+        {"id": 2, "inputs": [5, 6, 7, 8, 9]},
+        {"id": 3, "inputs": [10]},
+        {"id": 4, "inputs": [11]},
+        {"id": 5, "inputs": [12, 13, 14, 15, 16, 17]},
+        {"id": 6, "inputs": [18, 19]},
+    ]
+    ds = grain.MapDataset.source(input_elements)
+    ds = ds.map(lambda d: {k: np.asarray(v) for k, v in d.items()})
+    ds = ds.to_iter_dataset()
+
+    feature_lengths = {"inputs": 2, "id": constants.SKIP_FEATURE}
+    noam_packed_ds = packing.PackLazyIterDataset(
+        ds, packer=packing.NoamPacker(feature_lengths=feature_lengths)
+    )
+    slice_and_queue_packed_ds = packing.PackLazyIterDataset(
+        ds,
+        packer=packing.SliceAndQueuePacker(
+            max_sliced_examples=50, feature_lengths=feature_lengths
+        ),
+    )
+    expected_noam_packed = [
+        {"id": [0, 1], "inputs": [0, 1]},
+        {"id": [1], "inputs": [2, 3]},
+        {"id": [1], "inputs": [4, 5]},
+        {"id": [2], "inputs": [5, 6]},
+        {"id": [2], "inputs": [7, 8]},
+        {"id": [2, 3], "inputs": [9, 10]},
+        {"id": [4, 5], "inputs": [11, 12]},
+        {"id": [5], "inputs": [13, 14]},
+        {"id": [5], "inputs": [15, 16]},
+        {"id": [5, 6], "inputs": [17, 18]},
+        {"id": [6], "inputs": [19]},
+    ]
+    expected_slice_and_queue_packed = [
+        {"id": [0, 1], "inputs": [0, 1]},
+        {"id": [2], "inputs": [5, 6]},
+        {"id": [3, 4], "inputs": [10, 11]},
+        {"id": [5], "inputs": [12, 13]},
+        {"id": [6], "inputs": [18, 19]},
+        {"id": [1], "inputs": [2, 3]},
+        {"id": [2], "inputs": [7, 8]},
+        {"id": [5], "inputs": [14, 15]},
+        {"id": [1], "inputs": [4, 5]},
+        {"id": [2, 5], "inputs": [9, 16]},
+        {"id": [5], "inputs": [17]},
+    ]
+    # Verify noam-packed dataset.
+    for actual, expected in zip(
+        noam_packed_ds, expected_noam_packed, strict=True
+    ):
+      # Compare keys.
+      self.assertSequenceEqual(sorted(actual), sorted(expected))
+      for feature in ["id", "inputs"]:
+        np.testing.assert_array_equal(actual[feature], expected[feature])
+    # Verify slice-and-queue-packed dataset.
+    for actual, expected in zip(
+        slice_and_queue_packed_ds, expected_slice_and_queue_packed, strict=True
+    ):
+      # Compare keys.
+      self.assertSequenceEqual(sorted(actual), sorted(expected))
+      for feature in ["id", "inputs"]:
         np.testing.assert_array_equal(actual[feature], expected[feature])
 
 
