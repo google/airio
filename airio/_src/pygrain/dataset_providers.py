@@ -644,9 +644,7 @@ def _iter_and_prefetch(
   if not isinstance(ds, grain.IterDataset):
     ds = ds.to_iter_dataset(_get_read_options(num_prefetch_threads))
   if num_workers and num_workers > 0:
-    ds = grain.experimental.MultiprocessPrefetchIterDataset(
-        ds, grain.MultiprocessingOptions(num_workers=num_workers)
-    )
+    ds = ds.mp_prefetch(grain.MultiprocessingOptions(num_workers=num_workers))
   return ds
 
 
