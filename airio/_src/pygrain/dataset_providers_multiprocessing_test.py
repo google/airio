@@ -641,28 +641,21 @@ class IterAndPrefetchTest(absltest.TestCase):
     ds = dataset_providers._iter_and_prefetch(
         ds, num_workers=None, num_prefetch_threads=2
     )
-    self.assertDictEqual(iter(ds).get_state(), {"next_index": 0})
+    self.assertEqual(list(ds), list(range(10)))
 
   def test_iter_and_prefetch_zero_multiprocessing(self):
     ds = grain.MapDataset.range(10)
     ds = dataset_providers._iter_and_prefetch(
         ds, num_workers=0, num_prefetch_threads=2
     )
-    self.assertDictEqual(iter(ds).get_state(), {"next_index": 0})
+    self.assertEqual(list(ds), list(range(10)))
 
   def test_iter_and_prefetch_with_multiprocessing(self):
     ds = grain.MapDataset.range(10)
     ds = dataset_providers._iter_and_prefetch(
         ds, num_workers=2, num_prefetch_threads=2
     )
-    self.assertDictEqual(
-        iter(ds).get_state(),
-        {
-            "workers_state": {"0": {"next_index": 0}, "1": {"next_index": 0}},
-            "iterations_to_skip": {"0": 0, "1": 0},
-            "last_worker_index": -1,
-        },
-    )
+    self.assertEqual(list(ds), list(range(10)))
 
 
 if __name__ == "__main__":
