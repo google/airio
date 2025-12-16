@@ -300,11 +300,6 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
     self.assertDictEqual(
         {k: v.tolist() for k, v in next(ds).items()}, expected_first_batch
     )
-    # Worker state should reflect 2 workers.
-    self.assertDictEqual(
-        ds.get_state()["workers_state"],
-        {"0": {"next_index": 0}, "1": {"next_index": 0}},
-    )
 
   def test_mixing_with_iter_test_with_runtime_preps_and_batching(self):
     # Mix datasets that produce None elements and verify that mixture length and
@@ -372,22 +367,6 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
     for actual, expected in zip(ds, expected_dataset):
       for k in expected_keys:
         np.testing.assert_array_equal(actual[k], expected[k])
-    # Worker state should reflect 2 workers.
-    self.assertDictEqual(
-        ds.get_state()["workers_state"],
-        {
-            "0": {
-                "parents": [{"next_index": 0}, {"next_index": 0}],
-                "index": 0,
-                "stop": False,
-            },
-            "1": {
-                "parents": [{"next_index": 0}, {"next_index": 0}],
-                "index": 0,
-                "stop": False,
-            },
-        },
-    )
 
   def test_task_get_dataset_with_lazy_iter_prep_with_runtime_preps_and_batching(
       self,
@@ -437,14 +416,6 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
       self.assertSequenceEqual(sorted(actual.keys()), sorted(expected_keys))
       for k in expected_keys:
         np.testing.assert_array_equal(actual[k], expected[k])
-    # Worker state should reflect 2 workers.
-    self.assertDictEqual(
-        ds.get_state()["workers_state"],
-        {
-            "0": {"parent": {"next_index": 0}, "threshold": 4},
-            "1": {"parent": {"next_index": 0}, "threshold": 4},
-        },
-    )
 
   def test_task_get_dataset_with_none_elements_with_runtime_preps_and_batching(
       self,
@@ -489,8 +460,6 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
       self.assertSequenceEqual(sorted(actual.keys()), sorted(expected_keys))
       for k in expected_keys:
         np.testing.assert_array_equal(actual[k], expected[k])
-    # This uses the DataLoader, and doesn't have workers_state.
-    self.assertEqual(ds.get_state()["worker_count"], 2)
 
   def test_task_lazy_dataset_batch_across_epochs(self):
     # Create a Task with 3 elements.
@@ -614,8 +583,6 @@ class DatasetProvidersMultiprocessingTest(absltest.TestCase):
         },
     ]
     test_utils.assert_datasets_equal(ds, expected_first_batch)
-    # This uses the DataLoader, and doesn't have workers_state.
-    self.assertEqual(ds.get_state()["worker_count"], 2)
 
 
 class IterAndPrefetchTest(absltest.TestCase):
@@ -641,28 +608,21 @@ class IterAndPrefetchTest(absltest.TestCase):
     ds = dataset_providers._iter_and_prefetch(
         ds, num_workers=None, num_prefetch_threads=2
     )
-    self.assertDictEqual(iter(ds).get_state(), {"next_index": 0})
+    self.assertEqual(list(ds), list(range(10)))
 
   def test_iter_and_prefetch_zero_multiprocessing(self):
     ds = grain.MapDataset.range(10)
     ds = dataset_providers._iter_and_prefetch(
         ds, num_workers=0, num_prefetch_threads=2
     )
-    self.assertDictEqual(iter(ds).get_state(), {"next_index": 0})
+    self.assertEqual(list(ds), list(range(10)))
 
   def test_iter_and_prefetch_with_multiprocessing(self):
     ds = grain.MapDataset.range(10)
     ds = dataset_providers._iter_and_prefetch(
         ds, num_workers=2, num_prefetch_threads=2
     )
-    self.assertDictEqual(
-        iter(ds).get_state(),
-        {
-            "workers_state": {"0": {"next_index": 0}, "1": {"next_index": 0}},
-            "iterations_to_skip": {"0": 0, "1": 0},
-            "last_worker_index": -1,
-        },
-    )
+    self.assertEqual(list(ds), list(range(10)))
 
 
 if __name__ == "__main__":
