@@ -1,4 +1,4 @@
-# Copyright 2025 The AirIO Authors.
+# Copyright 2026 The AirIO Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ class DataSource(Protocol):
 
   splits: Iterable[str] = None
 
-  def get_data_source(self, split: str) -> ...:
+  def get_data_source(self, split: str):
     ...
 
   def num_input_examples(self, split: str) -> int:
