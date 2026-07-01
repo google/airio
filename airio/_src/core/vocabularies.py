@@ -237,7 +237,7 @@ class SentencePieceVocabulary(Vocabulary[Encoded, Decoded], Protocol):
       return cls._ModelContext(tokenizer=tokenizer, sp_model=sp_model)
 
   @property
-  def pad_id(self) -> int | None:
+  def pad_id(self) -> int | None:  # pyrefly: ignore[bad-override]
     return PAD_ID
 
   @property
@@ -287,7 +287,7 @@ class SentencePieceVocabulary(Vocabulary[Encoded, Decoded], Protocol):
     if not isinstance(other, SentencePieceVocabulary):
       return False
     try:
-      their_md5 = hashlib.md5(other.sp_model).hexdigest()
+      their_md5 = hashlib.md5(other.sp_model).hexdigest()  # pyrefly: ignore[bad-argument-type]
     # If other has no sp_model attribute, we can't test for equality
     except AttributeError:
       return False
@@ -298,6 +298,7 @@ class SentencePieceVocabulary(Vocabulary[Encoded, Decoded], Protocol):
 
   def __str__(self) -> str:
     return (
+        # pyrefly: ignore[bad-argument-type]
         f"SentencePieceVocabulary(file={self.sentencepiece_model_file}, "
         f"extra_ids={self._extra_ids}, "
         f"spm_md5={hashlib.md5(self.sp_model).hexdigest()})"
@@ -344,7 +345,7 @@ class UnigramVocabulary(Vocabulary[Encoded, Decoded], Protocol):
     return None
 
   @property
-  def pad_id(self) -> int | None:
+  def pad_id(self) -> int | None:  # pyrefly: ignore[bad-override]
     return PAD_ID
 
   @property

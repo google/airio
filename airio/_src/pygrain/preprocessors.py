@@ -42,7 +42,7 @@ class MapFnTransform(
   def map(self, element):
     """Maps a single element."""
     return core_preprocessors.inject_runtime_args_to_fn(
-        self.map_fn, self.runtime_args
+        self.map_fn, self.runtime_args  # pyrefly: ignore[bad-argument-type]
     )(element)
 
 
@@ -57,7 +57,7 @@ class RandomMapFnTransform(
     """Maps a single element."""
     jax_rng = jax.random.key(rng.integers(0, 2**16 - 1))
     return core_preprocessors.inject_runtime_args_to_fn(
-        self.map_fn, self.runtime_args
+        self.map_fn, self.runtime_args  # pyrefly: ignore[bad-argument-type]
     )(element, jax_rng)
 
 
@@ -71,7 +71,7 @@ class FilterFnTransform(
   def filter(self, element) -> bool:
     """Filters a single element."""
     return core_preprocessors.inject_runtime_args_to_fn(
-        self.filter_fn, self.runtime_args
+        self.filter_fn, self.runtime_args  # pyrefly: ignore[bad-argument-type]
     )(element)
 
 

@@ -62,8 +62,8 @@ def get_t5_model(**config_overrides) -> models.EncoderDecoderModel:
   tiny_config = dataclasses.replace(tiny_config, **config_overrides)
   return models.EncoderDecoderModel(  # pytype: disable=wrong-arg-types
       module=network.Transformer(tiny_config),
-      input_vocabulary=_DEFAULT_VOCAB,
-      output_vocabulary=_DEFAULT_VOCAB,
+      input_vocabulary=_DEFAULT_VOCAB,  # pyrefly: ignore[bad-argument-type]
+      output_vocabulary=_DEFAULT_VOCAB,  # pyrefly: ignore[bad-argument-type]
       optimizer_def=adafactor.Adafactor(
           decay_rate=0.8,
           step_offset=0,

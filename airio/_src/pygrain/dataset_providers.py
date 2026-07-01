@@ -63,7 +63,7 @@ class GrainTask(core_dataset_providers.Task):
     # lazy_dataset.
     preps = self.get_preprocessors()
     if runtime_preprocessors:
-      preps.extend(runtime_preprocessors)
+      preps.extend(runtime_preprocessors)  # pyrefly: ignore[bad-argument-type]
     for preprocessor in preps:
       if not isinstance(preprocessor, grain.Transformation):
         return True
@@ -109,16 +109,16 @@ class GrainTask(core_dataset_providers.Task):
     # Step 3: Run preprocessors and shuffle each epoch (if needed)
     preps = self._preprocessors
     updated_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths=sequence_lengths,
+        sequence_lengths=sequence_lengths,  # pyrefly: ignore[bad-argument-type]
         split=split,
         batch_size=batch_size,
     )
     preprocessed_dss = []
     has_none_elems = False
-    next_epoch_rng = jax.random.key(seed)
+    next_epoch_rng = jax.random.key(seed)  # pyrefly: ignore[bad-argument-type]
     for ds in dss:
       ds_runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-          sequence_lengths=sequence_lengths,
+          sequence_lengths=sequence_lengths,  # pyrefly: ignore[bad-argument-type]
           split=split,
           batch_size=batch_size,
       )
@@ -169,10 +169,10 @@ class GrainTask(core_dataset_providers.Task):
     return ds
 
   # TODO(sahildua): Add logging.
-  def get_dataset(
+  def get_dataset(  # pyrefly: ignore[bad-override]
       self,
       sequence_lengths: Mapping[str, int] | None = None,
-      split: str = tfds.Split.TRAIN,
+      split: str = tfds.Split.TRAIN,  # pyrefly: ignore[missing-attribute]
       runtime_preprocessors: (
           Sequence[preprocessors_lib.PyGrainAirIOPreprocessor] | None
       ) = None,
@@ -215,7 +215,7 @@ class GrainTask(core_dataset_providers.Task):
       )
 
     sampler = grain.IndexSampler(
-        num_records=self.num_input_examples(split=split),
+        num_records=self.num_input_examples(split=split),  # pyrefly: ignore[bad-argument-type]
         shard_options=shard_options,
         shuffle=shuffle,
         num_epochs=num_epochs,
@@ -226,13 +226,13 @@ class GrainTask(core_dataset_providers.Task):
 
     ops = self.get_preprocessors()
     if runtime_preprocessors:
-      ops.extend(runtime_preprocessors)
+      ops.extend(runtime_preprocessors)  # pyrefly: ignore[bad-argument-type]
     if batch_size:
       ops.append(grain.Batch(batch_size=batch_size, drop_remainder=False))
 
     # Add runtime args
     runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths=sequence_lengths,
+        sequence_lengths=sequence_lengths,  # pyrefly: ignore[bad-argument-type]
         split=split,
         batch_size=batch_size,
     )
@@ -291,7 +291,7 @@ class GrainTask(core_dataset_providers.Task):
       self,
       num_records: int = DEFAULT_NUM_RECORDS_TO_INSPECT,
       sequence_lengths: Mapping[str, int] | None = None,
-      split: str = tfds.Split.TRAIN,
+      split: str = tfds.Split.TRAIN,  # pyrefly: ignore[missing-attribute]
       runtime_preprocessors: (
           Sequence[preprocessors_lib.PyGrainAirIOPreprocessor] | None
       ) = None,
@@ -341,7 +341,7 @@ class GrainTask(core_dataset_providers.Task):
 
     all_ops = self.get_preprocessors()
     if runtime_preprocessors:
-      all_ops.extend(runtime_preprocessors)
+      all_ops.extend(runtime_preprocessors)  # pyrefly: ignore[bad-argument-type]
     if batch_size:
       all_ops.append(grain.Batch(batch_size=batch_size, drop_remainder=False))
 
@@ -354,7 +354,7 @@ class GrainTask(core_dataset_providers.Task):
 
     # Apply all transformations, one by one.
     runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths=sequence_lengths,
+        sequence_lengths=sequence_lengths,  # pyrefly: ignore[bad-argument-type]
         split=split,
         batch_size=batch_size,
     )
@@ -380,7 +380,7 @@ class GrainTask(core_dataset_providers.Task):
     """Returns updated runtime args based on preprocessors and feature converter."""
     preps = self._preprocessors
     if runtime_preprocessors:
-      preps.extend(runtime_preprocessors)
+      preps.extend(runtime_preprocessors)  # pyrefly: ignore[bad-argument-type]
     for prep in preps:
       transform = preprocessors_lib.LazyDatasetTransform(prep)
       runtime_args = transform.get_updated_runtime_args(runtime_args)
@@ -420,7 +420,7 @@ class GrainMixture(core_dataset_providers.Mixture):
   def get_lazy_dataset(
       self,
       sequence_lengths: Mapping[str, int] | None = None,
-      split: str = tfds.Split.TRAIN,
+      split: str = tfds.Split.TRAIN,  # pyrefly: ignore[missing-attribute]
       runtime_preprocessors: (
           Sequence[preprocessors_lib.PyGrainAirIOPreprocessor] | None
       ) = None,
@@ -495,7 +495,7 @@ class GrainMixture(core_dataset_providers.Mixture):
     # args must match, or mixing won't work (compute all updated runtime args
     # and add a check here in the future if helpful).
     runtime_args = core_preprocessors_lib.AirIOInjectedRuntimeArgs(
-        sequence_lengths=sequence_lengths,
+        sequence_lengths=sequence_lengths,  # pyrefly: ignore[bad-argument-type]
         split=split,
         batch_size=batch_size,
     )
@@ -503,7 +503,7 @@ class GrainMixture(core_dataset_providers.Mixture):
       runtime_args = self.leaf_tasks[0].get_updated_runtime_args(
           runtime_args, runtime_preprocessors=None
       )
-    base_rng = jax.random.key(seed)
+    base_rng = jax.random.key(seed)  # pyrefly: ignore[bad-argument-type]
     post_mix_rng, _ = jax.random.split(base_rng)
     ds, _, _ = _apply_preprocessors_to_lazy_dataset(
         ds,
@@ -519,10 +519,10 @@ class GrainMixture(core_dataset_providers.Mixture):
       ds = ds.repeat(num_epochs=None)  # pytype: disable=attribute-error
     return ds
 
-  def get_dataset(
+  def get_dataset(  # pyrefly: ignore[bad-override]
       self,
       sequence_lengths: Mapping[str, int] | None = None,
-      split: str = tfds.Split.TRAIN,
+      split: str = tfds.Split.TRAIN,  # pyrefly: ignore[missing-attribute]
       runtime_preprocessors: (
           Sequence[preprocessors_lib.PyGrainAirIOPreprocessor] | None
       ) = None,
@@ -581,7 +581,7 @@ class GrainTaskBuilder(core_dataset_providers.TaskBuilder):
     )
 
   @classmethod
-  def from_task(cls, task: GrainTask) -> "GrainTaskBuilder":
+  def from_task(cls, task: GrainTask) -> "GrainTaskBuilder":  # pyrefly: ignore[bad-override]
     """Returns TaskBuilder for the given existing Task object.
 
     This method takes an existing task, copies its properties into a new

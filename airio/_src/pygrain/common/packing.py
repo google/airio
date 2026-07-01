@@ -221,7 +221,7 @@ class PackLazyMapDataset(grain.MapDataset[T]):
   def __len__(self):
     return len(self.parent)
 
-  def __getitem__(self, index: slice):
+  def __getitem__(self, index: slice):  # pyrefly: ignore[bad-override]
     if isinstance(index, slice):
       return self.slice(index)
     return self._packed_ds[index]
@@ -350,7 +350,7 @@ class _PackLazyDatasetIterator(grain.DatasetIterator):
 
   def set_state(self, state):
     self._parent_iter.set_state(state["parent"])
-    self._packer = self._packer_type.from_dict(state["packer"])
+    self._packer = self._packer_type.from_dict(state["packer"])  # pyrefly: ignore[bad-argument-type]
     self._packed_examples = collections.deque[PyTree[np.ndarray]](
         [load_np_tree(t) for t in state["packed_examples"]]
     )
@@ -514,7 +514,7 @@ class MultiBinPacker:
     # Add if example fits an existing partially packed example; check if
     # resulting partially packed example becomes fully packed
     fits = False
-    fully_packed: PartiallyPackedExample = None
+    fully_packed: PartiallyPackedExample = None  # pyrefly: ignore[bad-assignment]
     fully_packed_idx = None
     for idx, partially_packed in enumerate(self._partially_packed_examples):
       if partially_packed.example_fits(flat_ex):
@@ -532,7 +532,7 @@ class MultiBinPacker:
           fully_packed.pack(),
           length_struct=self.feature_lengths,
       )
-      del self._partially_packed_examples[fully_packed_idx]
+      del self._partially_packed_examples[fully_packed_idx]  # pyrefly: ignore[unsupported-operation]
       # self._partially_packed_examples.remove(fully_packed)
       packed_examples.append(packed)
 
@@ -615,7 +615,7 @@ class NoamPacker:
   ):
     self._feature_lengths = feature_lengths
     self._flat_feature_lengths = flatten(feature_lengths)
-    self._partially_packed_example: PartiallyPackedExample = None
+    self._partially_packed_example: PartiallyPackedExample = None  # pyrefly: ignore[bad-assignment]
     if feature_lengths:
       self._partially_packed_example = PartiallyPackedExample(
           copy.copy(self._flat_feature_lengths)

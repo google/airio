@@ -39,7 +39,7 @@ class ArrayRecordDataSource(data_sources.DataSource):
 
     self.splits = frozenset(self._split_to_filepattern.keys())
     self._sources = {
-        split: grain.ArrayRecordDataSource(self._split_to_filepattern[split])
+        split: grain.ArrayRecordDataSource(self._split_to_filepattern[split])  # pyrefly: ignore[bad-argument-type]
         for split in self.splits
     }
 
@@ -119,7 +119,7 @@ class JsonDataSource(data_sources.DataSource):
     self.splits = frozenset(self._split_to_filepattern.keys())
     self._sources = {}
     for split in self.splits:
-      json_data = json.load(Open(self._split_to_filepattern[split]))
+      json_data = json.load(Open(self._split_to_filepattern[split]))  # pyrefly: ignore[bad-argument-type]
       json_data = [json.dumps(d) for d in json_data]
       self._sources[split] = grain.InMemoryDataSource(elements=json_data)
 
