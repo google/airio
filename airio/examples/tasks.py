@@ -54,16 +54,16 @@ def get_wmt_19_ende_v003_task(
       ),
       preprocessors=[
           airio.MapFnTransform(
-              functools.partial(
+              functools.partial(  # pyrefly: ignore[bad-argument-count]
                   translate,
                   source_language=builder_config.language_pair[1],
                   target_language=builder_config.language_pair[0],
               )
           ),
           airio.MapFnTransform(
-              airio.Tokenizer(
-                  tokenizer_configs=tokenizer_configs,
-                  copy_pretokenized=False,
+              airio.Tokenizer(  # pyrefly: ignore[bad-argument-count]
+                  tokenizer_configs=tokenizer_configs,  # pyrefly: ignore[unexpected-keyword]
+                  copy_pretokenized=False,  # pyrefly: ignore[unexpected-keyword]
               )
           ),
       ],
@@ -92,11 +92,11 @@ def get_nqo_v001_task(
           tfds_name=tfds_name, splits=["train", "validation"]
       ),
       preprocessors=[
-          airio.MapFnTransform(question),
+          airio.MapFnTransform(question),  # pyrefly: ignore[bad-argument-count]
           airio.MapFnTransform(
-              airio.Tokenizer(
-                  tokenizer_configs=tokenizer_configs,
-                  copy_pretokenized=False,
+              airio.Tokenizer(  # pyrefly: ignore[bad-argument-count]
+                  tokenizer_configs=tokenizer_configs,  # pyrefly: ignore[unexpected-keyword]
+                  copy_pretokenized=False,  # pyrefly: ignore[unexpected-keyword]
               )
           ),
       ],
@@ -140,12 +140,14 @@ def translate(
   }
   if isinstance(ex[source_language], bytes):
     src_str = (
+        # pyrefly: ignore[unsupported-operation]
         f"translate {lang_id_to_string[source_language]} to"
         f" {lang_id_to_string[target_language]}: ".encode()
         + ex[source_language]
     )
   else:
     src_str = (
+        # pyrefly: ignore[unsupported-operation]
         f"translate {lang_id_to_string[source_language]} to"
         f" {lang_id_to_string[target_language]}: "
         + ex[source_language]
@@ -214,16 +216,16 @@ def get_c4_v220_span_corruption_task(
       source=airio.TfdsDataSource(
           tfds_name="c4/en:2.2.0", splits=["train", "validation"]
       ),
-      preprocessors=[
-          airio.MapFnTransform(rekey_fn),
+      preprocessors=[  # pyrefly: ignore[bad-argument-type]
+          airio.MapFnTransform(rekey_fn),  # pyrefly: ignore[bad-argument-count]
           airio.MapFnTransform(
-              airio.Tokenizer(
-                  tokenizer_configs=tokenizer_configs,
+              airio.Tokenizer(  # pyrefly: ignore[bad-argument-count]
+                  tokenizer_configs=tokenizer_configs,  # pyrefly: ignore[unexpected-keyword]
               )
           ),
           airio_common.span_corruption.create_span_corruption_transform(
               tokenizer_configs
           ),
-          airio.MapFnTransform(append_eos_after_trim_fn),
+          airio.MapFnTransform(append_eos_after_trim_fn),  # pyrefly: ignore[bad-argument-count]
       ],
   )

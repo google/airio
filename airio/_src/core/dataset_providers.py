@@ -43,12 +43,12 @@ class ShardInfo:
 class DatasetProviderBase(Protocol):
   """Abstract base for classes that provide a dataset."""
 
-  splits: Iterable[str] = None
+  splits: Iterable[str] = None  # pyrefly: ignore[bad-assignment]
 
   def get_dataset(
       self,
       sequence_lengths: Mapping[str, int] | None = None,
-      split: str = tfds.Split.TRAIN,
+      split: str = tfds.Split.TRAIN,  # pyrefly: ignore[missing-attribute]
       runtime_preprocessors: Sequence[grain.Transformation] | None = None,
       batch_size: int | None = None,
       shuffle: bool = True,
@@ -114,7 +114,7 @@ class Mixture(DatasetProviderBase, Protocol):
     all_tasks = [t for t in tasks if isinstance(t, Task)]
     all_mixtures = [m for m in tasks if isinstance(m, Mixture)]
     sub_tasks = [mix.leaf_tasks for mix in all_mixtures]
-    leaf_tasks = sum(sub_tasks, all_tasks)
+    leaf_tasks = sum(sub_tasks, all_tasks)  # pyrefly: ignore[no-matching-overload]
     duplicate_tasks = [
         t for t, c in collections.Counter(leaf_tasks).items() if c > 1
     ]
@@ -128,7 +128,7 @@ class Mixture(DatasetProviderBase, Protocol):
     self._proportions = dict(zip(tasks, proportions))
 
   def num_input_examples(self, split: str) -> int | None:
-    return sum(
+    return sum(  # pyrefly: ignore[no-matching-overload]
         t.num_input_examples(split)
         for t in self.tasks_or_mixtures
         if split in t.splits
@@ -164,14 +164,14 @@ class Mixture(DatasetProviderBase, Protocol):
     tasks = [t for t in all_ if isinstance(t, Task)]
     mixtures = [m for m in all_ if isinstance(m, Mixture)]
     sub_tasks = [mix.leaf_tasks for mix in mixtures]
-    return sum(sub_tasks, tasks)
+    return sum(sub_tasks, tasks)  # pyrefly: ignore[no-matching-overload]
 
   @property
   def total_proportion(self) -> float:
     return sum(self._proportions.values())
 
   @property
-  def splits(self) -> Sequence[str]:
+  def splits(self) -> Sequence[str]:  # pyrefly: ignore[bad-override]
     splits = set()
     for task in self.tasks_or_mixtures:
       splits.update(task.splits)
@@ -218,7 +218,7 @@ class TaskBuilder(Protocol):
     if self._preprocessors is None:
       raise ValueError("Preprocessors have not been set on this task builder.")
 
-    return Task(
+    return Task(  # pyrefly: ignore[bad-instantiation]
         name=self._task_name,
         source=self._source,
         preprocessors=self._preprocessors,
@@ -248,7 +248,7 @@ class TaskBuilder(Protocol):
     Args:
       task: Existing task object.
     """
-    return TaskBuilder(
+    return TaskBuilder(  # pyrefly: ignore[bad-instantiation]
         task_name=task.name,
         source=task.source,
         preprocessors=task.get_preprocessors(),

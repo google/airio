@@ -101,22 +101,22 @@ def get_t5x_enc_dec_feature_converter_preprocessors(
     )
     pack_prep.append(
         preprocessors.LazyIterTransform(
-            packer, update_runtime_args=packer.update_runtime_args
+            packer, update_runtime_args=packer.update_runtime_args  # pyrefly: ignore[bad-argument-type]
         )
     )
   return (
       [
           preprocessors.MapFnTransform(
-              common_preprocessors.remove_features_not_in_sequence_lengths
+              common_preprocessors.remove_features_not_in_sequence_lengths  # pyrefly: ignore[bad-argument-count]
           ),
-          preprocessors.MapFnTransform(common_preprocessors.trim),
+          preprocessors.MapFnTransform(common_preprocessors.trim),  # pyrefly: ignore[bad-argument-count]
       ]
       + pack_prep
       + [
-          preprocessors.MapFnTransform(pad),
+          preprocessors.MapFnTransform(pad),  # pyrefly: ignore[bad-argument-count]
           preprocessors.MapFnTransform(
-              convert_features,
-              update_runtime_args=update_runtime_args,
+              convert_features,  # pyrefly: ignore[bad-argument-count]
+              update_runtime_args=update_runtime_args,  # pyrefly: ignore[unexpected-keyword]
           ),
       ]
   )
@@ -167,22 +167,22 @@ def get_t5x_lm_feature_converter_preprocessors(
     )
     packer_prep.append(
         preprocessors.LazyIterTransform(
-            packer, update_runtime_args=packer.update_runtime_args
+            packer, update_runtime_args=packer.update_runtime_args  # pyrefly: ignore[bad-argument-type]
         )
     )
   return (
       [
           preprocessors.MapFnTransform(
-              common_preprocessors.remove_features_not_in_sequence_lengths
+              common_preprocessors.remove_features_not_in_sequence_lengths  # pyrefly: ignore[bad-argument-count]
           ),
-          preprocessors.MapFnTransform(common_preprocessors.trim),
+          preprocessors.MapFnTransform(common_preprocessors.trim),  # pyrefly: ignore[bad-argument-count]
       ]
       + packer_prep
       + [
-          preprocessors.MapFnTransform(pad),
+          preprocessors.MapFnTransform(pad),  # pyrefly: ignore[bad-argument-count]
           preprocessors.MapFnTransform(
-              convert_features,
-              update_runtime_args=update_runtime_args,
+              convert_features,  # pyrefly: ignore[bad-argument-count]
+              update_runtime_args=update_runtime_args,  # pyrefly: ignore[unexpected-keyword]
           ),
       ]
   )
@@ -258,9 +258,9 @@ def get_t5x_prefix_lm_feature_converter_preprocessors(
 
   preps = [
       preprocessors.MapFnTransform(
-          concat_and_add_masks, update_runtime_args=concat_task_feature_lengths
+          concat_and_add_masks, update_runtime_args=concat_task_feature_lengths  # pyrefly: ignore[bad-argument-count, unexpected-keyword]
       ),
-      preprocessors.MapFnTransform(replace_0s),
+      preprocessors.MapFnTransform(replace_0s),  # pyrefly: ignore[bad-argument-count]
   ]
   if pack:
     packer = (
@@ -269,15 +269,15 @@ def get_t5x_prefix_lm_feature_converter_preprocessors(
         else packing.SingleBinTruePackIterPreprocessor
     )
     packer_prep = preprocessors.LazyIterTransform(
-        packer, update_runtime_args=packer.update_runtime_args
+        packer, update_runtime_args=packer.update_runtime_args  # pyrefly: ignore[bad-argument-type]
     )
-    preps.append(packer_prep)
+    preps.append(packer_prep)  # pyrefly: ignore[bad-argument-type]
   preps.extend([
-      preprocessors.MapFnTransform(common_preprocessors.trim),
-      preprocessors.MapFnTransform(pad),
-      preprocessors.MapFnTransform(restore_0s),
+      preprocessors.MapFnTransform(common_preprocessors.trim),  # pyrefly: ignore[bad-argument-count]
+      preprocessors.MapFnTransform(pad),  # pyrefly: ignore[bad-argument-count]
+      preprocessors.MapFnTransform(restore_0s),  # pyrefly: ignore[bad-argument-count]
       preprocessors.MapFnTransform(
-          convert_features, update_runtime_args=update_runtime_args
+          convert_features, update_runtime_args=update_runtime_args  # pyrefly: ignore[bad-argument-count, unexpected-keyword]
       ),
   ])
   return preps

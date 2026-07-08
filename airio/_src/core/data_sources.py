@@ -22,7 +22,7 @@ from typing import Iterable, Protocol
 class DataSource(Protocol):
   """Interface for data sources wrappers with multiple splits support."""
 
-  splits: Iterable[str] = None
+  splits: Iterable[str] = None  # pyrefly: ignore[bad-assignment]
 
   def get_data_source(self, split: str):
     ...

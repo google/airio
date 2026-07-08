@@ -24,7 +24,7 @@ from clu.data import dataset_iterator as clu_dataset_iterator
 class AirIODatasetIterator(clu_dataset_iterator.DatasetIterator):
   """Wrapper iterator for AirIO."""
 
-  _iterator: collections.abc.Iterator[Any] = None
+  _iterator: collections.abc.Iterator[Any] = None  # pyrefly: ignore[bad-assignment]
 
   def __next__(self) -> clu_dataset_iterator.Element:
     raise NotImplementedError()

@@ -38,7 +38,7 @@ class TokenizerConfig:
 
 @typing.runtime_checkable
 @dataclasses.dataclass(frozen=True)
-class Tokenizer(Generic[Inp, Out], Protocol):
+class Tokenizer(Generic[Inp, Out], Protocol):  # pyrefly: ignore[bad-class-definition]
   """Tokenizer class for AirIO tasks/mixtures."""
 
   tokenizer_configs: Mapping[str, TokenizerConfig]

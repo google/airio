@@ -44,7 +44,7 @@ class Tokenizer(tokenizer.Tokenizer[Inp, Out]):
         pad_width = [(0, 1)]
         # Tokenized rank is generally 1; adjust pad_width in case it's more
         pad_width += [(0, 0)] * (len(encoded_val.shape) - 1)
-        encoded_val = np.pad(
+        encoded_val = np.pad(  # pyrefly: ignore[no-matching-overload]
             encoded_val,
             pad_width,
             constant_values=tokenizer_config.vocab.eos_id,

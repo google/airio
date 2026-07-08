@@ -47,10 +47,10 @@ def create_task() -> airio.GrainTask:
           tfds_name="imdb_reviews/plain_text:1.0.0", splits=["train"]
       ),
       preprocessors=[
-          airio.MapFnTransform(_imdb_preprocessor),
+          airio.MapFnTransform(_imdb_preprocessor),  # pyrefly: ignore[bad-argument-count]
           airio.MapFnTransform(
-              airio.Tokenizer(
-                  tokenizer_configs={
+              airio.Tokenizer(  # pyrefly: ignore[bad-argument-count]
+                  tokenizer_configs={  # pyrefly: ignore[unexpected-keyword]
                       "inputs": airio.TokenizerConfig(vocab=DEFAULT_VOCAB),
                       "targets": airio.TokenizerConfig(vocab=DEFAULT_VOCAB),
                   },

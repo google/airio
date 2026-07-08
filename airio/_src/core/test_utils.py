@@ -35,7 +35,7 @@ def assert_datasets_equal(
   """
 
   if not isinstance(expected, list):
-    expected = [expected]
+    expected = [expected]  # pyrefly: ignore[bad-assignment]
   actual = list(dataset)
   absltest.TestCase().assertEqual(len(actual), len(expected))
 
@@ -79,4 +79,4 @@ def create_airio_injected_runtime_args(
       "batch_size": batch_size,
   }
   args = {k: provided[k] if provided[k] else defaults[k] for k in defaults}
-  return preprocessors.AirIOInjectedRuntimeArgs(**args)
+  return preprocessors.AirIOInjectedRuntimeArgs(**args)  # pyrefly: ignore[bad-argument-type]

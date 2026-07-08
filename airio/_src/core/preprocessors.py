@@ -60,7 +60,7 @@ UpdateRuntimeArgsCallable = Callable[
 
 @dataclasses.dataclass
 @typing.runtime_checkable
-class MapFnTransform(Protocol):
+class MapFnTransform(Protocol):  # pyrefly: ignore[bad-class-definition]
   """Transform to represent AirIO map preprocessors.
 
   Attrs:
@@ -84,7 +84,7 @@ class MapFnTransform(Protocol):
 
 @dataclasses.dataclass
 @typing.runtime_checkable
-class RandomMapFnTransform(Protocol):
+class RandomMapFnTransform(Protocol):  # pyrefly: ignore[bad-class-definition]
   """Transform to represent AirIO random map preprocessors.
 
   Attrs:
@@ -108,7 +108,7 @@ class RandomMapFnTransform(Protocol):
 
 @dataclasses.dataclass
 @typing.runtime_checkable
-class FilterFnTransform(Protocol):
+class FilterFnTransform(Protocol):  # pyrefly: ignore[bad-class-definition]
   """Transform to represent AirIO filter preprocessors.
 
   Attrs:

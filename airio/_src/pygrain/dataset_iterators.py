@@ -98,13 +98,13 @@ class PyGrainDatasetIteratorWrapper(dataset_iterators.AirIODatasetIterator):
 
   def get_state(self) -> Mapping[str, Any]:
     if self._state_as_dict:
-      return self._iterator.get_state()
-    return json.loads(self._iterator.get_state().decode())
+      return self._iterator.get_state()  # pyrefly: ignore[missing-attribute]
+    return json.loads(self._iterator.get_state().decode())  # pyrefly: ignore[missing-attribute]
 
   def set_state(self, state: Mapping[str, Any]) -> None:
     if not self._state_as_dict:
-      state = json.dumps(state, indent=4).encode()
-    self._iterator.set_state(state)
+      state = json.dumps(state, indent=4).encode()  # pyrefly: ignore[bad-assignment]
+    self._iterator.set_state(state)  # pyrefly: ignore[missing-attribute]
 
   def save(self, filename: epath.PathLike):
     filename = epath.Path(filename)
