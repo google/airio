@@ -60,7 +60,7 @@ def get_t5_model(**config_overrides) -> models.EncoderDecoderModel:
       logits_via_embedding=False,
   )
   tiny_config = dataclasses.replace(tiny_config, **config_overrides)
-  return models.EncoderDecoderModel(  # pytype: disable=wrong-arg-types
+  return models.EncoderDecoderModel(
       module=network.Transformer(tiny_config),
       input_vocabulary=_DEFAULT_VOCAB,  # pyrefly: ignore[bad-argument-type]
       output_vocabulary=_DEFAULT_VOCAB,  # pyrefly: ignore[bad-argument-type]

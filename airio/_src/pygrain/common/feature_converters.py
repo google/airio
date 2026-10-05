@@ -107,16 +107,16 @@ def get_t5x_enc_dec_feature_converter_preprocessors(
   return (
       [
           preprocessors.MapFnTransform(
-              common_preprocessors.remove_features_not_in_sequence_lengths  # pyrefly: ignore[bad-argument-count]
+              common_preprocessors.remove_features_not_in_sequence_lengths
           ),
-          preprocessors.MapFnTransform(common_preprocessors.trim),  # pyrefly: ignore[bad-argument-count]
+          preprocessors.MapFnTransform(common_preprocessors.trim),
       ]
       + pack_prep
       + [
-          preprocessors.MapFnTransform(pad),  # pyrefly: ignore[bad-argument-count]
+          preprocessors.MapFnTransform(pad),
           preprocessors.MapFnTransform(
-              convert_features,  # pyrefly: ignore[bad-argument-count]
-              update_runtime_args=update_runtime_args,  # pyrefly: ignore[unexpected-keyword]
+              convert_features,
+              update_runtime_args=update_runtime_args,
           ),
       ]
   )
@@ -173,16 +173,16 @@ def get_t5x_lm_feature_converter_preprocessors(
   return (
       [
           preprocessors.MapFnTransform(
-              common_preprocessors.remove_features_not_in_sequence_lengths  # pyrefly: ignore[bad-argument-count]
+              common_preprocessors.remove_features_not_in_sequence_lengths
           ),
-          preprocessors.MapFnTransform(common_preprocessors.trim),  # pyrefly: ignore[bad-argument-count]
+          preprocessors.MapFnTransform(common_preprocessors.trim),
       ]
       + packer_prep
       + [
-          preprocessors.MapFnTransform(pad),  # pyrefly: ignore[bad-argument-count]
+          preprocessors.MapFnTransform(pad),
           preprocessors.MapFnTransform(
-              convert_features,  # pyrefly: ignore[bad-argument-count]
-              update_runtime_args=update_runtime_args,  # pyrefly: ignore[unexpected-keyword]
+              convert_features,
+              update_runtime_args=update_runtime_args,
           ),
       ]
   )
@@ -258,9 +258,9 @@ def get_t5x_prefix_lm_feature_converter_preprocessors(
 
   preps = [
       preprocessors.MapFnTransform(
-          concat_and_add_masks, update_runtime_args=concat_task_feature_lengths  # pyrefly: ignore[bad-argument-count, unexpected-keyword]
+          concat_and_add_masks, update_runtime_args=concat_task_feature_lengths
       ),
-      preprocessors.MapFnTransform(replace_0s),  # pyrefly: ignore[bad-argument-count]
+      preprocessors.MapFnTransform(replace_0s),
   ]
   if pack:
     packer = (
@@ -273,11 +273,11 @@ def get_t5x_prefix_lm_feature_converter_preprocessors(
     )
     preps.append(packer_prep)  # pyrefly: ignore[bad-argument-type]
   preps.extend([
-      preprocessors.MapFnTransform(common_preprocessors.trim),  # pyrefly: ignore[bad-argument-count]
-      preprocessors.MapFnTransform(pad),  # pyrefly: ignore[bad-argument-count]
-      preprocessors.MapFnTransform(restore_0s),  # pyrefly: ignore[bad-argument-count]
+      preprocessors.MapFnTransform(common_preprocessors.trim),
+      preprocessors.MapFnTransform(pad),
+      preprocessors.MapFnTransform(restore_0s),
       preprocessors.MapFnTransform(
-          convert_features, update_runtime_args=update_runtime_args  # pyrefly: ignore[bad-argument-count, unexpected-keyword]
+          convert_features, update_runtime_args=update_runtime_args
       ),
   ])
   return preps

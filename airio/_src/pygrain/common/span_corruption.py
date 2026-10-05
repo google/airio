@@ -48,7 +48,7 @@ def _t5_single_example_select_random_chunk(
   return t5_preps.single_example_select_random_chunk(
       ex,
       seed,
-      output_features=tokenizer_configs,  # pytype: disable=wrong-arg-types
+      output_features=tokenizer_configs,  # pyrefly: ignore[bad-argument-type]
       max_length=max_length,
       feature_key=feature_key,
       passthrough_feature_keys=passthrough_feature_keys,
@@ -69,7 +69,7 @@ def _t5_single_example_denoise(
   return t5_preps.single_example_denoise(
       ex,
       seed,
-      output_features=tokenizer_configs,    # pytype: disable=wrong-arg-types
+      output_features=tokenizer_configs,
       inputs_fn=t5_preps.noise_span_to_unique_sentinel,
       targets_fn=t5_preps.nonnoise_span_to_unique_sentinel,
       noise_density=noise_density,

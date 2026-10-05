@@ -54,16 +54,16 @@ def get_wmt_19_ende_v003_task(
       ),
       preprocessors=[
           airio.MapFnTransform(
-              functools.partial(  # pyrefly: ignore[bad-argument-count]
+              functools.partial(
                   translate,
                   source_language=builder_config.language_pair[1],
                   target_language=builder_config.language_pair[0],
               )
           ),
           airio.MapFnTransform(
-              airio.Tokenizer(  # pyrefly: ignore[bad-argument-count]
-                  tokenizer_configs=tokenizer_configs,  # pyrefly: ignore[unexpected-keyword]
-                  copy_pretokenized=False,  # pyrefly: ignore[unexpected-keyword]
+              airio.Tokenizer(
+                  tokenizer_configs=tokenizer_configs,
+                  copy_pretokenized=False,
               )
           ),
       ],
@@ -92,11 +92,11 @@ def get_nqo_v001_task(
           tfds_name=tfds_name, splits=["train", "validation"]
       ),
       preprocessors=[
-          airio.MapFnTransform(question),  # pyrefly: ignore[bad-argument-count]
+          airio.MapFnTransform(question),
           airio.MapFnTransform(
-              airio.Tokenizer(  # pyrefly: ignore[bad-argument-count]
-                  tokenizer_configs=tokenizer_configs,  # pyrefly: ignore[unexpected-keyword]
-                  copy_pretokenized=False,  # pyrefly: ignore[unexpected-keyword]
+              airio.Tokenizer(
+                  tokenizer_configs=tokenizer_configs,
+                  copy_pretokenized=False,
               )
           ),
       ],
@@ -217,15 +217,15 @@ def get_c4_v220_span_corruption_task(
           tfds_name="c4/en:2.2.0", splits=["train", "validation"]
       ),
       preprocessors=[  # pyrefly: ignore[bad-argument-type]
-          airio.MapFnTransform(rekey_fn),  # pyrefly: ignore[bad-argument-count]
+          airio.MapFnTransform(rekey_fn),
           airio.MapFnTransform(
-              airio.Tokenizer(  # pyrefly: ignore[bad-argument-count]
-                  tokenizer_configs=tokenizer_configs,  # pyrefly: ignore[unexpected-keyword]
+              airio.Tokenizer(
+                  tokenizer_configs=tokenizer_configs,
               )
           ),
           airio_common.span_corruption.create_span_corruption_transform(
               tokenizer_configs
           ),
-          airio.MapFnTransform(append_eos_after_trim_fn),  # pyrefly: ignore[bad-argument-count]
+          airio.MapFnTransform(append_eos_after_trim_fn),
       ],
   )

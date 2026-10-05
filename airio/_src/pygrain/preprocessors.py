@@ -196,7 +196,6 @@ class LazyDatasetTransform:
   def get_updated_runtime_args(
       self, runtime_args: core_preprocessors.AirIOInjectedRuntimeArgs
   ) -> core_preprocessors.AirIOInjectedRuntimeArgs:
-    # pytype:disable=attribute-error
     if (
         hasattr(self.transform, "update_runtime_args")
         and self.transform.update_runtime_args
@@ -205,7 +204,6 @@ class LazyDatasetTransform:
     if isinstance(self.transform, LazyTransforms):
       return self.transform.update_runtime_args(runtime_args)
     return runtime_args
-    # pytype:enable=attribute-error
 
   @property
   def produces_none_elements(self) -> bool:
@@ -241,7 +239,6 @@ class LazyDatasetTransform:
       rng: JaxRng | None = None,
       runtime_args: core_preprocessors.AirIOInjectedRuntimeArgs | None = None,
   ):
-    # pytype: disable=attribute-error
     if isinstance(self.transform, FnTransforms):
       self.transform.runtime_args = runtime_args
     match self.transform:
@@ -259,7 +256,7 @@ class LazyDatasetTransform:
         if rng is None:
           rng = jax.random.key(np.int32(time.time()))
         map_fn = core_preprocessors.inject_runtime_args_to_fn(
-            self.transform.map_fn, runtime_args
+            self.transform.map_fn, runtime_args  # pyrefly: ignore[bad-argument-type]
         )
         return lazy_dataset_transforms.RandomMapFnLazyMapDataset(
             ds,
@@ -274,10 +271,9 @@ class LazyDatasetTransform:
             drop_remainder=self.transform.drop_remainder,
         )
       case LazyMapTransform():
-        return self.transform(ds, runtime_args, rng)
+        return self.transform(ds, runtime_args, rng)  # pyrefly: ignore[bad-argument-type]
       case LazyIterTransform():
-        return self.transform(ds, runtime_args, rng)
+        return self.transform(ds, runtime_args, rng)  # pyrefly: ignore[bad-argument-type]
       case _:
         # Should be taken care of by post init validation.
         raise ValueError("%s is not supported" % str(self.transform))
-    # pytype: enable=attribute-error

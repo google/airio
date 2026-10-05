@@ -50,8 +50,8 @@ class ConcatLazyMapDataset(grain.MapDataset[T]):
   def __getitem__(self, index):
     if isinstance(index, slice):
       return self.slice(index)
-    parent_index = bisect.bisect_right(self._accumulated_lens, index) - 1  # pytype: disable=wrong-arg-types
-    local_index = index - self._accumulated_lens[parent_index]  # pytype: disable=unsupported-operands
+    parent_index = bisect.bisect_right(self._accumulated_lens, index) - 1
+    local_index = index - self._accumulated_lens[parent_index]
     return self.parents[parent_index][local_index]
 
 

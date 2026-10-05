@@ -323,7 +323,6 @@ class _PackLazyDatasetIterator(grain.DatasetIterator):
     self._packer_type = type(packer)
     self._packed_examples = collections.deque[PyTree[np.ndarray]]()
 
-  # pytype:disable=attribute-error
   def __next__(self):
     if self._packed_examples:
       return self._packed_examples.popleft()
@@ -339,7 +338,6 @@ class _PackLazyDatasetIterator(grain.DatasetIterator):
       if self._packer.has_partially_packed_examples():
         return self._packer.get_packed_example()
       raise e
-  # pytype:enable=attribute-error
 
   def get_state(self):
     return {
@@ -350,7 +348,7 @@ class _PackLazyDatasetIterator(grain.DatasetIterator):
 
   def set_state(self, state):
     self._parent_iter.set_state(state["parent"])
-    self._packer = self._packer_type.from_dict(state["packer"])  # pyrefly: ignore[bad-argument-type]
+    self._packer = self._packer_type.from_dict(state["packer"])
     self._packed_examples = collections.deque[PyTree[np.ndarray]](
         [load_np_tree(t) for t in state["packed_examples"]]
     )
@@ -380,7 +378,7 @@ class PackLazyIterDataset(grain.IterDataset[T]):
   def __iter__(self) -> grain.DatasetIterator:
     return _PackLazyDatasetIterator(
         iter(self._parent), self._packer
-    )  # pytype: disable=wrong-arg-types
+    )
 
 
 class MultiBinPacker:
@@ -472,7 +470,7 @@ class MultiBinPacker:
   def get_packed_example(self):
     if not self._partially_packed_examples:
       raise ValueError("No packed examples available.")
-    return unflatten_packed_example(  # pytype: disable=wrong-arg-types
+    return unflatten_packed_example(
         self._partially_packed_examples.popleft().pack(),
         length_struct=self.feature_lengths,
     )
@@ -528,7 +526,7 @@ class MultiBinPacker:
     # Add to result if example fit and became fully packed
     if fully_packed:
       assert fits
-      packed = unflatten_packed_example(  # pytype: disable=wrong-arg-types
+      packed = unflatten_packed_example(
           fully_packed.pack(),
           length_struct=self.feature_lengths,
       )
@@ -653,7 +651,6 @@ class NoamPacker:
       )
     return obj
 
-  # pytype:disable=attribute-error
   def has_partially_packed_examples(self):
     return not self._partially_packed_example.is_empty()
 
@@ -709,7 +706,6 @@ class NoamPacker:
     if not is_empty_flattened(remainder, self.flat_feature_lengths):
       self._partially_packed_example.add_example(remainder)
     return unflatten_packed_example(trimmed, length_struct=self.feature_lengths)
-  # pytype:enable=attribute-error
 
 
 class SliceAndQueuePacker:
@@ -839,7 +835,6 @@ class SliceAndQueuePacker:
       raise ValueError("feature_lengths must be set before packing.")
     return self.feature_lengths
 
-  # pytype:disable=attribute-error
   def _slice_and_queue_remainder(self):
     """Packs and slices at required lengths; adds remaining to sliced example queue; resets the partially packed example."""
     # Pack.
@@ -868,7 +863,6 @@ class SliceAndQueuePacker:
         trimmed, length_struct=self.feature_lengths
     )
 
-  # pytype:enable=attribute-error
 
 
 @dataclasses.dataclass

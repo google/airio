@@ -201,7 +201,7 @@ class GrainTask(core_dataset_providers.Task):
           num_prefetch_threads=num_prefetch_threads,
       )
       if num_epochs is None:
-        ds = ds.repeat(num_epochs=None)  # pytype: disable=attribute-error
+        ds = ds.repeat(num_epochs=None)  # pyrefly: ignore[missing-attribute]
       ds = _iter_and_prefetch(
           ds, num_workers=num_workers, num_prefetch_threads=num_prefetch_threads
       )
@@ -516,7 +516,7 @@ class GrainMixture(core_dataset_providers.Mixture):
         name=self.name,
     )
     if num_epochs is None:
-      ds = ds.repeat(num_epochs=None)  # pytype: disable=attribute-error
+      ds = ds.repeat(num_epochs=None)
     return ds
 
   def get_dataset(  # pyrefly: ignore[bad-override]

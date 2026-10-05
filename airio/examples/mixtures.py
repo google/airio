@@ -76,10 +76,10 @@ def get_mc4_mixture(
             splits={"train": lang, "validation": f"{lang}-validation"},
         ),
         preprocessors=[  # pyrefly: ignore[bad-argument-type]
-            airio.MapFnTransform(rekey_fn),  # pyrefly: ignore[bad-argument-count]
+            airio.MapFnTransform(rekey_fn),
             airio.MapFnTransform(
-                airio.Tokenizer(  # pyrefly: ignore[bad-argument-count]
-                    tokenizer_configs=tokenizer_configs,  # pyrefly: ignore[unexpected-keyword]
+                airio.Tokenizer(
+                    tokenizer_configs=tokenizer_configs,
                 )
             ),
             airio_common.span_corruption.create_span_corruption_transform(
