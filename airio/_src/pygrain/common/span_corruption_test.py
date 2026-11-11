@@ -15,7 +15,6 @@
 """Tests for span_corruption preprocessor."""
 
 import functools
-import itertools
 import os
 from typing import Any, Callable
 
@@ -48,10 +47,13 @@ def _get_seeds(seed: int, num_seeds: int, ds_size: int):
   return [d[1][0] for d in zip_ds.as_numpy_iterator()]
 
 
-TEST_SEEDS = itertools.chain([
-    _get_seeds(94043, 1, 500),  # used by select random chunk.
-    _get_seeds(94047, 1, 500),  # used by denoise.
-])
+TEST_SEEDS = (
+    _get_seeds(seed, 1, 500)
+    for seed in (
+        94043,  # used by select random chunk.
+        94047,  # used by denoise.
+    )
+)
 
 
 class _MapWithPresetSeeds(grain.MapDataset):
